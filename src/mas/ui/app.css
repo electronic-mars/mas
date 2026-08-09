@@ -383,9 +383,16 @@ optgroup{background:var(--panel-hi);color:var(--tx-3);font-style:normal;font-siz
 :root[data-theme="light"] .btn.ghost.quit:hover{background:rgba(209,67,67,.1)}
 
 /* ---------- icon palette ---------- */
-.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;
-  justify-content:center;padding:18px;z-index:20}
-.sheet .box{width:100%;background:var(--panel-hi);border:1px solid var(--line-hi);
+/* The palette scrolls, and the box is centred with margin:auto rather than
+   align-items:center. With align-items the box is centred until it grows taller
+   than the window, and then its top is pushed out above the scrolling area,
+   where nothing can reach it: on a 1366x768 laptop at 125% the heading ended up
+   clipped under the title bar. margin:auto centres the same way and keeps both
+   ends reachable. */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;
+  justify-content:center;padding:18px;z-index:20;overflow-y:auto;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet .box{width:100%;margin:auto;background:var(--panel-hi);border:1px solid var(--line-hi);
   border-radius:15px;padding:14px;box-shadow:0 24px 50px -14px rgba(0,0,0,.7)}
 .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}
 .gi{aspect-ratio:1;border-radius:10px;background:var(--card);border:1px solid var(--line);

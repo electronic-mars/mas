@@ -332,5 +332,29 @@ check("playing, but the title is unknown — the device",
       tip_for(app="Opera", artist="", title="", playing=True),
       "Master Audio Switcher — Speakers (Realtek(R) Audio)")
 
+print("Window height on someone else's screen")
+
+from mas.core import screen  # noqa: E402
+
+
+def room_for(work_area_px: int, scale: float, desired: int = 772) -> int:
+    """fit_height over a made-up screen: a work area and a display scale."""
+    screen.work_area = lambda: type("R", (), {"top": 0, "bottom": work_area_px})
+    screen.dpi_scale = lambda: scale
+    return screen.fit_height(desired)
+
+
+# Our own machine: 1540 points of work area, everything fits — which is exactly
+# why this was never visible here.
+check("a tall screen keeps the full height", room_for(1540, 1.0), 772)
+# A 1366x768 laptop: about 728 points of work area. Before this, 44 points were
+# cut off at 100% and 237 at 125%, with no way to scroll or resize.
+check("1366x768 at 100% — the window shrinks", room_for(728, 1.0), 704)
+check("1080p at 150% — scale counts too", room_for(1032, 1.5), 664)
+check("a margin is left at the top and the bottom", room_for(700, 1.0), 700 - 24)
+check("an absurdly short screen still leaves a window", room_for(200, 1.0),
+      screen.MIN_HEIGHT)
+check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

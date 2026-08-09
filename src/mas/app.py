@@ -28,7 +28,7 @@ _log = log.get("app")
 
 MUTEX_NAME = "Global\\MasterAudioSwitcherSingleInstance"
 ERROR_ALREADY_EXISTS = 183
-FULL_SIZE = (440, 772)      # full window view in logical points
+FULL_SIZE = (440, 772)      # full window view in logical points, before fitting
 
 
 def already_running() -> bool:
@@ -186,6 +186,9 @@ class App:
         # Mini view is session state, not a setting: it is not written to config.
         self._mini = False
         self._mini_height = 250
+        # The full height the window is allowed on this screen. The real value
+        # is measured in run(), once the window module has set DPI awareness.
+        self._full_height = FULL_SIZE[1]
         # Whether the window is visible. A hidden window keeps drawing: the page
         # does not know about it (document.hidden stays false for a hidden
         # window), so the knowledge comes from Python on the next poll.
@@ -611,9 +614,9 @@ class App:
         if not hwnd:
             return False
         if height:
-            self._mini_height = max(120, min(int(height), 420))
+            self._mini_height = max(120, min(int(height), 420, self._full_height))
         self._mini = bool(on)
-        size = (FULL_SIZE[0], self._mini_height) if on else FULL_SIZE
+        size = (FULL_SIZE[0], self._mini_height if on else self._full_height)
         ok = screen.resize_at_tray(hwnd, *size)
         _log.info("mini view: %s, window %s×%s", on, *size)
         return ok
@@ -703,6 +706,14 @@ class App:
         # icon appears it is not needed at all.
         import webview
 
+        # Only now, after the window module has declared this process DPI aware,
+        # does the screen report its real size. A window taller than the screen
+        # cannot be scrolled or resized — it is simply cut off at the bottom.
+        self._full_height = screen.fit_height(FULL_SIZE[1])
+        if self._full_height != FULL_SIZE[1]:
+            _log.info("the screen is short: window height %s instead of %s",
+                      self._full_height, FULL_SIZE[1])
+
         url = self.bridge.start()
         self.meter.start()
         self.hotkeys.start()
@@ -727,7 +738,7 @@ class App:
         # the knob stop working. The drag zone is set in the markup by the
         # pywebview-drag-region class.
         self.window = webview.create_window(
-            "Master Audio Switcher", url, width=440, height=772,
+            "Master Audio Switcher", url, width=FULL_SIZE[0], height=self._full_height,
             resizable=False, frameless=True, easy_drag=False, hidden=True,
             background_color="#1C1F24",
         )

@@ -17,6 +17,9 @@ shell32 = ctypes.windll.shell32
 ABM_GETTASKBARPOS = 0x00000005
 SPI_GETWORKAREA = 0x0030
 EDGES = {0: "left", 1: "top", 2: "right", 3: "bottom"}
+# Below this the window stops being a window: the front panel alone is 250
+# points, and squeezing the device list to nothing defeats the whole program.
+MIN_HEIGHT = 420
 
 
 class _APPBARDATA(ctypes.Structure):
@@ -43,6 +46,30 @@ def work_area() -> wintypes.RECT:
     rc = wintypes.RECT()
     user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rc), 0)
     return rc
+
+
+def dpi_scale() -> float:
+    """Physical pixels per logical point, as a factor."""
+    get = getattr(user32, "GetDpiForSystem", None)     # Windows 10 1607 and up
+    return ((get() if get else 0) or 96) / 96
+
+
+def fit_height(desired: int, margin: int = 12) -> int:
+    """The tallest window that still fits the screen, in logical points.
+
+    Window sizes are given to pywebview in logical points and multiplied by the
+    display scale, while the work area comes back in physical pixels — so the
+    two have to be brought to the same units before they can be compared.
+
+    Measured on our own machine the work area is 1540 points, which is why the
+    full 772 always fitted and this was never visible here. On a 1366x768 laptop
+    the work area is about 728 points: 44 are cut off at 100% and 237 at 125%,
+    and there is nothing the user can do about it, because the window cannot be
+    resized. The content itself scrolls, so a shorter window loses nothing.
+    """
+    wa = work_area()
+    room = int((wa.bottom - wa.top) / dpi_scale()) - margin * 2
+    return max(MIN_HEIGHT, min(desired, room))
 
 
 def own_window(title: str) -> int | None:
