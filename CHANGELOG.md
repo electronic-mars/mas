@@ -3,11 +3,9 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.0
 
-The first public release is still being prepared.
-
-Done so far:
+The first public release.
 
 - switching audio by clicking the tray icon, cycling through the devices you
   marked;

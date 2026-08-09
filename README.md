@@ -1,6 +1,6 @@
 # Master Audio Switcher
 
-A tray utility for Windows 11 that switches audio between speakers and
+A tray utility for Windows that switches audio between speakers and
 headphones with one click on the tray icon.
 
 ![Devices](docs/screens/01-devices-dark.png)
@@ -29,6 +29,21 @@ explicit check for a newer release.
 | ![](docs/screens/04-mixer-dark.png) | ![](docs/screens/06-settings-dark.png) | ![](docs/screens/17-about-dark.png) |
 
 Light theme, the welcome screen and the rest are in [docs/screens](docs/screens).
+
+## Install
+
+Get the installer or the archive from
+[Releases](https://github.com/electronic-mars/mas/releases/latest). The installer
+is per user and needs no administrator rights.
+
+The program is not code-signed, so Windows SmartScreen will warn about it:
+**More info → Run anyway**. Every release carries `SHA256SUMS.txt`, and the
+binaries are built in public by
+[this workflow](https://github.com/electronic-mars/mas/actions) — you can check
+what went into them. If an antivirus objects, that is a false positive worth
+reporting to them; an unsigned program that synthesises keystrokes and reads HID
+looks alarming to a heuristic, and there is nothing to be done about that short
+of a paid certificate.
 
 ## Requirements
 

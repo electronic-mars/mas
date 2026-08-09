@@ -14,7 +14,6 @@ terms.
 | [comtypes](https://github.com/enthought/comtypes) 1.4.16 | MIT | talking to Windows COM interfaces |
 | [Pillow](https://python-pillow.org/) 12.3.0 | MIT-CMU | preparing raster icons |
 | [winrt-runtime](https://github.com/pywinrt/pywinrt) with `Windows.Media.Control` and `Windows.Foundation` 3.2.1 | MIT | player state through WinRT |
-| [psutil](https://github.com/giampaolo/psutil) 7.2.2 | BSD-3-Clause | program names in the mixer |
 | [bottle](https://bottlepy.org/) 0.13.4 | MIT | comes with pywebview, serves the page locally |
 | [pythonnet](https://pythonnet.github.io/), clr-loader, cffi, pycparser | MIT | pywebview dependencies |
 | [pywin32-ctypes](https://github.com/enthought/pywin32-ctypes) 0.2.3 | BSD-3-Clause | build dependency |

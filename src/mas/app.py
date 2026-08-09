@@ -18,7 +18,7 @@ from .core.dongle import Dongle
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
-from .core import language, runtime, screen
+from .core import language, runtime, screen, strings
 from .overlay import Overlay
 from .core.switcher import Switcher
 from .paths import is_frozen, log_path
@@ -26,7 +26,12 @@ from .tray import Tray
 
 _log = log.get("app")
 
-MUTEX_NAME = "Global\\MasterAudioSwitcherSingleInstance"
+# Local, not Global. A standard user is not allowed to create a Global mutex:
+# CreateMutexW then fails with "access denied" rather than "already exists", the
+# check below reads that as "nobody here", and a second copy starts as if the
+# first did not exist — silently, on exactly the machines a per-user installer
+# targets. Per session is also what we want: one tray icon per signed-in person.
+MUTEX_NAME = "Local\\MasterAudioSwitcherSingleInstance"
 ERROR_ALREADY_EXISTS = 183
 FULL_SIZE = (440, 772)      # full window view in logical points, before fitting
 
@@ -87,7 +92,10 @@ class Api:
         if key == "autostart" and not startup.set_enabled(bool(value)):
             return self.app.state()  # registry refused — don't lie about it
         self.app.cfg.set(key, value)
-        if key == "hotkey":
+        if key == "language":
+            strings.use(value)
+            self.app.refresh_tray()
+        elif key == "hotkey":
             self.app.hotkeys.bind("switch", value)
         elif key == "hotkey_play":
             self.app.hotkeys.bind("play", value)
@@ -176,12 +184,14 @@ class App:
                            on_default_changed=self._default_changed)
         if not self.cfg.get("language"):
             self.cfg.set("language", language.pick())
+        # The tray and the notifications speak the same language as the window.
+        strings.use(self.cfg.get("language"))
         self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead)
         self.players.set_priority(self.cfg.get("priority_player"))
         self.hotkeys = Hotkeys(
             {"switch": self.cycle, "play": lambda: self.players.command("play")},
             {"switch": self.cfg.get("hotkey"), "play": self.cfg.get("hotkey_play")})
-        self._device_tip = "starting…"
+        self._device_tip = strings.t("starting")
         self.api = Api(self)
         self.bridge = Bridge(self.api)
         self.window = None      # webview.Window, but the module loads later — see run()
@@ -321,7 +331,7 @@ class App:
         target = self.switcher.next_id()
         if target is None:
             if self.tray:
-                self.tray.notify("No device is marked for switching")
+                self.tray.notify(strings.t("msg_none_marked"))
             return
         self.note_manual_switch()
         self._go(target)
@@ -349,7 +359,7 @@ class App:
             _log.warning("the switch did not happen, reverting the icon")
             self.show_device(self.current_device())
             if self.tray:
-                self.tray.notify("Windows did not hand the sound to the chosen device")
+                self.tray.notify(strings.t("msg_switch_failed"))
             self.push_state()
             return
         self._follow_microphone(device_id)
@@ -372,7 +382,7 @@ class App:
         if dev is None:
             _log.warning("the microphone did not switch")
             if self.tray:
-                self.tray.notify("Windows did not hand recording to the chosen microphone")
+                self.tray.notify(strings.t("msg_mic_failed"))
             self.push_state()
             return
         self.announce(dev)
@@ -592,7 +602,7 @@ class App:
         """The player is listed in the system but does not answer: usually the
         tab has already been closed."""
         if self.tray:
-            self.tray.notify(f"{who} is not answering — the tab was probably closed")
+            self.tray.notify(strings.t("msg_player_dead", who))
 
     def announce(self, dev: devices.Device | None, tray_done: bool = False) -> None:
         """Feedback is mandatory: without it a person switches blind."""
@@ -634,7 +644,8 @@ class App:
             return
         dev = self.current_device()
         if dev is None:
-            self.tray.set_device(None, "Master Audio Switcher — device unknown")
+            self.tray.set_device(
+                None, f"Master Audio Switcher — {strings.t('device_unknown')}")
             return
         self.show_device(dev)
 
@@ -679,8 +690,7 @@ class App:
         it would be a modal box in the face at every sign-in.
         """
         if self.tray:
-            self.tray.notify("The window needs the Microsoft WebView2 runtime. "
-                             "Switching sound works without it.")
+            self.tray.notify(strings.t("msg_no_engine"))
         if not modal or self._engine_asking:
             return
         self._engine_asking = True
@@ -691,11 +701,7 @@ class App:
         MB_YESNO, MB_ICONWARNING, IDYES = 0x4, 0x30, 6
         try:
             answer = ctypes.windll.user32.MessageBoxW(
-                None,
-                "The window is drawn with the Microsoft WebView2 runtime, and this "
-                "computer does not have it.\n\n"
-                "Switching sound from the tray icon works without it.\n\n"
-                "Open the download page?",
+                None, strings.t("dlg_no_engine"),
                 "Master Audio Switcher", MB_YESNO | MB_ICONWARNING)
             if answer == IDYES:
                 import webbrowser

@@ -1,8 +1,12 @@
-pycaw
-comtypes
-pywebview
-pystray
-pillow
+# Pinned, all of them. THIRD-PARTY.md names exact versions, and a floating
+# dependency makes that document wrong the day upstream releases — and makes a
+# build from an old tag unreproducible, which is the whole point of building in
+# public.
+pycaw==20251023
+comtypes==1.4.16
+pywebview==6.2.1
+pystray==0.19.5
+pillow==12.3.0
 winrt-runtime==3.2.1
 winrt-Windows.Foundation==3.2.1
 winrt-Windows.Foundation.Collections==3.2.1

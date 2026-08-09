@@ -90,11 +90,18 @@ class Hotkeys(threading.Thread):
         self.ok = {n: True for n in self._handlers}
 
     def bind(self, name: str, combo: str) -> None:
+        # Silence on an unknown name would be the worst kind of bug: the setting
+        # saves, the interface shows the combination, and it never fires.
         if name not in self._handlers:
+            _log.error("nobody is registered under the name %s — combination %s "
+                       "will never fire", name, combo)
             return
         self._wanted[name] = combo or ""
-        if self.is_alive() and self._ready.wait(2.0) and self._tid:
-            user32.PostThreadMessageW(self._tid, WM_REBIND, 0, 0)
+        if not (self.is_alive() and self._ready.wait(2.0) and self._tid):
+            _log.warning("the hotkey thread is not ready, %s stays on the old "
+                         "combination until the next restart", name)
+            return
+        user32.PostThreadMessageW(self._tid, WM_REBIND, 0, 0)
 
     def stop(self) -> None:
         if self._tid:

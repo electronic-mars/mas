@@ -35,13 +35,20 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#AppExe}
-; The program is 64-bit because Python is.
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+; The program is 64-bit because Python is. Spelled the old way on purpose:
+; x64compatible needs Inno Setup 6.3, and the compiler on the build machine is
+; whatever its image happens to ship.
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 ; A running copy must be closed before its files can be replaced, and it lives in
-; the tray where people forget about it.
+; the tray where people forget about it. The filter is left at its default on
+; purpose: a PyInstaller folder holds python314.dll and a hundred others open the
+; whole time it runs, and narrowing the filter to *.exe would hide from Windows
+; exactly the locks that block the upgrade.
 CloseApplications=yes
-CloseApplicationsFilter=*.exe
+; The program's own single-instance mutex, so Setup can see a running copy and
+; say so instead of failing halfway through replacing files.
+AppMutex=Local\MasterAudioSwitcherSingleInstance
 SetupMutex=MasterAudioSwitcherSetup
 
 [Languages]

@@ -294,9 +294,16 @@ print("\nGhost of a closed tab")
 from mas.core.players import PAUSED, Players  # noqa: E402
 
 
+class FakeControls:
+    is_play_enabled = is_pause_enabled = is_next_enabled = is_previous_enabled = True
+
+
 class FakeInfo:
     def __init__(self, status):
         self.playback_status = status
+        # _describe reads this to write the log line that says who was there and
+        # what they could do — the line that settled the last false bug report.
+        self.controls = FakeControls()
 
 
 class FakeSession:
@@ -378,7 +385,7 @@ quiet = HushSession("Chrome", PAUSED)
 mine = HushSession("Spotify", PAUSED)
 hushing = Players()
 hushing.set_priority("Spotify")
-hushing._hush([loud, quiet, mine])
+hushing._hush([loud, quiet, mine], "Spotify")
 check("what was playing is paused", loud.paused, True)
 check("what was already quiet is left alone", quiet.paused, False)
 check("the nominated one is never hushed", mine.paused, False)
@@ -430,6 +437,102 @@ check("a margin is left at the top and the bottom", room_for(700, 1.0), 700 - 24
 check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
+
+print("A command that cannot be carried out")
+
+import mas.core.players as players_mod  # noqa: E402
+
+
+class Cmd(FakeSession):
+    """A session that answers but does not necessarily obey."""
+
+    def __init__(self, app, status, obeys=True):
+        super().__init__(app, status)
+        self.obeys = obeys
+        self.played = self.paused = False
+
+    def _act(self, playing):
+        async def done():
+            return True
+        if self.obeys:
+            self.status = PLAYING if playing else PAUSED
+        return done()
+
+    def try_play_async(self):
+        self.played = True
+        return self._act(True)
+
+    def try_pause_async(self):
+        self.paused = True
+        return self._act(False)
+
+    # _do builds the call table for all three actions before picking one, so
+    # every method has to exist even when only play is under test.
+    def try_skip_next_async(self):
+        return self._act(self.status == PLAYING)
+
+    def try_skip_previous_async(self):
+        return self._act(self.status == PLAYING)
+
+
+class Mgr:
+    def __init__(self, sessions, current):
+        self._s, self._cur = sessions, current
+
+    def get_sessions(self):
+        return self._s
+
+    def get_current_session(self):
+        return self._cur
+
+
+def do_play(sessions, current, priority, keys_only=()):
+    """Run a real play command against fake players, with the key press counted."""
+    p = Players()
+    p._mgr = Mgr(sessions, current)
+    p.set_priority(priority)
+    p._keys_only.update(keys_only)
+    p.dead_said = []
+    p._on_dead = p.dead_said.append
+    taps = []
+    real_tap, players_mod.media.tap = players_mod.media.tap, taps.append
+    real_wait, players_mod.VERIFY_WAIT_S = players_mod.VERIFY_WAIT_S, 0.05
+    try:
+        p._do("play")
+    finally:
+        players_mod.media.tap = real_tap
+        players_mod.VERIFY_WAIT_S = real_wait
+    return p, taps
+
+
+# The whole point: a video is playing in a browser, the nominated player starts,
+# and the browser goes quiet.
+video = Cmd("Opera", PLAYING)
+music = Cmd("Spotify", PAUSED)
+p, taps = do_play([video, music], video, "Spotify")
+check("the nominated player is started", music.played, True)
+check("what was playing is hushed", video.paused, True)
+check("no blind key press", taps, [])
+
+# It refuses to start. Everything must not be left silent, and the person must
+# be told — that failure used to pass in complete quiet.
+video = Cmd("Opera", PLAYING)
+music = Cmd("Spotify", PAUSED, obeys=False)
+p, taps = do_play([video, music], video, "Spotify")
+check("the hush is undone when the music does not start", video.played, True)
+check("and still no key press that would hit the browser", taps, [])
+check("the person is told", len(p.dead_said), 1)
+# This is the one that made the feature die after a single slow press: the player
+# was recorded as key-only on the strength of a key press that never happened.
+check("a player is not blamed for a key we never pressed",
+      "Spotify" in p._keys_only, False)
+
+# With nobody nominated the old fallback still works: the key is pressed, and a
+# player that ignores addressed commands is remembered as such.
+lonely = Cmd("Chrome", PAUSED, obeys=False)
+p, taps = do_play([lonely], lonely, "")
+check("without a nomination the key is still pressed", taps, ["play"])
+check("and the player is remembered as key-only", "Chrome" in p._keys_only, True)
 
 print("The languages")
 

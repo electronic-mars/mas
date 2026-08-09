@@ -484,11 +484,21 @@ function startCapture(btn, key) {
   capturing = true;
   btn.textContent = t('hk_press');
   btn.classList.add('armed');
+  // Armed means two things are suspended: every keystroke in the window is
+  // swallowed, and the settings stop refreshing so the button does not lose its
+  // state mid-capture. Both have to end even when the person simply changes
+  // their mind — a click elsewhere, another window, or walking away. Without
+  // this the panel stayed frozen and the next stray keystroke was written into
+  // a setting nobody was looking at any more.
   const done = () => {
     capturing = false;
+    clearTimeout(timer);
     document.removeEventListener('keydown', onKey, true);
+    document.removeEventListener('pointerdown', onElsewhere, true);
+    window.removeEventListener('blur', done);
     renderAll();
   };
+  const onElsewhere = (e) => { if (!e.target.closest('[data-capture]')) done(); };
   const onKey = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -499,7 +509,10 @@ function startCapture(btn, key) {
     state = await call('set_setting', { key, value: combo });
     renderAll();
   };
+  const timer = setTimeout(done, 15000);
   document.addEventListener('keydown', onKey, true);
+  document.addEventListener('pointerdown', onElsewhere, true);
+  window.addEventListener('blur', done);
 }
 
 function renderSettings() {
@@ -786,6 +799,11 @@ document.addEventListener('click', async (e) => {
 document.addEventListener('change', async (e) => {
   if (e.target.id === 'lang-select') {
     state = await call('set_setting', { key: 'language', value: e.target.value });
+    // The file has to be here before anything is drawn in it. Without this the
+    // dropdown moved and every other word stayed in the old language, until
+    // something unrelated happened to force a full refresh — which made it look
+    // as if picking a language worked at random.
+    await ensureLang(state.settings.language);
     renderAll();
   }
   if (e.target.id === 'auto-select') {

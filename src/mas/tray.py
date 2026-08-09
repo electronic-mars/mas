@@ -17,6 +17,7 @@ import pystray
 from PIL import Image
 
 from . import log
+from .core import strings
 from .paths import icons_dir
 
 _log = log.get("tray")
@@ -100,7 +101,7 @@ class Tray:
             "MasterAudioSwitcher",
             load_glyph(self._glyph, self._light),
             "Master Audio Switcher",
-            menu=pystray.Menu(pystray.MenuItem("Exit", lambda: self.on_quit())),
+            menu=pystray.Menu(pystray.MenuItem(strings.t("tray_exit"), lambda: self.on_quit())),
         )
         self._stop = threading.Event()
         self._queue: queue.Queue = queue.Queue()

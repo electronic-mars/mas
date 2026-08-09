@@ -246,6 +246,11 @@ class Players(threading.Thread):
     def _do(self, action: str) -> None:
         import asyncio
 
+        # Read once, at the top. Both of these are written from the bridge thread
+        # when the setting changes, and a change landing halfway through a command
+        # used to be able to make us hush the very player we were about to start.
+        priority = self._priority
+
         sessions = self._sessions()
         self._revive(sessions)
         self._note(sessions)
@@ -261,9 +266,23 @@ class Players(threading.Thread):
         who = self._short(self._last_app)
         playing = int(target.get_playback_info().playback_status) == PLAYING
 
+        # Can a media key reach the one we are addressing? It cannot be aimed: it
+        # goes to whoever the system calls current. When that is somebody else and
+        # we have been told which player matters, pressing it would hit the wrong
+        # program — very possibly the one we are about to hush. Deciding this once
+        # here, rather than in each fallback, is what keeps the two from
+        # disagreeing.
+        cur = self._mgr.get_current_session() if self._mgr else None
+        key_reaches = not (priority and self._last_app == priority
+                           and cur is not None
+                           and cur.source_app_user_model_id != priority)
+
         # A player that lied once is served by the key right away: without this
         # every press would cost an extra second on verification.
         if self._last_app in self._keys_only:
+            if not key_reaches:
+                self._refuse(who, cur)
+                return
             _log.info("%s -> %s: straight to the key, it ignores addressed commands",
                       action, who)
             self._key(action, target, playing, who)
@@ -274,8 +293,9 @@ class Players(threading.Thread):
         # person wants the music. Silencing the others by hand is exactly the
         # chore the setting is meant to remove, so it happens before we start —
         # the other way round they overlap for a moment and it sounds broken.
-        if action == "play" and not playing and self._last_app == self._priority:
-            self._hush(sessions)
+        hushed = []
+        if action == "play" and not playing and self._last_app == priority:
+            hushed = self._hush(sessions, priority)
 
         call = {"play": target.try_pause_async if playing else target.try_play_async,
                 "next": target.try_skip_next_async,
@@ -288,33 +308,76 @@ class Players(threading.Thread):
         moved = self._wait_change(target, playing) if action == "play" else ok
         _log.info("%s -> %s: answer %s, state %s", action, who, ok,
                   "changed" if moved else "unchanged")
-        if not moved:
-            self._keys_only.add(self._last_app)
-            _log.info("%s does not obey addressed commands, key only from now on", who)
-            self._key(action, target, playing, who)
+        if moved:
+            return
 
-    def _hush(self, sessions) -> None:
-        """Pause everyone except the nominated player.
+        if not key_reaches:
+            # Nothing left to try. Whatever we silenced has to come back, or the
+            # person is left with no music at all and no explanation — which is a
+            # worse outcome than the press simply not working.
+            self._resume(hushed)
+            self._refuse(who, cur)
+            return
+        # Only now, with the key actually about to be pressed, is it fair to
+        # conclude anything about addressed commands. Recording it before trying
+        # the key marked players broken on the strength of an experiment that
+        # never happened, and nothing ever cleared that mark.
+        self._keys_only.add(self._last_app)
+        _log.info("%s does not obey addressed commands, key only from now on", who)
+        self._key(action, target, playing, who)
+
+    def _refuse(self, who: str, cur) -> None:
+        """Say out loud that we are not going to press anything.
+
+        Silence here is the worst of all outcomes: the person presses, the music
+        does not start, nothing is said, and the natural conclusion is that the
+        program is broken.
+        """
+        other = self._short(cur.source_app_user_model_id) if cur is not None else "another player"
+        _log.warning("%s does not answer addressed commands, and the media key would "
+                     "go to %s instead — not pressing it", who, other)
+        if self._on_dead:
+            self._on_dead(who)
+
+    def _hush(self, sessions, priority: str) -> list:
+        """Pause everyone except the nominated player, and report who was paused.
 
         Only those actually playing are touched: pausing a paused player is at
         best pointless and at worst wakes a browser tab that had gone quiet on
-        its own. We do not wait for them to obey either — the person is waiting
-        for their music to start, not for a report on the neighbours.
+        its own. We do not wait for them to obey — the person is waiting for
+        their music, not for a report on the neighbours — but we do remember
+        them, because if the music then fails to start they have to come back.
         """
         import asyncio
 
+        paused = []
         for s in sessions:
             app = s.source_app_user_model_id
-            if app == self._priority or app in self._dead:
+            if app == priority or app in self._dead:
                 continue
             if int(s.get_playback_info().playback_status) != PLAYING:
                 continue
             try:
                 asyncio.run(s.try_pause_async())
+                paused.append(s)
                 _log.info("hushing %s: the nominated player is starting",
                           self._short(app))
             except Exception:
                 _log.warning("could not hush %s", self._short(app), exc_info=True)
+        return paused
+
+    def _resume(self, sessions) -> None:
+        """Undo a hush that turned out to be for nothing."""
+        import asyncio
+
+        for s in sessions:
+            try:
+                asyncio.run(s.try_play_async())
+                _log.info("%s back on: the nominated player did not start",
+                          self._short(s.source_app_user_model_id))
+            except Exception:
+                _log.warning("could not bring %s back",
+                             self._short(s.source_app_user_model_id), exc_info=True)
 
     def _wait_change(self, target, playing: bool) -> bool:
         """Wait for the player to obey, and exactly as long as needed.
@@ -341,19 +404,11 @@ class Players(threading.Thread):
         is why the result has to be read from the current session too — otherwise
         the program sees "state did not change" on an unrelated player and
         declares it unresponsive, having never touched it at all.
+
+        Whether pressing it is acceptable at all is decided by the caller, in one
+        place, so that the two fallbacks cannot disagree about it.
         """
         cur = self._mgr.get_current_session() if self._mgr else None
-        # With a nominated player the fallback has to be refused. The key would
-        # go to whoever the system thinks is current — quite possibly the very
-        # browser we have just hushed, which would start it up again and leave
-        # the person with the sound they were getting rid of. Better to do
-        # nothing and say why.
-        if (self._priority and self._last_app == self._priority and cur is not None
-                and cur.source_app_user_model_id != self._priority):
-            _log.warning("%s does not obey addressed commands, and the key would go "
-                         "to %s instead — not pressing it", who,
-                         self._short(cur.source_app_user_model_id))
-            return
         if cur is not None and cur.source_app_user_model_id != self._last_app:
             who = self._short(cur.source_app_user_model_id)
             target = cur

@@ -65,7 +65,7 @@ TIGHT = {
     "lcd_level": 10, "lcd_signal": 10, "btn_left": 10, "btn_right": 10,
     "theme_system": 16, "theme_dark": 10, "theme_light": 10,
     "hk_none": 16, "hk_clear": 10, "open_btn": 12, "welcome_ok": 14,
-    "player_none": 18, "muted": 12, "active": 12, "silent": 12,
+    "player_none": 18, "muted": 12,
 }
 
 
@@ -159,9 +159,17 @@ def translate(key: str, code: str, missing: dict, source: dict) -> dict:
     return done
 
 
-def write_locale(code: str, strings: dict) -> None:
+def write_locale(code: str, strings: dict, untranslated: list) -> None:
     """Through a temporary file, and only after it has been read back."""
-    doc = {"code": code, "name": LANGUAGES.get(code, code), "strings": strings}
+    doc = {"code": code, "name": LANGUAGES.get(code, code)}
+    # Keys that fell back to English are named, not silently baked in. Without
+    # this list the English value looks like a finished translation: the next run
+    # sees a non-empty string, calls the language complete, and never tries
+    # again — which is how the previous project ended up with English text sitting
+    # in fifteen locales with nothing to show which.
+    if untranslated:
+        doc["untranslated"] = sorted(untranslated)
+    doc["strings"] = strings
     tmp = LOCALES / f".{code}.json.new"
     tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     json.loads(tmp.read_text(encoding="utf-8"))      # would raise before we replace
@@ -202,12 +210,16 @@ def main() -> int:
         raise SystemExit(f"unknown languages: {unknown}")
 
     key = load_key(args.key_file)
+    trouble: list[str] = []
     for code in codes:
         path = LOCALES / f"{code}.json"
-        have = {}
+        have, failed_before = {}, set()
         if path.is_file() and not args.all:
-            have = json.loads(path.read_text(encoding="utf-8")).get("strings", {})
-        missing = {k: v for k, v in source.items() if k not in have or not have[k].strip()}
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            have = doc.get("strings", {})
+            failed_before = set(doc.get("untranslated", []))
+        missing = {k: v for k, v in source.items()
+                   if k not in have or not have[k].strip() or k in failed_before}
         stale = [k for k in have if k not in source]
         if not missing and not stale:
             print(f"{code}: already complete ({len(have)} strings)")
@@ -217,13 +229,20 @@ def main() -> int:
         merged = {k: got.get(k, have.get(k, "")) for k in source}
         blank = [k for k, v in merged.items() if not v]
         if blank:
-            print(f"  {code}: {len(blank)} left untranslated, English stays: {blank[:5]}")
+            print(f"  {code}: {len(blank)} left untranslated, English stays "
+                  f"and will be retried next run: {blank[:5]}")
             for k in blank:
                 merged[k] = source[k]
-        write_locale(code, merged)
+            trouble.append(code)
+        write_locale(code, merged, blank)
         print(f"  {code}: written, {len(merged)} strings")
 
     rebuild_index()
+    if trouble:
+        # Loudly, and with a non-zero code: a half-translated language that
+        # reports success is how this goes unnoticed for months.
+        print("\nincomplete: " + ", ".join(trouble))
+        return 1
     return 0
 
 

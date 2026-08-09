@@ -5,7 +5,17 @@ name: release
 # anyone can reproduce it from the same source.
 on:
   push:
-    tags: ['v*']
+    # Numbers only. A tag like v1.0.0-rc1 would reach the version resource of the
+    # executable and the installer, and neither accepts anything but numbers.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  # So the whole thing can be rehearsed before a real tag exists. A workflow that
+  # has never run is a workflow that does not work, and every failed attempt on a
+  # real tag burns the tag name and leaves a half-made draft behind.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, for a dry run (no release is published)'
+        default: '0.0.0'
 
 permissions:
   contents: write
@@ -21,6 +31,23 @@ jobs:
 
       - run: pip install -r requirements.txt pyinstaller
 
+      # One number, in one place. The executable's properties and the About tab
+      # read it from the package; the file names read it from the tag. If those
+      # two disagree, people download 1.0.1 and the program says 1.0.0.
+      - name: The tag and the package must agree on the version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event_name }}" -eq "workflow_dispatch" `
+            ? "${{ inputs.version }}" : "${{ github.ref_name }}".TrimStart("v")
+          $pkg = (Select-String -Path src\mas\__init__.py `
+                  -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
+          "tag $tag, package $pkg"
+          if ("${{ github.event_name }}" -ne "workflow_dispatch" -and $tag -ne $pkg) {
+            throw "the tag says $tag and src/mas/__init__.py says $pkg"
+          }
+          "VERSION=$(if ("${{ github.event_name }}" -eq "workflow_dispatch") { $pkg } else { $tag })" |
+            Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
       - run: python tests/test_device_icons.py
       - run: python tests/test_smoke.py
         env:
@@ -30,6 +57,25 @@ jobs:
       # machine it is exactly what kept the previous icon inside the exe.
       - run: pyinstaller build/mas.spec --distpath build/mas --workpath build/work --noconfirm
 
+      - name: Start the built program once
+        shell: pwsh
+        run: |
+          $exe = "build\mas\MasterAudioSwitcher\MasterAudioSwitcher.exe"
+          $p = Start-Process $exe -ArgumentList "--startup" -PassThru
+          Start-Sleep -Seconds 25
+          $log = "$env:LOCALAPPDATA\MasterAudioSwitcher\mas.log"
+          if ($p.HasExited) { throw "it exited on its own with $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+          if (-not (Test-Path $log)) { throw "it started but wrote no log" }
+          $text = Get-Content $log -Raw
+          if ($text -notmatch "=== start") { throw "the log has no start line" }
+          # A runner has no sound card, so plenty will be missing — but the tray,
+          # the bridge and the settings must come up regardless.
+          foreach ($mark in @("settings loaded", "bridge is up")) {
+            if ($text -notmatch [regex]::Escape($mark)) { throw "never got to: $mark" }
+          }
+          "started, ran for 25 seconds, and said so in the log"
+
       - name: Build the installer
         shell: pwsh
         run: |
@@ -37,8 +83,7 @@ jobs:
           if (-not (Test-Path $iscc)) {
             choco install innosetup --no-progress -y
           }
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          & $iscc "/DAppVersion=$version" `
+          & $iscc "/DAppVersion=$env:VERSION" `
             "/DSourceDir=$PWD\build\mas\MasterAudioSwitcher" `
             "/O$PWD" build\installer.iss
           if ($LASTEXITCODE -ne 0) { throw "the installer did not build" }
@@ -46,9 +91,8 @@ jobs:
       - name: Pack the archive and the checksums
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag.TrimStart("v")
-          $zip = "MasterAudioSwitcher-$tag.zip"
+          $version = $env:VERSION
+          $zip = "MasterAudioSwitcher-$version.zip"
           $setup = "MasterAudioSwitcher-$version-setup.exe"
           Compress-Archive -Path build/mas/MasterAudioSwitcher/* -DestinationPath $zip
           # One checksum file for both, so a person verifies whichever they took.
@@ -64,6 +108,8 @@ jobs:
           "SETUP=$setup" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Publish the release
+        # A dry run builds everything and publishes nothing.
+        if: github.event_name != 'workflow_dispatch'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -88,3 +134,13 @@ jobs:
           "@
           gh release create "${{ github.ref_name }}" "$env:SETUP" "$env:ZIP" "SHA256SUMS.txt" `
             --title "${{ github.ref_name }}" --notes "$notes" --draft
+
+      - name: Keep the files from a dry run
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run
+          path: |
+            MasterAudioSwitcher-*.zip
+            MasterAudioSwitcher-*-setup.exe
+            SHA256SUMS.txt
