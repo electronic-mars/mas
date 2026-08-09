@@ -1,0 +1,20 @@
+name: Translation
+description: A wrong string, or a new language.
+labels: [translation]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "German (de)"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong
+      description: >
+        The key, the current text and what it should say. A screenshot helps if
+        the text does not fit the window.
+    validations:
+      required: true

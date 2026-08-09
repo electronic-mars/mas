@@ -1,0 +1,26 @@
+# Build output. All of it is rebuilt from source in a minute, and it would have
+# weighed 155 MB in history forever — large files are not easily removed from git.
+/dist/
+/build/mas/
+/build/work/
+/build/verify-localappdata/
+
+# Environment and caches
+/.venv/
+__pycache__/
+*.py[cod]
+/.tmp-test-*/
+
+# Design drafts, concept sheets and working notes. Kept on disk, out of the
+# repository: they are the workshop, not the product.
+/workshop/
+
+# Local state of assistant tooling, not part of the program
+/.superpowers/
+/.codex/
+/.agents/
+/.playwright-mcp/
+
+# Logs and settings live in the user profile, but just in case
+*.log
+crash.log

@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    # The program is Windows through and through: COM, WinRT, HID, tray. On any
+    # other system there is nothing to even import it with.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: pip install -r requirements.txt
+      - run: python tests/test_device_icons.py
+      - run: python tests/test_smoke.py
+        env:
+          PYTHONPATH: src

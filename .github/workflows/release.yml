@@ -1,0 +1,60 @@
+name: release
+
+# Builds and publishes a release for a tag like v1.0.0. The build runs on a
+# clean machine rather than mine, so nothing stray ends up in the archive and
+# anyone can reproduce it from the same source.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - run: pip install -r requirements.txt pyinstaller
+
+      - run: python tests/test_device_icons.py
+      - run: python tests/test_smoke.py
+        env:
+          PYTHONPATH: src
+
+      # The builder's work directory is clean by definition here. On a local
+      # machine it is exactly what kept the previous icon inside the exe.
+      - run: pyinstaller build/mas.spec --distpath build/mas --workpath build/work --noconfirm
+
+      - name: Pack the archive and its checksum
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zip = "MasterAudioSwitcher-$tag.zip"
+          Compress-Archive -Path build/mas/MasterAudioSwitcher/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -FilePath "$zip.sha256" -Encoding ascii
+          "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SHA=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          SHA256: ``$env:SHA``
+
+          Windows 11, or Windows 10 with the WebView2 runtime installed.
+          Unpack and run ``MasterAudioSwitcher.exe`` — the program lives in the tray.
+
+          The program is not code-signed, so SmartScreen will show a warning:
+          "More info" then "Run anyway". You can verify the download with
+          ``Get-FileHash <file> -Algorithm SHA256``.
+          "@
+          gh release create "${{ github.ref_name }}" "$env:ZIP" "$env:ZIP.sha256" `
+            --title "${{ github.ref_name }}" --notes "$notes" --draft

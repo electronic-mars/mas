@@ -1,0 +1,36 @@
+name: Bug report
+description: Something behaves differently than it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown at the bottom of the About tab.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Win+R, type `winver`, copy the version and build.
+      placeholder: "Windows 11 24H2, build 26100.2033"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >
+        Settings → Diagnostics opens the folder with the log. Attach the file or
+        paste the last few dozen lines. Note that the log contains the names of
+        tracks that were playing — remove them if you would rather not share.
+      render: text

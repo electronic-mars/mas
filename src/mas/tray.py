@@ -1,0 +1,213 @@
+"""Tray icon and three gestures.
+
+pystray physically never gets a double click: it registers its own window without
+the CS_DBLCLKS style. So the double click is not used at all, and mouse messages
+are parsed directly — that way a single left click fires instantly, with no delay
+spent waiting for a second click.
+"""
+import ctypes
+import os
+import queue
+import tempfile
+import threading
+import winreg
+from ctypes import wintypes
+
+import pystray
+from PIL import Image
+
+from . import log
+from .paths import icons_dir
+
+_log = log.get("tray")
+
+WM_LBUTTONUP = 0x0202
+WM_RBUTTONUP = 0x0205
+WM_MBUTTONUP = 0x0208
+
+DEFAULT_GLYPH = "speakers"
+SM_CXSMICON = 49
+HAVE_SIZES = (16, 20, 24, 32, 40, 48, 64)
+IMAGE_ICON = 1
+LR_LOADFROMFILE = 0x00000010
+
+user32 = ctypes.windll.user32
+user32.LoadImageW.restype = wintypes.HANDLE
+
+
+def tray_icon_size() -> int:
+    """The icon size Windows expects in the tray, mapped onto the files we have.
+
+    At 125% scaling that is 20 pixels, at 150% — 24. Hand it 32 and Windows will
+    shrink it itself, and the glyph will smear: that is exactly why we take the
+    file of the size needed.
+    """
+    want = user32.GetSystemMetrics(SM_CXSMICON) or 16
+    for size in HAVE_SIZES:
+        if size >= want:
+            return size
+    return HAVE_SIZES[-1]
+
+
+def taskbar_is_light() -> bool:
+    """0 in SystemUsesLightTheme = dark taskbar, which means a white glyph."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+            return bool(winreg.QueryValueEx(k, "SystemUsesLightTheme")[0])
+    except OSError:
+        return False
+
+
+def load_glyph(name: str, light_taskbar: bool, size: int | None = None) -> Image.Image:
+    theme = "light" if light_taskbar else "dark"
+    size = size or tray_icon_size()
+    path = icons_dir() / "devices" / f"{name}_{theme}_{size}.png"
+    if not path.is_file():
+        path = icons_dir() / "devices" / f"{DEFAULT_GLYPH}_{theme}_{size}.png"
+    return Image.open(path).convert("RGBA")
+
+
+def icon_handle(img: Image.Image) -> int:
+    """A Windows icon of exactly the size it was drawn at, with no rescaling.
+
+    pystray itself loads the icon with the "default size" flag, and for icons that
+    is 32 pixels: it would first stretch a 20-pixel image up to 32, and the tray
+    would then squeeze it back down to 20. On top of that PIL, saving an ICO
+    without an explicit size list, writes a single 16x16 entry out of a 20x20
+    image. So we write an ICO with one entry of the size needed and ask Windows
+    for exactly that size.
+    """
+    fd, path = tempfile.mkstemp(suffix=".ico")
+    os.close(fd)
+    try:
+        img.save(path, format="ICO", sizes=[img.size])
+        return user32.LoadImageW(None, path, IMAGE_ICON, img.width, img.height,
+                                 LR_LOADFROMFILE)
+    finally:
+        os.unlink(path)
+
+
+class Tray:
+    def __init__(self, on_left, on_right, on_middle, on_quit):
+        self.on_left = on_left
+        self.on_right = on_right
+        self.on_middle = on_middle
+        self.on_quit = on_quit
+        self._glyph = DEFAULT_GLYPH
+        self._light = taskbar_is_light()
+        self.icon = pystray.Icon(
+            "MasterAudioSwitcher",
+            load_glyph(self._glyph, self._light),
+            "Master Audio Switcher",
+            menu=pystray.Menu(pystray.MenuItem("Exit", lambda: self.on_quit())),
+        )
+        self._stop = threading.Event()
+        self._queue: queue.Queue = queue.Queue()
+
+    # --- appearance --------------------------------------------------
+    # The tray icon is a shared Windows resource. Changing it from arbitrary
+    # threads (say, from an HTTP request thread when an icon is picked in the
+    # window) is unsafe, so all changes are queued and run by a single thread.
+    def set_device(self, glyph: str | None, tooltip: str) -> None:
+        """The tooltip is always updated: without it nobody knows where sound goes."""
+        self._queue.put(("device", glyph or DEFAULT_GLYPH, tooltip[:127]))
+
+    def set_tip(self, tooltip: str) -> None:
+        """Tooltip only: no reason to touch the icon, and the track changes often."""
+        self._queue.put(("tip", tooltip[:127], None))
+
+    def notify(self, message: str, title: str = "Master Audio Switcher") -> None:
+        self._queue.put(("notify", message, title))
+
+    def _apply(self, job) -> None:
+        kind = job[0]
+        if kind == "device":
+            _, glyph, tooltip = job
+            self._glyph = glyph
+            self.icon.icon = load_glyph(glyph, self._light)
+            self.icon.title = tooltip  # Windows cuts tooltips longer than 128 chars
+        elif kind == "tip":
+            self.icon.title = job[1]
+        elif kind == "notify":
+            _, message, title = job
+            self.icon.notify(message, title)
+
+    def _worker(self) -> None:
+        while not self._stop.is_set():
+            try:
+                job = self._queue.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            try:
+                self._apply(job)
+            except Exception:
+                _log.warning("tray icon update failed (%s)", job[0], exc_info=True)
+
+    # --- mouse interception -------------------------------------
+    def _install_mouse_hook(self) -> None:
+        from pystray._util import win32
+
+        original = self.icon._message_handlers.get(win32.WM_NOTIFY)
+
+        def handler(wparam, lparam):
+            if lparam == WM_LBUTTONUP:
+                self._safe(self.on_left, "left button")
+                return
+            if lparam == WM_RBUTTONUP:
+                self._safe(self.on_right, "right button")
+                return
+            if lparam == WM_MBUTTONUP:
+                self._safe(self.on_middle, "middle button")
+                return
+            if original:
+                original(wparam, lparam)
+
+        self.icon._message_handlers[win32.WM_NOTIFY] = handler
+        _log.info("icon click interception installed")
+
+    def _install_icon_loader(self) -> None:
+        """Our own icon loading instead of pystray's: see `icon_handle`."""
+        icon = self.icon
+
+        def assert_handle():
+            if icon._icon_handle:
+                return
+            icon._icon_handle = icon_handle(icon.icon)
+
+        icon._assert_icon_handle = assert_handle
+        _log.info("tray icon loaded by our own loader, size %s", tray_icon_size())
+
+    @staticmethod
+    def _safe(fn, label: str) -> None:
+        try:
+            fn()
+        except Exception:
+            _log.exception("error in handler: %s", label)
+
+    # --- taskbar theme -----------------------------------------
+    def _theme_poller(self) -> None:
+        size = tray_icon_size()
+        while not self._stop.wait(2.0):
+            light, now = taskbar_is_light(), tray_icon_size()
+            # People change screen scaling on the fly, and then the tray starts
+            # asking for another icon size — redraw it, otherwise it smears.
+            if light != self._light or now != size:
+                self._light, size = light, now
+                self.icon.icon = load_glyph(self._glyph, light, now)
+                _log.info("tray icon redrawn (light taskbar: %s, size: %s)", light, now)
+
+    # --- lifecycle -----------------------------------------------
+    def run(self) -> None:
+        def setup(icon):
+            self._install_icon_loader()
+            icon.visible = True
+            self._install_mouse_hook()
+            threading.Thread(target=self._worker, daemon=True, name="mas-tray-jobs").start()
+            threading.Thread(target=self._theme_poller, daemon=True, name="mas-theme").start()
+
+        self.icon.run(setup=setup)
+
+    def stop(self) -> None:
+        self._stop.set()
+        self.icon.stop()

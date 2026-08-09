@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<meta charset="utf-8">
+<title>Master Audio Switcher</title>
+<link rel="stylesheet" href="app.css">
+
+<div class="shell">
+
+  <!-- Our own title bar instead of the native frame. Dragging only works on
+       .pywebview-drag-region, so the buttons are kept outside it. -->
+  <header class="cap">
+    <div class="capdrag pywebview-drag-region">
+      <img class="mark" src="icons/app/icon_512.png" alt="">
+      <h1>Master Audio Switcher</h1>
+    </div>
+    <div class="sp">
+      <!-- Mini view: two chevrons meeting — "collapse vertically". The button is
+           outside .capdrag, otherwise it would become a drag region. -->
+      <button class="iconbtn" id="btn-mini" title="Mini view" aria-label="Mini view">
+        <svg viewBox="0 0 24 24" class="to-mini"><path d="M8 4l4 4 4-4M8 20l4-4 4 4"/></svg>
+        <svg viewBox="0 0 24 24" class="to-full"><path d="M8 8l4-4 4 4M8 16l4 4 4-4"/></svg>
+      </button>
+      <!-- There is deliberately no "minimize" button: the program lives in the
+           tray, and closing the window already hides it there. Minimizing to the
+           taskbar would leave a second trace of a utility that already has a
+           tray icon. -->
+      <button class="iconbtn danger" id="btn-close" title="Close to tray" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="devices" aria-selected="true">
+      <span class="tabico" style="-webkit-mask-image:url(icons/ui/tab-devices.svg);mask-image:url(icons/ui/tab-devices.svg)"></span>
+      <span data-t="tab_devices">Devices</span>
+    </button>
+    <button class="tab" role="tab" data-tab="mixer" aria-selected="false">
+      <span class="tabico" style="-webkit-mask-image:url(icons/ui/tab-mixer.svg);mask-image:url(icons/ui/tab-mixer.svg)"></span>
+      <span data-t="tab_mixer">Mixer</span>
+    </button>
+    <button class="tab" role="tab" data-tab="settings" aria-selected="false">
+      <span class="tabico" style="-webkit-mask-image:url(icons/ui/tab-settings.svg);mask-image:url(icons/ui/tab-settings.svg)"></span>
+      <span data-t="tab_settings">Settings</span>
+    </button>
+    <button class="tab" role="tab" data-tab="about" aria-selected="false">
+      <span class="tabico" style="-webkit-mask-image:url(icons/ui/tab-about.svg);mask-image:url(icons/ui/tab-about.svg)"></span>
+      <span data-t="tab_about">About</span>
+    </button>
+  </div>
+
+  <!-- Front panel: two LCD windows at the edges with the knob between them.
+       Volume in digits on the left, signal level in bars on the right.
+       The windows are marked decorative: the same value is available on the
+       knob itself through aria-valuenow, and a screen reader has no reason to
+       announce it twice. -->
+  <section class="console" id="console">
+    <div class="lcdbox">
+      <span class="micro lcdcap" data-t="lcd_level">Level</span>
+      <div class="lcd" id="lcd-vol" aria-hidden="true"></div>
+    </div>
+    <div class="knobcol">
+      <div class="knob" id="knob" role="slider" aria-valuemin="0" aria-valuemax="100"
+           aria-valuenow="0" aria-label="Volume" tabindex="0"
+           title="Turn it in a circle, drag up and down, or use the wheel">
+        <svg viewBox="0 0 130 130" id="ticks"></svg>
+        <div class="cap-body"></div>
+        <div class="ind-hold"><div class="ind" id="ind"></div></div>
+      </div>
+      <!-- Key block under the knob. The glyph on the middle key is a combined
+           one: the program sends the command but never asks the system whether
+           music is playing, so it has no right to show a state. -->
+      <div class="transport" id="transport">
+        <button class="tbtn" data-media="prev" title="Previous track" aria-label="Previous track">
+          <svg viewBox="0 0 24 24" class="ti"><path d="M18.6 5.7 9.6 12l9 6.3z"/><path d="M5.4 5.7h2.4v12.6H5.4z"/></svg>
+        </button>
+        <button class="tbtn" data-media="play" title="Pause or resume" aria-label="Pause or resume">
+          <svg viewBox="0 0 24 24" class="ti"><path d="M4.6 5.6 13 12l-8.4 6.4z"/><path d="M15.4 5.6h1.9v12.8h-1.9z"/><path d="M19 5.6h1.9v12.8H19z"/></svg>
+        </button>
+        <button class="tbtn" data-media="next" title="Next track" aria-label="Next track">
+          <svg viewBox="0 0 24 24" class="ti"><path d="M5.4 5.7 14.4 12l-9 6.3z"/><path d="M16.2 5.7h2.4v12.6h-2.4z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="lcdbox">
+      <span class="micro lcdcap" data-t="lcd_signal">Signal</span>
+      <div class="lcd" id="lcd-lvl" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <main class="body" id="scroller">
+    <div id="panel-devices"></div>
+    <div id="panel-mixer" class="hidden"></div>
+    <div id="panel-settings" class="hidden"></div>
+    <div id="panel-about" class="hidden"></div>
+  </main>
+
+  <!-- A fade instead of a scrollbar: a clipped row promises by itself that
+       there is more below. It shows up only when the list is taller than the
+       window. -->
+  <div class="fade hidden" id="fade"></div>
+</div>
+
+<div id="overlays"></div>
+
+<script type="module">
+  window.__MAS_TOKEN__ = '%%MAS_TOKEN%%';
+</script>
+<script type="module" src="app.js"></script>
+</html>

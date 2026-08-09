@@ -1,0 +1,45 @@
+name: Wireless headset support
+description: Ask for a wireless headset dongle to be recognised.
+title: "Dongle: "
+labels: [dongle]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Windows does not report when a headset on a USB dongle is switched on or
+        off — the audio endpoint stays alive either way. The dongle itself sends
+        a short status report, and the program can use it once that report has
+        been decoded. This is what the recording below is for.
+  - type: input
+    id: model
+    attributes:
+      label: Headset model
+      placeholder: "HyperX Cloud Flight S"
+    validations:
+      required: true
+  - type: input
+    id: ids
+    attributes:
+      label: Vendor and product id
+      description: >
+        Device Manager → the dongle → Details → Hardware Ids. Or take it from
+        the first line of the recording below.
+      placeholder: "0951:16EA"
+    validations:
+      required: true
+  - type: textarea
+    id: reports
+    attributes:
+      label: Recorded reports
+      description: >
+        Settings → Diagnostics → Learn this dongle, then switch the headset on
+        and off about six times. The folder button opens the file. Paste its
+        contents here — it is a list of hex lines and nothing else.
+      render: text
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: >
+        Thank you. Devices get added as time allows — support helps me spend
+        more of it here: https://github.com/sponsors/electronic-mars

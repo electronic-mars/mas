@@ -1,0 +1,819 @@
+"""Entry point: tray, window and core."""
+import ctypes
+import gc
+import os
+import queue
+import sys
+import threading
+import time
+
+import logging
+
+from . import log
+from .bridge import Bridge
+from .core import devices, mixer, startup
+from .core.config import Config
+from .core.dongle import KNOWN as KNOWN_DONGLES
+from .core.dongle import Dongle
+from .core.hotkey import Hotkeys
+from .core.meter import Meter
+from .core.players import Players
+from .core import screen
+from .overlay import Overlay
+from .core.switcher import Switcher
+from .paths import is_frozen, log_path
+from .tray import Tray
+
+_log = log.get("app")
+
+MUTEX_NAME = "Global\\MasterAudioSwitcherSingleInstance"
+ERROR_ALREADY_EXISTS = 183
+FULL_SIZE = (440, 772)      # full window view in logical points
+
+
+def already_running() -> bool:
+    kernel32 = ctypes.windll.kernel32
+    kernel32.CreateMutexW(None, False, MUTEX_NAME)
+    return kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+
+
+class Api:
+    """Methods available to the interface through the bridge."""
+
+    def __init__(self, app: "App"):
+        self.app = app
+        self.selfcheck_seen = False
+
+    def selfcheck(self, **kw):
+        self.selfcheck_seen = True
+        _log.info("SELFCHECK: the interface reached the bridge")
+        return {"python": sys.version.split()[0], "frozen": is_frozen(), "log": str(log_path())}
+
+    def get_state(self):
+        return self.app.state()
+
+    def switch_next(self):
+        self.app.cycle()
+        return self.app.state()
+
+    def switch_to(self, device_id: str):
+        self.app.note_manual_switch()
+        if device_id.startswith(devices.OUTPUT_PREFIX):
+            self.app._go(device_id)          # same path as the tray: the mic follows
+        else:
+            # The microphone was chosen by hand. If it belongs to no headset,
+            # then this is the person's base microphone.
+            if device_id not in devices.tied_microphones():
+                self.app._mic_base = device_id
+            self.app.announce(self.app.switcher.switch_to(device_id))
+        return self.app.state()
+
+    def toggle_cycle(self, device_id: str, enabled: bool):
+        self.app.switcher.toggle_in_cycle(device_id, enabled)
+        return self.app.state()
+
+    def reorder(self, device_ids: list):
+        self.app.switcher.reorder(device_ids)
+        return self.app.state()
+
+    def set_icon(self, device_id: str, glyph: str):
+        icons = dict(self.app.cfg.get("icons"))
+        icons[device_id] = glyph
+        self.app.cfg.set("icons", icons)
+        self.app.refresh_tray()
+        return self.app.state()
+
+    def set_setting(self, key: str, value):
+        if key == "autostart" and not startup.set_enabled(bool(value)):
+            return self.app.state()  # registry refused — don't lie about it
+        self.app.cfg.set(key, value)
+        if key == "hotkey":
+            self.app.hotkeys.bind(value)
+        elif key in ("auto_device", "watch_dongle", "learn_dongle"):
+            self.app.sync_auto_device()
+        return self.app.state()
+
+    # --- mixer and volume --------------------------------------------
+    def get_mixer(self):
+        snap = self.app.meter.snapshot()
+        return {
+            "master": {"volume": snap["volume"], "muted": snap["muted"]},
+            "device": snap["device"],
+            "sessions": [vars(s) for s in mixer.list_sessions()],
+        }
+
+    def set_master(self, value: float):
+        self.app.meter.set_volume(value)
+        return True
+
+    def set_master_mute(self, muted: bool):
+        self.app.meter.set_mute(muted)
+        return True
+
+    def set_app_volume(self, key: str, value: float):
+        return mixer.set_volume(key, value)
+
+    def set_app_mute(self, key: str, muted: bool):
+        return mixer.set_mute(key, muted)
+
+    def get_meter(self):
+        """A ready snapshot from the meter thread plus signals for the interface.
+        COM is not touched here at all."""
+        return {**self.app.meter.snapshot(), **self.app.take_ui_signal()}
+
+    # --- other ---------------------------------------------------------
+    def complete_onboarding(self):
+        self.app.cfg.set("onboarded", True)
+        return True
+
+    def open_url(self, url: str):
+        import webbrowser
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("link is not allowed")
+        webbrowser.open(url)
+        return True
+
+    def open_data_folder(self):
+        """Show the log folder — nobody types a %LOCALAPPDATA% path by hand."""
+        from .paths import data_dir
+        import subprocess
+        subprocess.Popen(["explorer", str(data_dir())])
+        return True
+
+    def media(self, action: str):
+        """Pause and track skipping go to the chosen player, not to the one the
+        system guessed. The selection rule is described in core/players.py."""
+        self.app.players.command(action)
+        return True
+
+    def now_playing(self):
+        """Who we control and what is playing. The snapshot is updated by the
+        players thread."""
+        self.app.players.refresh()
+        return self.app.players.snapshot()
+
+    def set_mini(self, on: bool, height: int | None = None):
+        return self.app.set_mini(on, height)
+
+    def hide_window(self):
+        self.app.hide()
+        return True
+
+    def quit(self):
+        self.app.quit()
+        return True
+
+
+class App:
+    def __init__(self):
+        self.cfg = Config()
+        self.switcher = Switcher(self.cfg)
+        self.meter = Meter(on_devices_changed=self._devices_changed,
+                           on_default_changed=self._default_changed)
+        self.hotkeys = Hotkeys(self.cycle, self.cfg.get("hotkey"))
+        self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead)
+        self._device_tip = "starting…"
+        self.api = Api(self)
+        self.bridge = Bridge(self.api)
+        self.window = None      # webview.Window, but the module loads later — see run()
+        self.tray: Tray | None = None
+        self.overlay = Overlay()
+        self._quitting = False
+        self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
+        self._ui_lock = threading.Lock()
+        self._pending_tab: str | None = None
+        self._state_rev = 0
+        # Mini view is session state, not a setting: it is not written to config.
+        self._mini = False
+        self._mini_height = 250
+        # Whether the window is visible. A hidden window keeps drawing: the page
+        # does not know about it (document.hidden stays false for a hidden
+        # window), so the knowledge comes from Python on the next poll.
+        self._visible = False
+        # Snapshot of the "known outputs" list: dropped on a device-set event,
+        # not on a timer.
+        self._known_cache: list[dict] | None = None
+        self._known_pinned = ""
+        # Where to return the sound when the priority device disappears, and
+        # whether we are holding it right now. If the person left it by hand,
+        # we do not interfere.
+        self._auto_prev: str | None = None
+        self._auto_held = False
+        # The base microphone is the one a person uses without a headset.
+        self._mic_base: str | None = None
+        # USB dongle listener and the recognized headset name for the interface.
+        self.dongle: Dongle | None = None
+        self._dongle_name: str | None = None
+        self._dongle_usb: str | None = None
+        # Last known headset state: None means we have not heard from it yet.
+        self._dongle_on: bool | None = None
+        self._jobs: queue.SimpleQueue = queue.SimpleQueue()
+
+    # --- state for the interface ---------------------------------------
+    def state(self) -> dict:
+        cur_out = devices.default_id(is_output=True)
+        cur_in = devices.default_id(is_output=False)
+        icons = self.cfg.get("icons")
+        cycle = self.cfg.get("cycle")
+        devs = devices.list_devices(only_active=True)
+
+        def pack(d: devices.Device) -> dict:
+            return {
+                "id": d.id, "name": d.name, "kind": d.kind,
+                "icon": icons.get(d.id, "microphone" if not d.is_output else "speakers"),
+                "in_cycle": d.id in cycle,
+                "is_default": d.id == (cur_out if d.is_output else cur_in),
+            }
+
+        outputs = [pack(d) for d in devs if d.is_output]
+        outputs.sort(key=lambda x: cycle.index(x["id"]) if x["id"] in cycle else len(cycle))
+        settings = self.cfg.all()
+        settings["autostart"] = startup.is_enabled()  # source of truth is the registry
+        settings["hotkey_ok"] = self.hotkeys.ok
+        settings["dongle_name"] = self._dongle_name
+        settings["dongle_usb"] = self._dongle_usb
+        known = self.known_outputs_cached(settings.get("auto_device", ""))
+        return {
+            "outputs": outputs,
+            "inputs": [pack(d) for d in devs if not d.is_output],
+            "known_outputs": known,
+            "settings": settings,
+        }
+
+    def known_outputs_cached(self, pinned: str = "") -> list[dict]:
+        """The same list, but computed once.
+
+        Enumerating every endpoint, including the disabled ones, costs half a
+        second, and the window asks for the state on every refresh. The set of
+        devices changes rarely, and the watcher tells us when it does — the
+        snapshot is dropped on that, not on a timer.
+        """
+        if self._known_cache is None or self._known_pinned != pinned:
+            self._known_cache = self.known_outputs(pinned)
+            self._known_pinned = pinned
+        return self._known_cache
+
+    def forget_known(self) -> None:
+        self._known_cache = None
+
+    @staticmethod
+    def known_outputs(pinned: str = "") -> list[dict]:
+        """The list for choosing the priority device.
+
+        You have to choose it exactly when the headphones are off, so the
+        endpoints that are absent right now are needed too. But Windows piles up
+        their duplicates over the years: four separate "Digital Audio (HDMI)"
+        entries add up. Identical names mean one and the same jack, so we keep
+        one record per name, preferring a live one, and drop unnamed endpoints
+        entirely.
+        """
+        best: dict[str, devices.Device] = {}
+        for d in devices.list_devices(only_active=False):
+            # "Device" is the fallback name devices.py gives an endpoint that
+            # reports none of its own — it is data, and must match that literal.
+            if not d.is_output or d.name in ("", "Device"):
+                continue
+            kept = best.get(d.name)
+            # The already selected device must stay in the list, otherwise the
+            # setting would look reset even though it is in force.
+            if kept is None or d.id == pinned or (d.active and not kept.active
+                                                  and kept.id != pinned):
+                best[d.name] = d
+        ordered = sorted(best.values(), key=lambda d: (not d.active, d.name.lower()))
+        return [{"id": d.id, "name": d.name, "active": d.active} for d in ordered]
+
+    def current_device(self) -> devices.Device | None:
+        cur = devices.default_id(is_output=True)
+        return next((d for d in devices.list_devices() if d.id == cur), None) if cur else None
+
+    # --- actions --------------------------------------------------------
+    def cycle(self) -> None:
+        """The icon changes BEFORE the sound is switched.
+
+        Changing the device in Windows takes about 90 ms, and if the icon is
+        drawn after that, the person sees the response with a delay and decides
+        the click did not work. Show the result first, do the work second.
+        """
+        target = self.switcher.next_id()
+        if target is None:
+            if self.tray:
+                self.tray.notify("No device is marked for switching")
+            return
+        self.note_manual_switch()
+        self._go(target)
+
+    def _go(self, device_id: str) -> None:
+        """The common switching path: icon first, sound second.
+
+        The icon changes before the switch for the sake of responsiveness —
+        changing the device in Windows takes about 90 ms. But if the system
+        refuses, what was shown has to be taken back: a utility with a single
+        job has no right to lie about whether it did that job.
+        """
+        dev = self.switcher.device_by_id(device_id)
+        self.show_device(dev)
+        try:
+            done = self.switcher.switch_to(device_id)
+        except Exception:
+            # The device managed to disappear between drawing the list and the
+            # click: Windows answers "element not found". That is no reason to
+            # crash, but staying silent is not an option either — the icon
+            # already shows the wrong thing.
+            _log.warning("the switch failed with an error", exc_info=True)
+            done = None
+        if done is None:
+            _log.warning("the switch did not happen, reverting the icon")
+            self.show_device(self.current_device())
+            if self.tray:
+                self.tray.notify("Windows did not hand the sound to the chosen device")
+            self.push_state()
+            return
+        self._follow_microphone(device_id)
+        self.announce(dev, tray_done=True)
+
+    def _follow_microphone(self, output_id: str) -> None:
+        """The mic follows the headset; on speakers the base one comes back.
+
+        Asking "which microphone was it a minute ago" is not allowed: Windows
+        sometimes moves the microphone to the headset before we do, and then the
+        previous one turns out to be that very microphone. So the base
+        microphone is determined by meaning — it is the one that belongs to no
+        headset.
+
+        The communications role is always included: a microphone is needed
+        exactly for talking.
+        """
+        if not self.cfg.get("switch_microphone"):
+            return
+        try:
+            mic = devices.microphone_of(output_id)
+            cur = devices.default_id(is_output=False, max_age=0.0)
+            if mic is not None:
+                if mic.id != cur:
+                    devices.set_default(mic.id, include_communications=True)
+                    _log.info("the microphone moved to %s", mic.name)
+                return
+            if cur and cur not in devices.tied_microphones():
+                self._mic_base = cur   # belongs to no headset — so it is the base
+                return
+            base = self._mic_base or devices.standalone_microphone()
+            if base and base != cur:
+                devices.set_default(base, include_communications=True)
+                self._mic_base = base
+                _log.info("the microphone is back on the base one")
+            elif not base:
+                _log.info("no base microphone known — leaving the microphone alone")
+        except Exception:
+            _log.exception("could not switch the microphone")
+
+    # --- priority device -------------------------------------------------
+    def note_manual_switch(self) -> None:
+        """The person switched by hand — so we no longer "hold" the headphones,
+        and there is no need to butt in with our fallback when they vanish."""
+        self._auto_held = False
+
+    def sync_auto_device(self) -> None:
+        """The setting could have been turned on while the headphones are
+        already connected. We consider them held if the sound really is on them
+        — otherwise the very first time they are turned off the setting would
+        look like it does nothing."""
+        auto = self.cfg.get("auto_device")
+        self._auto_held = bool(auto) and devices.default_id(is_output=True, max_age=0.0) == auto
+        self._auto_prev = None
+        self.sync_dongle()
+
+    def sync_dongle(self) -> None:
+        """Start or stop the dongle listener to match the current settings."""
+        if self.dongle is not None:
+            self.dongle.stop()
+            self.dongle = None
+        auto = self.cfg.get("auto_device")
+        self._dongle_name = self._dongle_usb = None
+        if not auto:
+            return
+        ids = devices.usb_ids_of(auto)
+        if ids is None:
+            return                            # not USB — no dongle can be here
+        self._dongle_usb = f"{ids[0]:04X}:{ids[1]:04X}"
+        rule = KNOWN_DONGLES.get(ids)
+        if rule is None:
+            # An unknown dongle: there is no decoding for it, but its reports
+            # can be written to a file and a model added from them.
+            if self.cfg.get("learn_dongle"):
+                self.dongle = Dongle(ids[0], ids[1], None, learn=True)
+                self.dongle.start()
+            return
+        self._dongle_name = rule["name"]      # the interface will show a toggle
+        if not self.cfg.get("watch_dongle"):
+            return
+        self.dongle = Dongle(ids[0], ids[1], self._dongle_changed)
+        self.dongle.start()
+
+    def _dongle_changed(self, on: bool) -> None:
+        """The dongle reported that the headset was turned on or off.
+
+        Reports arrive in batches: at startup the dongle dumps several of them
+        in a row, and each one used to count as an event — the program threw the
+        sound back and forth several times a second (314 such events in the
+        log). We react only to a change of state.
+        """
+        if on == self._dongle_on:
+            return
+        self._dongle_on = on
+        auto = self.cfg.get("auto_device")
+        if not auto:
+            return
+        if on:
+            self._dispatch(self._grab_auto, auto)
+        elif self._auto_held:
+            self._dispatch(self._release_auto, auto)
+
+    def _devices_changed(self, added: set, removed: set) -> None:
+        """Called from the meter thread: the set of endpoints has changed."""
+        self.forget_known()
+        self.push_state()
+        auto = self.cfg.get("auto_device")
+        if not auto:
+            return
+        if auto in added:
+            job = self._grab_auto
+        elif auto in removed and self._auto_held:
+            job = self._release_auto
+        else:
+            return
+        self._dispatch(job, auto)
+
+    def _default_changed(self, device_id: str) -> None:
+        """The default device changed — no matter who changed it."""
+        self.refresh_tray()
+        self.push_state()
+
+    def _dispatch(self, job, auto: str) -> None:
+        self._jobs.put((job, auto))
+
+    def _job_loop(self) -> None:
+        """One thread for the whole session that switches sound on events.
+
+        Switching right in the meter thread is not allowed: enumerating devices
+        creates pycaw objects, at the end the meter thread runs garbage
+        collection, and objects belonging to other threads are released
+        somewhere other than where they were created — the process crashes.
+        Starting a thread per event is not allowed either: some of the objects
+        end up in reference cycles, outlive the thread and are released in an
+        already closed COM environment — the same crash. So there is one
+        environment here and it lives to the end.
+        """
+        import comtypes
+        comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
+        while True:
+            job, auto = self._jobs.get()
+            try:
+                job(auto)
+            except Exception:
+                _log.exception("automatic switching failed")
+
+    def _grab_auto(self, auto: str) -> None:
+        current = devices.default_id(is_output=True, max_age=0.0)
+        self._auto_held = True
+        if current == auto:
+            # Windows already gave the sound to the headphones on its own —
+            # there is nothing to switch, but the tray icon is still ours and it
+            # must show the new device.
+            self.show_device(self.switcher.device_by_id(auto))
+            self.push_state()
+            return
+        self._auto_prev = current
+        _log.info("the priority device appeared, taking the sound")
+        self._go(auto)
+
+    def _release_auto(self, auto: str) -> None:
+        self._auto_held = False
+        present = {d.id for d in devices.list_devices(only_active=True) if d.is_output}
+        back = self._auto_prev if self._auto_prev in present else None
+        if back is None:
+            # The previous device is gone too (or we never remembered it) — take
+            # the first one marked in the cycle, just so the sound does not stay
+            # nowhere.
+            back = next((i for i in self.switcher.available() if i != auto), None)
+        self._auto_prev = None
+        if back is None:
+            return
+        _log.info("the priority device disappeared, returning the sound")
+        self._go(back)
+
+    def _button(self, pressed: str) -> None:
+        if pressed == self.cfg.get("switch_button"):
+            self.cycle()
+        else:
+            self.show("devices")
+
+    def show_device(self, dev: devices.Device | None) -> None:
+        """Only the icon and the tooltip — the fastest part of the feedback."""
+        if dev is None or not self.tray:
+            _log.warning("icon not updated: device %s, tray %s",
+                         "not found" if dev is None else "there",
+                         "there" if self.tray else "missing")
+            return
+        glyph = self.cfg.get("icons").get(dev.id)
+        # Written to the log: the complaint "the tray icon never changed" is
+        # otherwise impossible to settle.
+        _log.info("tray icon: %s (%s)", glyph or "default", dev.name)
+        self._device_tip = dev.name
+        self.tray.set_device(glyph, self.tray_tip())
+
+    def tray_tip(self) -> str:
+        """The tooltip on the icon.
+
+        While the music plays — only the track name. The program name, the
+        player name and the device are things the person knows anyway, and
+        because of them the main thing had to be read out of a long line. When
+        there is no music there is nothing to show, and the line goes back to
+        the device.
+        """
+        now = self.players.snapshot()
+        if now["playing"]:
+            track = " — ".join(x for x in (now["artist"], now["title"]) if x)
+            if track:
+                return track
+        return f"Master Audio Switcher — {self._device_tip}"
+
+    def refresh_tip(self) -> None:
+        """The track changed — refresh the tooltip without touching the icon."""
+        if self.tray:
+            self.tray.set_tip(self.tray_tip())
+
+    def _player_dead(self, who: str) -> None:
+        """The player is listed in the system but does not answer: usually the
+        tab has already been closed."""
+        if self.tray:
+            self.tray.notify(f"{who} is not answering — the tab was probably closed")
+
+    def announce(self, dev: devices.Device | None, tray_done: bool = False) -> None:
+        """Feedback is mandatory: without it a person switches blind."""
+        if dev is None:
+            return
+        if not tray_done:
+            self.refresh_tray()
+        if self.cfg.get("notify_on_switch"):
+            self.overlay.show(self.cfg.get("icons").get(dev.id), dev.name, self._light_theme())
+        if self.cfg.get("sound_on_switch"):
+            self._beep()
+        self.push_state()
+
+    def _light_theme(self) -> bool:
+        """The overlay follows the window theme, and with "like Windows" — the
+        system theme."""
+        mode = self.cfg.get("theme")
+        if mode in ("light", "dark"):
+            return mode == "light"
+        from .tray import taskbar_is_light
+        return taskbar_is_light()
+
+    @staticmethod
+    def _beep() -> None:
+        """The tone plays on the default device, that is, already on the new one
+        — you hear where the sound went. In a separate thread so the click is
+        not held up."""
+        def run():
+            try:
+                import winsound
+                winsound.Beep(880, 90)
+            except Exception:
+                _log.warning("the beep did not play", exc_info=True)
+
+        threading.Thread(target=run, daemon=True, name="mas-beep").start()
+
+    def refresh_tray(self) -> None:
+        if not self.tray:
+            return
+        dev = self.current_device()
+        if dev is None:
+            self.tray.set_device(None, "Master Audio Switcher — device unknown")
+            return
+        self.show_device(dev)
+
+    def push_state(self) -> None:
+        """Only mark that the state changed. The interface will fetch it."""
+        with self._ui_lock:
+            self._state_rev += 1
+
+    # --- window ----------------------------------------------------------
+    def set_mini(self, on: bool, height: int | None = None) -> bool:
+        """Mini view: only the front panel is left, the window shrinks in height.
+
+        The interface measures the height itself and sends it here: it depends
+        on the fonts and the screen scale, and guessing it with a number in the
+        code is lying to yourself. The mode is deliberately not kept between
+        runs: otherwise one day a person gets a stub of a window at start and
+        decides the program is broken.
+        """
+        hwnd = screen.own_window("Master Audio Switcher")
+        if not hwnd:
+            return False
+        if height:
+            self._mini_height = max(120, min(int(height), 420))
+        self._mini = bool(on)
+        size = (FULL_SIZE[0], self._mini_height) if on else FULL_SIZE
+        ok = screen.resize_at_tray(hwnd, *size)
+        _log.info("mini view: %s, window %s×%s", on, *size)
+        return ok
+
+    def leave_mini(self) -> None:
+        """Mini view is cancelled when we need to show what it does not have."""
+        if self._mini:
+            self.set_mini(False)
+            self.push_state()
+
+    def show(self, tab: str = "devices") -> None:
+        """Python does not call JavaScript. The tab we need goes into the
+        snapshot, and the interface picks it up on the next poll. Calling
+        evaluate_js from a background thread into a hidden window used to hang
+        the whole program dead."""
+        if not self.window:
+            return
+        # The mixer and the settings have nowhere to go in mini view — leave it.
+        if tab != "devices" and self._mini:
+            self.set_mini(False)
+        with self._ui_lock:
+            self._pending_tab = tab
+            self._state_rev += 1
+        try:
+            self.window.show()
+            self._visible = True
+            self.meter.set_idle(False)
+            hwnd = screen.own_window("Master Audio Switcher")
+            if hwnd and screen.place_at_tray(hwnd):
+                pass          # the window went to the corner where the tray is
+            _log.info("window shown, tab %s", tab)
+        except Exception:
+            _log.exception("the window did not show up")
+
+    def take_ui_signal(self) -> dict:
+        with self._ui_lock:
+            tab, self._pending_tab = self._pending_tab, None
+            return {"tab": tab, "rev": self._state_rev, "mini": self._mini,
+                    "hidden": not self._visible, "now": self.players.snapshot()}
+
+    def hide(self) -> None:
+        if not self.window:
+            return
+        try:
+            self.window.hide()
+        except Exception:
+            _log.warning("the window did not hide", exc_info=True)
+            return
+        # The order matters: hide first, then put everything into sleep mode.
+        self._visible = False
+        self.meter.set_idle(True)
+        with self._ui_lock:
+            self._state_rev += 1      # so the page learns of it on the next poll
+
+    def _shutdown_com(self) -> None:
+        """Let COM go before the window unloads the .NET runtime.
+
+        Otherwise the garbage collector calls Release in an already destroyed
+        environment, and the process crashes with a memory access violation —
+        caught by the crash trap.
+        """
+        self.hotkeys.stop()
+        self.players.stop()
+        self.meter.stop()
+        self.meter.join(timeout=1.5)
+        devices.invalidate()
+
+    def quit(self) -> None:
+        if self._quitting:
+            return
+        self._quitting = True
+        _log.info("exit on request")
+        self._shutdown_com()
+        if self.tray:
+            self.tray.stop()
+        self.bridge.stop()
+        if self.window:
+            try:
+                self.window.destroy()
+            except Exception:
+                pass
+
+    # --- startup ---------------------------------------------------------
+    def run(self) -> int:
+        # The window module is loaded here and not at the top of the file: it
+        # drags .NET along with it and costs about 90 ms, and until the tray
+        # icon appears it is not needed at all.
+        import webview
+
+        url = self.bridge.start()
+        self.meter.start()
+        self.hotkeys.start()
+        self.players.start()
+        threading.Thread(target=self._job_loop, daemon=True, name="mas-auto").start()
+
+        # The buttons are read on every click instead of being remembered at
+        # startup: the setting gets changed on the fly, and restarting the
+        # program for that would be silly.
+        self.tray = Tray(
+            on_left=lambda: self._button("left"),
+            on_right=lambda: self._button("right"),
+            on_middle=lambda: self.show("mixer"),
+            on_quit=self.quit,
+        )
+        self.overlay.start()
+        threading.Thread(target=self.tray.run, daemon=True, name="mas-tray").start()
+        threading.Thread(target=self._boot_watchdog, daemon=True, name="mas-boot").start()
+
+        # Our own title bar instead of the native frame. easy_drag is off: with
+        # it the window is dragged by any point of the page, and the sliders and
+        # the knob stop working. The drag zone is set in the markup by the
+        # pywebview-drag-region class.
+        self.window = webview.create_window(
+            "Master Audio Switcher", url, width=440, height=772,
+            resizable=False, frameless=True, easy_drag=False, hidden=True,
+            background_color="#1C1F24",
+        )
+        try:
+            webview.start()
+            # We get here both when the window was closed and when the WebView2
+            # engine crashed. Telling them apart matters: in the second case the
+            # program is obliged to say so.
+            _log.info("window loop finished (exit requested: %s)", self._quitting)
+        finally:
+            self._shutdown_com()
+            self.bridge.stop()
+            _log.info("=== exit ===")
+            log.note_clean_exit()
+            logging.shutdown()
+            # We cut the process off without letting the interpreter shut down.
+            # On exit the WebView2 window unloads the .NET runtime, that runtime
+            # starts garbage collection, and it releases the remaining COM
+            # objects in an already collapsing environment — the process crashes
+            # with a memory access violation five times out of five. There is
+            # nothing to clean up: the settings are written immediately, and the
+            # memory is given back by the system.
+            os._exit(0)
+        return 0
+
+    def _boot_watchdog(self) -> None:
+        # Devices are enumerated here and not in the main thread: the main one
+        # is the only one with the single-threaded COM model, and the COM objects
+        # created there are later released by the garbage collector from another
+        # thread, and the process crashes.
+        self.switcher.seed_if_empty()
+        # We wait not "two seconds just in case" but for exactly what we are
+        # waiting for: the first binding of the meter to a device. The window
+        # used to appear 2.5 s after a manual start only because of that pause.
+        if not self.meter.ready.wait(timeout=2.0):
+            _log.info("the meter did not bind within 2 s — showing the window as is")
+        self.refresh_tray()
+        self.sync_auto_device()
+        # A manual start is obliged to show the window: Windows hides a new icon
+        # in the tray overflow, and the person decides the program did not
+        # start. A start from autostart goes to the tray silently, otherwise the
+        # window pops up every time the computer is turned on.
+        if self.launched_by_startup:
+            # The window was never opened — put the meter into the sleepy rhythm
+            # right away, otherwise it spins at full rate until the window is
+            # first shown, that is, possibly for the whole session.
+            self.meter.set_idle(True)
+            _log.info("started from autostart — not showing the window")
+        else:
+            _log.info("manual start — showing the window")
+            self.show("devices")
+        dev = self.current_device()
+        _log.info("SELFCHECK RESULT: bridge=%s, tray=%s, device=%s",
+                  "alive" if self.api.selfcheck_seen else "SILENT",
+                  "there" if self.tray else "missing",
+                  dev.name if dev else "unknown")
+
+
+def set_app_id() -> None:
+    """Without an app id of its own Windows signs notifications with the process
+    name — when started from source, "Python" shows up in the title."""
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MasterAudioSwitcher.App")
+    except Exception:
+        _log.warning("the application id was not set", exc_info=True)
+
+
+def main() -> int:
+    # Cyclic garbage collection is disabled on purpose, and this is not an
+    # optimization. COM objects live in different threads, while the collector
+    # fires in whichever thread got unlucky and releases someone else's object
+    # outside its environment — the process crashes with a memory access
+    # violation. Caught by the trap on the path back from the headset. Reference
+    # counting releases everything by itself, in the right thread. The price is
+    # measured: 8 KB for a full device enumeration, and those same kilobytes are
+    # not given back by a manual collection either — that is, there is no price
+    # at all.
+    gc.disable()
+    log.setup()
+    set_app_id()
+    _log.info("=== start, frozen=%s ===", is_frozen())
+    if already_running():
+        _log.warning("an instance is already running, exiting")
+        return 0
+    return App().run()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

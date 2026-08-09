@@ -1,0 +1,419 @@
+/* Braun: graphite body, a single orange accent, recessed controls. */
+
+:root{
+  --bg:#1C1F24; --panel:#1C1F24; --panel-hi:#23272D;
+  --card:#191C21; --card-hi:#212630;
+  --line:rgba(255,255,255,.065); --line-hi:rgba(255,255,255,.12);
+  /* The third text level is explanations and utility captions, not decoration:
+     the old #5F6773 gave 2.99:1 on a card, which is formally unreadable.
+     This one is 5.1:1 — the norm for small text, with room to spare. */
+  --tx:#E9ECF1; --tx-2:#98A0AC; --tx-3:#88909B;
+  --acc:#F26A21; --acc-soft:rgba(242,106,33,.16); --on-acc:#140702;
+  --led:#4ADE80; --danger:#FF6B6B;
+  /* The glass of the LCD window: pale grey-green, like a real panel with no
+     backlight. Segments are almost black, and unlit ones are barely visible:
+     that shadow of unlit segments is exactly what gives away a real LCD. */
+  --lcd-hi:#A9B3A7; --lcd:#99A399; --lcd-lo:#8B958B; --lcd-ink:#131A14;
+  --knob-a:#4A5058; --knob-b:#33383F; --knob-c:#23272C; --knob-d:#191C20;
+  --sunk:rgba(0,0,0,.4);
+  --active-row:rgba(255,255,255,.045);
+}
+:root[data-theme="light"]{
+  --bg:#EDEAE3; --panel:#EDEAE3; --panel-hi:#F5F3EE;
+  --card:#F7F5F1; --card-hi:#FFFFFF;
+  --line:rgba(0,0,0,.09); --line-hi:rgba(0,0,0,.16);
+  --tx:#23262B; --tx-2:#5C6169; --tx-3:#626871;
+  --acc-soft:rgba(242,106,33,.14);
+  --led:#22A45D;
+  /* On the cream body the same glass is taken one shade darker, otherwise the
+     window blends into the panel and stops reading as recessed. */
+  --lcd-hi:#9CA79B; --lcd:#8D988D; --lcd-lo:#808B81; --lcd-ink:#111710;
+  --knob-a:#FFFFFF; --knob-b:#E4E1DA; --knob-c:#D2CFC7; --knob-d:#BEBAB1;
+  --sunk:rgba(0,0,0,.08);
+  --active-row:rgba(0,0,0,.035);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+/* The focus ring from a mouse press is removed: the browser draws it as a
+   two-colour outline, and clipped by the container it looked like a white strip
+   at the edge of a key. For the keyboard the ring stays — otherwise you cannot
+   tell where you are when tabbing. */
+:focus{outline:none}
+:focus-visible{outline:1px solid var(--acc);outline-offset:-3px}
+html,body{height:100%;overflow:hidden}
+/* Everything 10% larger, through one factor so the proportions stay put.
+   The window is enlarged by the same amount, so nothing overflows. */
+html{zoom:1.1}
+body{
+  background:var(--bg);color:var(--tx);
+  font-family:Inter,'Segoe UI Variable Text','Segoe UI',sans-serif;font-size:13px;
+  user-select:none;-webkit-user-select:none;
+}
+.shell{position:relative;height:100%;display:flex;flex-direction:column;
+  /* Our own shadow: Windows does not draw one for a frameless window. */
+  box-shadow:inset 0 0 0 1px var(--line-hi)}
+.micro{font-size:9px;text-transform:uppercase;letter-spacing:.22em;color:var(--tx-3);font-weight:500}
+.micro.acc{color:var(--acc)}
+.hidden{display:none !important}
+
+/* ---------- our own title bar ---------- */
+.cap{display:flex;align-items:center;padding:10px 8px 0 14px;flex:none}
+.capdrag{display:flex;align-items:center;gap:9px;flex:1;min-width:0;
+  padding:4px 0;cursor:default}
+.mark{width:22px;height:22px;border-radius:6px;flex:none;display:block;
+  box-shadow:0 2px 6px -2px rgba(0,0,0,.6)}
+.cap h1{font-size:10px;text-transform:uppercase;letter-spacing:.18em;font-weight:500;
+  color:var(--tx-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp{display:flex;gap:2px;flex:none}
+.iconbtn{width:26px;height:26px;border-radius:7px;border:1px solid transparent;background:none;
+  color:var(--tx-3);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn:hover{background:var(--card);border-color:var(--line);color:var(--tx)}
+.iconbtn.danger:hover{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.35);color:var(--danger)}
+.iconbtn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* ---------- mini view ---------- */
+/* Hide everything except the title bar and the front panel. The title bar is
+   left alone: it holds the drag region and the way out of the mini view. */
+html.mini .tabs,html.mini .body,html.mini .fade{display:none}
+html.mini #console{display:flex !important}   /* panel visible on any tab */
+#btn-mini .to-full{display:none}
+html.mini #btn-mini .to-mini{display:none}
+html.mini #btn-mini .to-full{display:block}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:2px;margin:10px 12px 0;padding:3px;background:var(--sunk);
+  border-radius:11px;flex:none;box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+.tab{flex:1;padding:7px 0 6px;border-radius:8px;border:0;background:none;cursor:pointer;
+  color:var(--tx-3);display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:10px;text-transform:uppercase;letter-spacing:.12em;font-weight:500;font-family:inherit}
+.tab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* Tab icon through a mask: the colour comes from the text and changes by itself
+   on the active tab. */
+.tabico{display:block;width:22px;height:22px;margin:0 auto;background:currentColor;
+  -webkit-mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;
+  mask-position:center;mask-size:contain;mask-repeat:no-repeat}
+.tab[aria-selected="true"]{background:var(--panel-hi);color:var(--tx);
+  box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 2px 5px rgba(0,0,0,.3)}
+
+/* ---------- console with the knob ---------- */
+.console{position:relative;margin:10px 12px 0;padding:10px;border-radius:14px;flex:none;
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,var(--panel-hi) 0%,var(--panel) 70%);
+  border:1px solid var(--line-hi);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 10px rgba(0,0,0,.25)}
+.knobcol{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
+
+/* ---------- player key block ---------- */
+/* Instrument logic: a rail recessed into the body holding three separate caps
+   with a bevel on top and a shadow below — like rubber keys on a remote. The
+   rail is as wide as the knob's tick ring, so it reads as a bank of keys under
+   the knob. The glyphs are white: on real gear they are printed in ink, not
+   backlit. */
+.transport{display:flex;gap:3px;padding:3px;width:132px;height:34px;border-radius:9px;
+  background:rgba(0,0,0,.45);border:1px solid var(--line);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+.tbtn{flex:1;border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:0;cursor:pointer;
+  color:var(--tx);display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#2B3037 0%,#20242B 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5)}
+.tbtn:hover{background:linear-gradient(180deg,#333941 0%,#262B33 100%)}
+/* On press the cap travels down. The glyph colour does not change: the program
+   does not know whether music is playing, so it has nothing to highlight. */
+.tbtn:active{transform:translateY(1px);
+  background:linear-gradient(180deg,#1D2128 0%,#232830 100%);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.55)}
+.ti{width:15px;height:15px;fill:currentColor;display:block}
+
+:root[data-theme="light"] .transport{background:rgba(0,0,0,.13)}
+:root[data-theme="light"] .tbtn{color:#2B2E33;border-color:rgba(0,0,0,.1);
+  background:linear-gradient(180deg,#FBFAF7 0%,#E6E3DC 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 1px 2px rgba(0,0,0,.22)}
+:root[data-theme="light"] .tbtn:hover{background:linear-gradient(180deg,#FFF 0%,#EDEAE3 100%)}
+:root[data-theme="light"] .tbtn:active{background:linear-gradient(180deg,#DDD9D1 0%,#E9E6DF 100%);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.2)}
+/* Caption above the window: without it nothing explains the right-hand window.
+   The bottom margin keeps the windows on the knob's centre line rather than on
+   the centre of the whole panel, which grew taller because of the key block. */
+.lcdbox{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1 1 0;min-width:0;
+  margin-bottom:42px}
+.lcdcap{font-size:8px;letter-spacing:.2em}
+
+/* ---------- LCD windows ---------- */
+/* The glass is recessed into the body: an inner shadow at the top, a light
+   bevel at the bottom. There is no raised highlight — the glass does not stick
+   out, it sits below the panel. */
+/* The width is fluid: the window is narrow, and a hard 102 pixels left the knob
+   no air — the gap collapsed to four pixels and the panel spilled over the
+   edge. */
+.lcd{position:relative;width:100%;min-width:74px;max-width:100px;
+  height:42px;border-radius:3px;
+  display:flex;align-items:center;overflow:hidden;
+  padding:0 5px;
+  background:linear-gradient(180deg,var(--lcd-hi) 0%,var(--lcd) 55%,var(--lcd-lo) 100%);
+  border:1px solid rgba(0,0,0,.5);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.32),inset 0 -1px 0 rgba(255,255,255,.22),
+             0 1px 0 rgba(255,255,255,.05)}
+/* Reflection on the glass: one shallow band at the top, no rainbows or flares. */
+.lcd::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(158deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.04) 38%,
+             transparent 60%)}
+.lcd svg{display:block}
+#lcd-vol{justify-content:flex-end;gap:3px}
+#lcd-lvl{justify-content:center}
+
+/* An unlit segment is always visible — that is what the resemblance to a real
+   screen rests on. The transition is short: digits should snap, not drift.
+   The class is called lseg, not seg: seg is already taken by the segmented
+   buttons in settings, and the opacity from here dimmed them to unreadable. */
+.lseg{fill:var(--lcd-ink);opacity:.085;transition:opacity .07s linear}
+.lseg.on{opacity:.93}
+.lseg.peak{fill:none;stroke:var(--lcd-ink);stroke-width:1;opacity:.75}
+.pct{fill:var(--lcd-ink);stroke:var(--lcd-ink);opacity:.93}
+
+/* Cursor: an open hand on hover and a closed one while grabbing. */
+.knob{position:relative;width:130px;height:130px;touch-action:none;cursor:grab}
+.knob.grabbing{cursor:grabbing}
+.knob svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.knob .cap-body{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:84px;height:84px;border-radius:50%;
+  background:radial-gradient(120% 120% at 34% 24%,var(--knob-a) 0%,var(--knob-b) 34%,var(--knob-c) 66%,var(--knob-d) 100%);
+  box-shadow:0 10px 20px -6px rgba(0,0,0,.6),0 2px 5px rgba(0,0,0,.4),
+             inset 0 1px 1px rgba(255,255,255,.22),inset 0 -2px 6px rgba(0,0,0,.4)}
+.knob .cap-body::before{content:'';position:absolute;inset:6px;border-radius:50%;
+  background:radial-gradient(120% 120% at 36% 26%,var(--knob-b) 0%,var(--knob-c) 48%,var(--knob-d) 100%);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.13),inset 0 -1px 4px rgba(0,0,0,.35)}
+.knob .ind-hold{position:absolute;inset:0;pointer-events:none}
+/* The rotation axis matches the centre: 65 - 27 = 38. Otherwise the mark travels
+   along a curve. */
+.knob .ind{position:absolute;left:50%;top:27px;width:3px;height:20px;margin-left:-1.5px;
+  transform-origin:50% 38px;border-radius:2px;background:#F2F5F9;
+  box-shadow:0 0 7px rgba(255,255,255,.5)}
+:root[data-theme="light"] .knob .ind{background:#2B2E33;box-shadow:none}
+
+/* ---------- scrollable body ---------- */
+.body{padding:10px 12px 20px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:none}
+.body::-webkit-scrollbar{width:0;height:0;display:none}
+.fade{position:absolute;left:0;right:0;bottom:0;height:30px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,var(--bg))}
+
+.lbl{margin:2px 0 7px 3px}
+h2.sec{margin:12px 0 7px 3px}
+/* Icon next to a section heading: the drawing comes from a mask and the colour
+   from the text. An <img> cannot do that — the icon would stay black on the
+   dark panel. */
+.lbl,h2.sec{display:flex;align-items:center;gap:6px}
+.secico{display:inline-block;width:17px;height:17px;flex:none;background:currentColor;
+  -webkit-mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;
+  mask-position:center;mask-size:contain;mask-repeat:no-repeat;opacity:.85}
+
+/* ---------- device rows ---------- */
+/* Tight on the left, a normal margin on the right: the drag grip is not content,
+   there is no reason to reserve a wide field for it, and the icon should start
+   right at the edge. */
+.row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:6px 11px 6px 8px;margin-top:6px}
+/* The left padding equals the gap between columns: otherwise the grip dots sit
+   closer to the card edge than to the icon and the row looks shifted. */
+.row[data-order]{transition:transform .13s ease}
+/* The row being dragged: lifted above the rest, deeper shadows, no easing — it
+   has to follow the finger exactly. */
+.row.dragging{transition:none;z-index:5;position:relative;cursor:grabbing;
+  box-shadow:0 12px 26px -10px rgba(0,0,0,.75);border-color:var(--line-hi)}
+/* The active device: no colour fill — a dot, more weight, a slightly lighter
+   background. */
+.row.active{background:var(--active-row);border-color:var(--line-hi)}
+.row.active .nm{font-weight:500}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--led);
+  box-shadow:0 0 8px var(--led)}
+.dot.ghost{background:transparent;box-shadow:none}
+/* The grip box is strictly fixed (flex:none): otherwise the flex layout
+   stretched it in some rows and squeezed it in others, and the icons of devices
+   and microphones sat on different vertical lines. */
+.row .grip{flex:none;width:6px;height:16px;color:var(--tx-3);cursor:grab;line-height:0}
+.row .grip svg{fill:currentColor;display:block}
+.row:hover .grip{color:var(--tx-2)}
+/* The class is blank on purpose: the name empty is already taken by the empty
+   state of the list, and its padding inflated this box to 20 points. */
+.row .grip.blank{visibility:hidden;cursor:default}
+/* The icon tile is the main identifying detail of a row, so it is large: the
+   silhouette of the device should be visible without peering. The tile is also
+   the icon-picker button, and 44 px is a comfortable mouse target. */
+.row .ic{width:44px;height:44px;border-radius:12px;flex:none;background:var(--card-hi);
+  display:flex;align-items:center;justify-content:center;border:1px solid var(--line);
+  cursor:pointer;position:relative}
+.row .ic img{width:28px;height:28px}
+.row .ic .pen{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;
+  background:var(--panel);border:1px solid var(--line-hi);display:flex;align-items:center;justify-content:center}
+.row .ic .pen svg{width:8px;height:8px;fill:var(--tx-2)}
+.row .ic:hover{border-color:var(--line-hi)}
+.row .ic:hover .pen svg{fill:var(--tx)}
+.row .col{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.row .nm{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk{width:19px;height:19px;border-radius:6px;flex:none;border:1.5px solid var(--line-hi);
+  background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+/* Checkmarks, switches and buttons no longer glow: when everything glows, the
+   accent stops highlighting anything. The orange glow is kept for the knob and
+   the current-device indicator — there it means "running right now". */
+.chk[aria-checked="true"]{background:var(--acc);border-color:transparent}
+.chk svg{width:11px;height:11px;stroke:var(--on-acc);stroke-width:2.8;fill:none;display:none}
+.chk[aria-checked="true"] svg{display:block}
+
+/* ---------- collapsible section ---------- */
+.fold{display:flex;align-items:center;gap:7px;background:none;border:0;padding:0;margin:14px 0 4px 3px;
+  cursor:pointer;font-family:inherit;color:var(--tx-3)}
+.fold .arw{transition:transform .15s ease}
+.fold .arw svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.fold[aria-expanded="true"] .arw{transform:rotate(90deg)}
+.fold .cnt{margin-left:auto;margin-right:3px}
+
+/* ---------- mixer ---------- */
+.mx{display:flex;align-items:center;gap:11px;padding:11px;background:var(--card);
+  border:1px solid var(--line);border-radius:12px;margin-top:7px}
+/* The icon is drawn whole: the container is bigger than the image, nothing is
+   clipped. */
+.mx .ap{width:48px;height:48px;border-radius:13px;flex:none;position:relative;cursor:pointer;
+  border:0;padding:0;background:var(--card-hi);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:600;color:#fff;text-transform:uppercase;overflow:hidden}
+.mx .ap img{width:34px;height:34px;display:block;object-fit:contain}
+/* The master volume tile: the icon through a mask, the colour contrasting with
+   the orange. */
+.mx .ap .mxico{width:30px;height:30px;display:block;background:var(--on-acc);
+  -webkit-mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;
+  mask-position:center;mask-size:contain;mask-repeat:no-repeat}
+.mx .ap .slash{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  border-radius:11px;background:rgba(12,14,18,.62)}
+.mx .ap .slash svg{width:18px;height:18px;fill:var(--danger)}
+.mx .ap:hover .slash{display:flex;background:rgba(12,14,18,.45)}
+.mx.muted .ap img{filter:grayscale(1);opacity:.5}
+.mx.muted .ap .slash{display:flex}
+.mx.muted .nm,.mx.muted .pc{color:var(--tx-3)}
+.mx.muted .fill{background:var(--tx-3)}
+.mx .col{flex:1;min-width:0}
+.mx .top{display:flex;align-items:baseline;gap:6px}
+.mx .nm{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The percentage reads as a value, not as a utility caption: the digits are
+   larger and tabular so they do not jitter while dragging. */
+.mx .pc{margin-left:auto;font-size:11.5px;color:var(--tx-2);font-variant-numeric:tabular-nums}
+.mx .pc.off{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--tx-3)}
+
+/* An instrument fader: a thin recessed track, short ticks under it and a compact
+   cylindrical thumb. The ticks are drawn by a gradient — separate elements for
+   every tick are pointless here. */
+.slider{height:20px;margin-top:2px;position:relative;cursor:pointer;display:flex;align-items:center}
+.slider .track{height:3px;width:100%;border-radius:2px;background:var(--sunk);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.45)}
+.slider .track::after{content:'';position:absolute;left:0;right:0;top:12px;height:4px;
+  background:repeating-linear-gradient(90deg,var(--line-hi) 0 1px,transparent 1px 10%)}
+.slider .fill{position:absolute;height:3px;border-radius:2px;background:var(--acc)}
+.slider .knb{position:absolute;width:9px;height:17px;border-radius:2px;transform:translateX(-50%);
+  background:linear-gradient(180deg,#F2F4F7 0%,#D6DAE1 46%,#AEB4BE 54%,#C6CBD3 100%);
+  box-shadow:0 1px 3px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.18)}
+:root[data-theme="light"] .slider .knb{
+  background:linear-gradient(180deg,#FFF 0%,#E7E4DD 46%,#BFBCB4 54%,#DAD7D0 100%);
+  box-shadow:0 1px 3px rgba(0,0,0,.28),inset 0 0 0 1px rgba(0,0,0,.14)}
+
+/* ---------- settings ---------- */
+/* One panel per section, with rows inside separated by a thin divider. A
+   separate card for every switch doubled the height of the settings screen and
+   turned a dense instrument into a list of big slabs. */
+.group{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.group .st+.st{border-top:1px solid var(--line)}
+.st{display:flex;align-items:center;gap:12px;padding:9px 12px}
+.st .col{flex:1;min-width:0}
+.st .nm{font-size:12.5px}
+.st .ds{font-size:10.5px;color:var(--tx-3);margin-top:3px;line-height:1.45}
+/* The control moves into the right column and lines up across every row of the
+   section — that way the eye finds the right switch in one move. */
+.st .ctl{flex:none;display:flex;align-items:center;gap:5px}
+.st.stack{display:block}
+.st.stack .ctl{margin-top:8px}
+.st .ctl select{margin-top:0}   /* .ctl already gives the margin, a second one is redundant */
+select.narrow{width:auto;min-width:148px;padding:8px 34px 8px 11px}
+.sw{width:35px;height:20px;border-radius:11px;flex:none;background:var(--sunk);cursor:pointer;
+  border:1px solid var(--line-hi);position:relative;padding:0;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+.sw i{position:absolute;top:50%;left:3px;transform:translateY(-50%);width:14px;height:14px;
+  border-radius:50%;background:linear-gradient(180deg,#7C838E,#5A616B);
+  box-shadow:0 1px 2px rgba(0,0,0,.4);transition:left .13s ease}
+.sw[aria-checked="true"]{background:var(--acc);border-color:transparent}
+.sw[aria-checked="true"] i{left:18px;background:linear-gradient(180deg,#FFF,#E2E6EC)}
+
+.segs{display:flex;gap:4px}
+.segs.wide{width:100%}
+.seg{flex:1;padding:8px 0;border-radius:8px;background:var(--card-hi);border:1px solid var(--line);
+  cursor:pointer;font-family:inherit;font-size:9.5px;text-transform:uppercase;
+  letter-spacing:.16em;color:var(--tx-3);white-space:nowrap}
+.segs:not(.wide) .seg{flex:none;padding:8px 12px}
+.seg[aria-selected="true"]{background:var(--acc);border-color:transparent;color:var(--on-acc);
+  font-weight:500}
+/* The shortcut field is set like a legend on a key, not like a micro heading. */
+.seg.key{text-transform:none;letter-spacing:.06em;font-size:11.5px;color:var(--tx);
+  font-variant-numeric:tabular-nums;min-width:96px}
+.seg.key.armed{border-color:var(--acc);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.seg.drop{flex:0 0 auto;padding:8px 11px}
+.ds.warn{color:var(--acc);margin-top:6px}
+
+select{width:100%;margin-top:8px;padding:10px 11px;border-radius:9px;cursor:pointer;
+  background:var(--card-hi);border:1px solid var(--line);color:var(--tx);
+  font-family:inherit;font-size:12.5px;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--tx-3) 50%),
+                   linear-gradient(135deg,var(--tx-3) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+select:focus{outline:none;border-color:var(--line-hi)}
+option{background:var(--panel-hi);color:var(--tx)}
+optgroup{background:var(--panel-hi);color:var(--tx-3);font-style:normal;font-size:11px}
+
+/* ---------- about ---------- */
+.about{text-align:center;padding:10px 8px 4px}
+.about .logo{width:72px;height:72px;border-radius:18px;display:block;margin:4px auto 12px;
+  box-shadow:0 10px 26px -8px rgba(0,0,0,.75)}
+.about h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.2em;font-weight:500}
+.about p{font-size:11.5px;color:var(--tx-2);line-height:1.65;margin:12px 6px 0}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:10px;border-radius:10px;border:0;cursor:pointer;
+  font-family:inherit;font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;font-weight:500;
+  color:var(--on-acc);background:var(--acc)}
+.btn.ghost{background:var(--card);color:var(--tx-2);border:1px solid var(--line);box-shadow:none}
+/* Quitting the program is red: it is the only irreversible action on the screen,
+   and it must not be confused with "check for updates". */
+.btn.ghost.quit{color:var(--danger);border-color:rgba(255,107,107,.35)}
+.btn.ghost.quit:hover{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.55)}
+:root[data-theme="light"] .btn.ghost.quit{color:#D14343;border-color:rgba(209,67,67,.4)}
+:root[data-theme="light"] .btn.ghost.quit:hover{background:rgba(209,67,67,.1)}
+
+/* ---------- icon palette ---------- */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;
+  justify-content:center;padding:18px;z-index:20}
+.sheet .box{width:100%;background:var(--panel-hi);border:1px solid var(--line-hi);
+  border-radius:15px;padding:14px;box-shadow:0 24px 50px -14px rgba(0,0,0,.7)}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}
+.gi{aspect-ratio:1;border-radius:10px;background:var(--card);border:1px solid var(--line);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.gi img{width:31px;height:31px}
+.gi[aria-selected="true"]{background:var(--acc);border-color:transparent}
+
+/* ---------- first run ---------- */
+.welcome{position:fixed;inset:0;background:var(--bg);z-index:30;display:flex;flex-direction:column;
+  justify-content:center;padding:24px 20px;overflow-y:auto;scrollbar-width:none}
+.welcome::-webkit-scrollbar{display:none}
+.welcome .big{width:52px;height:52px;border-radius:16px;margin:0 auto 14px;background:var(--acc);
+  display:flex;align-items:center;justify-content:center}
+.welcome .big svg{width:27px;height:27px;fill:var(--on-acc)}
+.welcome h2{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.2em;font-weight:500}
+.welcome .gest{display:flex;align-items:center;gap:12px;background:var(--card);
+  border:1px solid var(--line);border-radius:12px;padding:11px;margin-top:8px}
+.welcome .gest .n{width:30px;height:30px;border-radius:9px;flex:none;background:var(--card-hi);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+.welcome .gest .n svg{width:17px;height:17px;stroke:var(--acc);fill:none;stroke-width:1.7}
+.welcome .gest .t{font-size:12px}
+.welcome .gest .d{font-size:10.5px;color:var(--tx-3);margin-top:3px;line-height:1.4}
+.welcome .note{font-size:10.5px;color:var(--tx-3);text-align:center;margin-top:12px;line-height:1.5}
+
+.empty{text-align:center;color:var(--tx-3);font-size:11.5px;padding:20px 10px;line-height:1.6}
+
+/* On buttons the icon is larger than on headings: the label there is small and
+   letter-spaced. */
+.btn .secico{width:21px;height:21px;opacity:1}
+/* Icon for the collapsible list of microphones. */
+.fold .secico{width:16px;height:16px;margin-right:1px}
