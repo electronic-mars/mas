@@ -6,11 +6,17 @@ browser both open, the target hops between them every one to eight seconds, and
 two presses in a row land in different programs. There is no way to explain
 that to a person.
 
-Here the target is chosen by a rule you can state: the command goes to whoever
-is **playing**; if nobody is playing, to whoever we controlled last time; if
-that one is gone too, to whoever the system picked. Players that do not appear
-in the session list at all (VLC 3.x never shows up there) are served the old
-way — by tapping a media key.
+Here the target is chosen by a rule you can state. A player the person has
+nominated wins outright, whatever else is going on. Otherwise the command goes
+to whoever is **playing**; if nobody is playing, to whoever we controlled last
+time; if that one is gone too, to whoever the system picked. Players that do not
+appear in the session list at all (VLC 3.x never shows up there) are served the
+old way — by tapping a media key.
+
+Nominating a player also means starting it *instead* of what is going on: the
+others get paused first. Without that, a short video in a browser and the music
+would simply play on top of each other, which is the very thing the setting is
+there to end.
 
 The WinRT work lives in a separate thread with its own COM model: calls from
 there are blocking, and in the single-threaded model they are forbidden. Event
@@ -74,6 +80,13 @@ class Players(threading.Thread):
         # Players that answer True and do nothing: Chromium-based browsers
         # behave exactly like that. The list fills itself, from experience.
         self._keys_only: set[str] = set()
+        # The player the person nominated. While it has a session, every command
+        # goes to it and the rule below is not consulted at all.
+        self._priority = ""
+        # Every player we have seen, system id -> the name a person calls it by.
+        # The settings need a list to choose from, and the chosen one has to keep
+        # its name even while it is not running.
+        self._seen: dict[str, str] = {}
         self._mgr = None
         self.available = False
 
@@ -81,6 +94,20 @@ class Players(threading.Thread):
     def command(self, action: str) -> None:
         """Pause or skip. Runs on our own thread, we do not wait for an answer."""
         self._jobs.put(("cmd", action))
+
+    def set_priority(self, app_id: str) -> None:
+        self._priority = app_id or ""
+        if self._priority:
+            with self._lock:
+                self._seen.setdefault(self._priority, self._short(self._priority))
+        _log.info("priority player: %s",
+                  self._short(self._priority) if self._priority else "not chosen")
+
+    def known_apps(self) -> list[dict]:
+        """For the settings list. The chosen one is always in it, running or not."""
+        with self._lock:
+            seen = dict(self._seen)
+        return [{"id": i, "name": n} for i, n in sorted(seen.items(), key=lambda kv: kv[1])]
 
     def refresh(self) -> None:
         """Refresh the snapshot: who is playing and what exactly."""
@@ -132,6 +159,14 @@ class Players(threading.Thread):
                 del self._dead[app]
                 _log.info("%s responds again", self._short(app))
 
+    def _note(self, sessions) -> None:
+        """Remember everyone we have seen, so the settings have a list to offer."""
+        with self._lock:
+            for s in sessions:
+                app = s.source_app_user_model_id
+                if app and app not in self._seen:
+                    self._seen[app] = self._short(app)
+
     def _pick(self, sessions):
         """Who to address the command to. The rule is described in the module header."""
         if not sessions:
@@ -139,6 +174,13 @@ class Players(threading.Thread):
         alive = [s for s in sessions if s.source_app_user_model_id not in self._dead]
         if alive:
             sessions = alive       # pick a ghost only if there is nobody else
+        # A nominated player outranks every guess below, including the system's.
+        # That is the whole point of nominating one: a video starts in a browser,
+        # and without this the next press would land there instead of the music.
+        if self._priority:
+            for s in sessions:
+                if s.source_app_user_model_id == self._priority:
+                    return s
         playing = [s for s in sessions
                    if int(s.get_playback_info().playback_status) == PLAYING]
         if playing:
@@ -157,6 +199,7 @@ class Players(threading.Thread):
 
     def _read(self, sessions) -> Track:
         self._revive(sessions)
+        self._note(sessions)
         target = self._pick(sessions)
         if target is None:
             return Track()
@@ -196,6 +239,7 @@ class Players(threading.Thread):
 
         sessions = self._sessions()
         self._revive(sessions)
+        self._note(sessions)
         target = self._pick(sessions)
         _log.info("%s: %s", action, self._describe(sessions))
         if target is None:
@@ -216,6 +260,14 @@ class Players(threading.Thread):
             self._key(action, target, playing, who)
             return
 
+        # Starting the nominated player means starting it *instead*, not as well.
+        # The case this exists for: a short video is playing in a browser, the
+        # person wants the music. Silencing the others by hand is exactly the
+        # chore the setting is meant to remove, so it happens before we start —
+        # the other way round they overlap for a moment and it sounds broken.
+        if action == "play" and not playing and self._last_app == self._priority:
+            self._hush(sessions)
+
         call = {"play": target.try_pause_async if playing else target.try_play_async,
                 "next": target.try_skip_next_async,
                 "prev": target.try_skip_previous_async}[action]
@@ -231,6 +283,29 @@ class Players(threading.Thread):
             self._keys_only.add(self._last_app)
             _log.info("%s does not obey addressed commands, key only from now on", who)
             self._key(action, target, playing, who)
+
+    def _hush(self, sessions) -> None:
+        """Pause everyone except the nominated player.
+
+        Only those actually playing are touched: pausing a paused player is at
+        best pointless and at worst wakes a browser tab that had gone quiet on
+        its own. We do not wait for them to obey either — the person is waiting
+        for their music to start, not for a report on the neighbours.
+        """
+        import asyncio
+
+        for s in sessions:
+            app = s.source_app_user_model_id
+            if app == self._priority or app in self._dead:
+                continue
+            if int(s.get_playback_info().playback_status) != PLAYING:
+                continue
+            try:
+                asyncio.run(s.try_pause_async())
+                _log.info("hushing %s: the nominated player is starting",
+                          self._short(app))
+            except Exception:
+                _log.warning("could not hush %s", self._short(app), exc_info=True)
 
     def _wait_change(self, target, playing: bool) -> bool:
         """Wait for the player to obey, and exactly as long as needed.
@@ -259,6 +334,17 @@ class Players(threading.Thread):
         declares it unresponsive, having never touched it at all.
         """
         cur = self._mgr.get_current_session() if self._mgr else None
+        # With a nominated player the fallback has to be refused. The key would
+        # go to whoever the system thinks is current — quite possibly the very
+        # browser we have just hushed, which would start it up again and leave
+        # the person with the sound they were getting rid of. Better to do
+        # nothing and say why.
+        if (self._priority and self._last_app == self._priority and cur is not None
+                and cur.source_app_user_model_id != self._priority):
+            _log.warning("%s does not obey addressed commands, and the key would go "
+                         "to %s instead — not pressing it", who,
+                         self._short(cur.source_app_user_model_id))
+            return
         if cur is not None and cur.source_app_user_model_id != self._last_app:
             who = self._short(cur.source_app_user_model_id)
             target = cur
@@ -327,6 +413,8 @@ class Players(threading.Thread):
                         self._on_track()
             except Exception:
                 _log.warning("failed to carry out %s", kind, exc_info=True)
-                if kind == "cmd":
-                    media.tap(arg)      # fallback path: the key always works
+                # The key always works, but it cannot be aimed — with a player
+                # nominated it could easily hit the wrong one, so we leave it.
+                if kind == "cmd" and not self._priority:
+                    media.tap(arg)
         self._mgr = None

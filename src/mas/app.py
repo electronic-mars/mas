@@ -88,7 +88,11 @@ class Api:
             return self.app.state()  # registry refused — don't lie about it
         self.app.cfg.set(key, value)
         if key == "hotkey":
-            self.app.hotkeys.bind(value)
+            self.app.hotkeys.bind("switch", value)
+        elif key == "hotkey_play":
+            self.app.hotkeys.bind("play", value)
+        elif key == "priority_player":
+            self.app.players.set_priority(value)
         elif key in ("auto_device", "watch_dongle", "learn_dongle"):
             self.app.sync_auto_device()
         return self.app.state()
@@ -170,8 +174,11 @@ class App:
         self.switcher = Switcher(self.cfg)
         self.meter = Meter(on_devices_changed=self._devices_changed,
                            on_default_changed=self._default_changed)
-        self.hotkeys = Hotkeys(self.cycle, self.cfg.get("hotkey"))
         self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead)
+        self.players.set_priority(self.cfg.get("priority_player"))
+        self.hotkeys = Hotkeys(
+            {"switch": self.cycle, "play": lambda: self.players.command("play")},
+            {"switch": self.cfg.get("hotkey"), "play": self.cfg.get("hotkey_play")})
         self._device_tip = "starting…"
         self.api = Api(self)
         self.bridge = Bridge(self.api)
@@ -242,7 +249,9 @@ class App:
         # build on the very first release.
         settings["version"] = __version__
         settings["autostart"] = startup.is_enabled()  # source of truth is the registry
-        settings["hotkey_ok"] = self.hotkeys.ok
+        settings["hotkey_ok"] = self.hotkeys.ok["switch"]
+        settings["hotkey_play_ok"] = self.hotkeys.ok["play"]
+        settings["players"] = self.players.known_apps()
         settings["dongle_name"] = self._dongle_name
         settings["dongle_usb"] = self._dongle_usb
         known = self.known_outputs_cached(settings.get("auto_device", ""))

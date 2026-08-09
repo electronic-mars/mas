@@ -27,6 +27,14 @@ DEFAULTS: dict[str, Any] = {
     "switch_button": "left",  # left | right
     # Hotkey for switching the sound, for example "Ctrl+Alt+H". Empty — disabled.
     "hotkey": "",
+    # The player every media command is addressed to, whatever else is going on,
+    # by its system id. Starting it pauses the others. Empty — we work out the
+    # target ourselves, which is the older and less predictable behaviour.
+    "priority_player": "",
+    # A combination that starts or pauses that player without opening the window.
+    # The keyboard's own play key cannot be used: Windows gives it to whichever
+    # player it considers current, and that is exactly what is being avoided.
+    "hotkey_play": "",
     # A device that takes over the sound as soon as it appears in the system and
     # hands it back when it disappears. Empty — the usual behaviour.
     "auto_device": "",

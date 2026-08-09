@@ -20,7 +20,6 @@ MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN = 0x0001, 0x0002, 0x0004, 0x0008
 MOD_NOREPEAT = 0x4000  # without it, holding the key showers us with switches
 WM_HOTKEY, WM_QUIT = 0x0312, 0x0012
 WM_REBIND = 0x0400 + 11  # our own message: "re-read the setting"
-HOTKEY_ID = 1
 
 MODIFIERS = {"ctrl": MOD_CONTROL, "alt": MOD_ALT, "shift": MOD_SHIFT, "win": MOD_WIN}
 
@@ -71,16 +70,29 @@ def parse(combo: str) -> tuple[int, int] | None:
 
 
 class Hotkeys(threading.Thread):
-    def __init__(self, on_fire, combo: str = ""):
+    """Several combinations at once, each with its own handler.
+
+    Every combination needs its own identifier within the thread, and both the
+    registration and the message loop stay on this one thread — so the names are
+    fixed when the object is made, and only the combinations behind them change.
+    """
+
+    def __init__(self, handlers: dict, combos: dict | None = None):
         super().__init__(daemon=True, name="mas-hotkey")
-        self._on_fire = on_fire
-        self._wanted = combo or ""
+        self._handlers = dict(handlers)              # name -> what to call
+        self._wanted = {n: (combos or {}).get(n) or "" for n in self._handlers}
+        self._ids = {n: i + 1 for i, n in enumerate(sorted(self._handlers))}
         self._tid = 0
         self._ready = threading.Event()
-        self.ok = True  # whether the current combination was successfully claimed
+        # Per name: was the combination actually claimed. The interface says so
+        # out loud, because a combination taken by another program looks exactly
+        # like a broken one.
+        self.ok = {n: True for n in self._handlers}
 
-    def bind(self, combo: str) -> None:
-        self._wanted = combo or ""
+    def bind(self, name: str, combo: str) -> None:
+        if name not in self._handlers:
+            return
+        self._wanted[name] = combo or ""
         if self.is_alive() and self._ready.wait(2.0) and self._tid:
             user32.PostThreadMessageW(self._tid, WM_REBIND, 0, 0)
 
@@ -89,19 +101,22 @@ class Hotkeys(threading.Thread):
             user32.PostThreadMessageW(self._tid, WM_QUIT, 0, 0)
 
     def _apply(self) -> None:
-        user32.UnregisterHotKey(None, HOTKEY_ID)
-        if not self._wanted:
-            self.ok = True
-            return
-        parsed = parse(self._wanted)
-        if parsed is None:
-            self.ok = False
-            _log.warning("combination not parsed: %s", self._wanted)
-            return
-        mods, vk = parsed
-        self.ok = bool(user32.RegisterHotKey(None, HOTKEY_ID, mods | MOD_NOREPEAT, vk))
-        _log.info("combination %s: %s", self._wanted, "claimed by us" if self.ok
-                  else "already taken by another program")
+        for name, hid in self._ids.items():
+            user32.UnregisterHotKey(None, hid)
+            combo = self._wanted[name]
+            if not combo:
+                self.ok[name] = True
+                continue
+            parsed = parse(combo)
+            if parsed is None:
+                self.ok[name] = False
+                _log.warning("combination for %s not parsed: %s", name, combo)
+                continue
+            mods, vk = parsed
+            self.ok[name] = bool(user32.RegisterHotKey(None, hid, mods | MOD_NOREPEAT, vk))
+            _log.info("combination %s for %s: %s", combo, name,
+                      "claimed by us" if self.ok[name]
+                      else "already taken by another program")
 
     def run(self) -> None:
         msg = wintypes.MSG()
@@ -111,12 +126,16 @@ class Hotkeys(threading.Thread):
         self._tid = kernel32.GetCurrentThreadId()
         self._apply()
         self._ready.set()
+        by_id = {hid: name for name, hid in self._ids.items()}
         while user32.GetMessageW(byref(msg), None, 0, 0) > 0:
             if msg.message == WM_HOTKEY:
+                name = by_id.get(msg.wParam)
                 try:
-                    self._on_fire()
+                    if name:
+                        self._handlers[name]()
                 except Exception:
-                    _log.exception("hotkey handler crashed")
+                    _log.exception("handler of the %s hotkey crashed", name)
             elif msg.message == WM_REBIND:
                 self._apply()
-        user32.UnregisterHotKey(None, HOTKEY_ID)
+        for hid in self._ids.values():
+            user32.UnregisterHotKey(None, hid)

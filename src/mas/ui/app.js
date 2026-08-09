@@ -480,7 +480,7 @@ function comboFrom(e) {
   return [...mods, name].join('+');
 }
 
-function startCapture(btn) {
+function startCapture(btn, key) {
   capturing = true;
   btn.textContent = t('hk_press');
   btn.classList.add('armed');
@@ -496,7 +496,7 @@ function startCapture(btn) {
     const combo = comboFrom(e);
     if (!combo) return;
     done();
-    state = await call('set_setting', { key: 'hotkey', value: combo });
+    state = await call('set_setting', { key, value: combo });
     renderAll();
   };
   document.addEventListener('keydown', onKey, true);
@@ -532,10 +532,25 @@ function renderSettings() {
   // to switch sound with. That is why they share a section, and the row names
   // talk about the control itself — otherwise the panel would read "Switch
   // sound" twice in a row.
-  const hkCtl = `<button class="seg key" id="hk-capture">${hk ? esc(hk) : t('hk_none')}</button>`
-    + (hk ? `<button class="seg drop" id="hk-clear">${t('hk_clear')}</button>` : '');
-  const hkWarn = hk && state.settings.hotkey_ok === false
-    ? `<div class="st"><div class="ds warn">${t('hk_taken')}</div></div>` : '';
+  const keyRow = (setting, combo, taken) => ({
+    ctl: `<button class="seg key" data-capture="${setting}">${combo ? esc(combo) : t('hk_none')}</button>`
+      + (combo ? `<button class="seg drop" data-uncapture="${setting}">${t('hk_clear')}</button>` : ''),
+    warn: combo && taken === false
+      ? `<div class="st"><div class="ds warn">${t('hk_taken')}</div></div>` : '',
+  });
+  const hkKey = keyRow('hotkey', hk, state.settings.hotkey_ok);
+  const hkCtl = hkKey.ctl;
+  const hkWarn = hkKey.warn;
+
+  // The nominated player. Only those we have actually seen are offered: a list
+  // of everything installed would be a list of guesses, and the chosen one stays
+  // in it even while it is not running.
+  const player = state.settings.priority_player || '';
+  const seen = state.settings.players || [];
+  const playerOptions = `<option value="" ${player ? '' : 'selected'}>${t('player_none')}</option>`
+    + seen.map((p) => `<option value="${esc(p.id)}" ${player === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const hkPlay = keyRow('hotkey_play', state.settings.hotkey_play || '',
+    state.settings.hotkey_play_ok);
 
   // Long lists are left under the name at full width: a device name like
   // "Headphones (HyperX Cloud Flight S)" would have to be truncated in the
@@ -551,6 +566,13 @@ function renderSettings() {
       state.settings.dongle_name
         ? toggle('watch_dongle', t('dongle'), t('dongle_d').replace('%s', state.settings.dongle_name))
         : '',
+    ])}
+     <h2 class="sec micro">${secIcon('ui-wave')}${t('player')}</h2>
+     ${group([
+      stRow(t('player_row'), t('player_d'),
+        `<select id="player-select">${playerOptions}</select>`, { stack: true }),
+      stRow(t('player_key'), t('player_key_d'), `<div class="segs">${hkPlay.ctl}</div>`),
+      hkPlay.warn,
     ])}
      <h2 class="sec micro">${secIcon('sec-control')}${t('control')}</h2>
      ${group([
@@ -728,12 +750,14 @@ document.addEventListener('click', async (e) => {
     return renderAll();
   }
 
-  if (e.target.closest('#hk-capture')) {
-    if (!capturing) startCapture(e.target.closest('#hk-capture'));
+  const grab = e.target.closest('[data-capture]');
+  if (grab) {
+    if (!capturing) startCapture(grab, grab.dataset.capture);
     return;
   }
-  if (e.target.closest('#hk-clear')) {
-    state = await call('set_setting', { key: 'hotkey', value: '' });
+  const drop = e.target.closest('[data-uncapture]');
+  if (drop) {
+    state = await call('set_setting', { key: drop.dataset.uncapture, value: '' });
     return renderAll();
   }
 
@@ -763,6 +787,10 @@ document.addEventListener('change', async (e) => {
   }
   if (e.target.id === 'auto-select') {
     state = await call('set_setting', { key: 'auto_device', value: e.target.value });
+    renderAll();
+  }
+  if (e.target.id === 'player-select') {
+    state = await call('set_setting', { key: 'priority_player', value: e.target.value });
     renderAll();
   }
 });

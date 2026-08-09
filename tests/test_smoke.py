@@ -317,6 +317,54 @@ ghost.status = PAUSED
 p._revive([ghost, live])
 check("state changed — alive again", "Opera" in p._dead, False)
 
+print("A player nominated by hand")
+# The case this exists for: a short video starts in a browser while the music is
+# meant to be Spotify. Without a nomination the command follows whoever plays.
+opera, spotify = FakeSession("Opera", PLAYING), FakeSession("Spotify", PAUSED)
+free = Players()
+check("without a nomination the playing one wins",
+      free._pick([opera, spotify]).source_app_user_model_id, "Opera")
+
+named = Players()
+named.set_priority("Spotify")
+check("the nominated one wins even while another plays",
+      named._pick([opera, spotify]).source_app_user_model_id, "Spotify")
+check("its name is remembered for the settings list",
+      [a["name"] for a in named.known_apps()], ["Spotify"])
+check("it is offered even while it is not running",
+      named._pick([opera]).source_app_user_model_id, "Opera")
+
+# A nominated player that stopped responding must not hold the command hostage.
+mute = Players()
+mute.set_priority("Spotify")
+mute._dead["Spotify"] = PAUSED
+check("a nominated ghost yields to a live player",
+      mute._pick([opera, spotify]).source_app_user_model_id, "Opera")
+
+
+class HushSession(FakeSession):
+    def __init__(self, app, status):
+        super().__init__(app, status)
+        self.paused = False
+
+    def try_pause_async(self):
+        self.paused = True
+
+        async def done():
+            return True
+        return done()
+
+
+loud = HushSession("Opera", PLAYING)
+quiet = HushSession("Chrome", PAUSED)
+mine = HushSession("Spotify", PAUSED)
+hushing = Players()
+hushing.set_priority("Spotify")
+hushing._hush([loud, quiet, mine])
+check("what was playing is paused", loud.paused, True)
+check("what was already quiet is left alone", quiet.paused, False)
+check("the nominated one is never hushed", mine.paused, False)
+
 # Icon tooltip: while something is playing — only the track, otherwise the device.
 print("\nTray icon tooltip")
 
