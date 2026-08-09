@@ -96,10 +96,19 @@ class Players(threading.Thread):
         self._jobs.put(("cmd", action))
 
     def set_priority(self, app_id: str) -> None:
+        was = self._priority
         self._priority = app_id or ""
         if self._priority:
             with self._lock:
                 self._seen.setdefault(self._priority, self._short(self._priority))
+        # Taking the nomination away has to take the habit away with it. When
+        # nobody is playing the command goes to whoever we controlled last, and
+        # that is the player just un-nominated: it would keep winning by inertia,
+        # and from the outside the setting would look as if it had not applied.
+        elif was and self._last_app == was:
+            self._last_app = None
+            _log.info("%s is no longer nominated — forgetting it as the last target",
+                      self._short(was))
         _log.info("priority player: %s",
                   self._short(self._priority) if self._priority else "not chosen")
 

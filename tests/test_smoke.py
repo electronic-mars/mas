@@ -334,6 +334,24 @@ check("its name is remembered for the settings list",
 check("it is offered even while it is not running",
       named._pick([opera]).source_app_user_model_id, "Opera")
 
+# Taking the nomination away must actually change what happens. Without this the
+# un-nominated player kept winning as "the one controlled last", and the setting
+# looked as though it had not applied at all.
+dropped = Players()
+dropped.set_priority("Spotify")
+dropped._last_app = "Spotify"
+dropped.set_priority("")
+check("the habit goes with the nomination", dropped._last_app, None)
+check("and the command follows whoever plays",
+      dropped._pick([opera, spotify]).source_app_user_model_id, "Opera")
+
+# Somebody else's stickiness is not ours to throw away.
+kept = Players()
+kept.set_priority("Spotify")
+kept._last_app = "Opera"
+kept.set_priority("")
+check("an unrelated last target is left alone", kept._last_app, "Opera")
+
 # A nominated player that stopped responding must not hold the command hostage.
 mute = Players()
 mute.set_priority("Spotify")
