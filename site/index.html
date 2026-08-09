@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>electronic-mars</title>
+<meta name="description" content="Small Windows programs, made carefully.">
+<!--
+  Meant for the personal site, not for this repository: copy this folder into
+  electronic-mars.github.io and it works as it is — one file, no build, no
+  dependencies, nothing to break in two years.
+
+  The site is named after the person, not after this program. That is the whole
+  point of having one: the next thing goes on the same page instead of starting
+  from nothing.
+
+  Every link a released program points at should come here rather than straight
+  at a shop or a donation service — then changing either of those is editing one
+  line here instead of releasing a new version of the program.
+-->
+<style>
+  :root{
+    --bg:#15171b; --panel:#1c1f24; --line:#2a2e35;
+    --tx:#e8e6e3; --tx-2:#a8adb5; --tx-3:#6f757e; --acc:#e8642c;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#e9e7e3; --panel:#f4f2ef; --line:#d5d2cc;
+           --tx:#1b1e23; --tx-2:#54595f; --tx-3:#868b92; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:16px/1.6 -apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:56px 20px 80px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+  header h1{font-size:19px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin:0}
+  .lede{color:var(--tx-2);margin:0 0 44px;font-size:17px}
+  h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--tx-3);
+    font-weight:500;margin:44px 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px;display:grid;grid-template-columns:64px 1fr;gap:20px;align-items:start}
+  .card img.icon{width:64px;height:64px;border-radius:16px;display:block}
+  .card h3{margin:0 0 6px;font-size:18px}
+  .card p{margin:0 0 14px;color:var(--tx-2)}
+  .row{display:flex;flex-wrap:wrap;gap:10px}
+  a.btn{display:inline-block;padding:9px 16px;border-radius:9px;text-decoration:none;
+    font-size:13px;letter-spacing:.06em;background:var(--acc);color:#1b1e23;font-weight:600}
+  a.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx-2);font-weight:500}
+  .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:26px}
+  .shots img{width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+  .soon{color:var(--tx-3);font-size:15px}
+  footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);
+    color:var(--tx-3);font-size:14px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  a{color:var(--tx-2)}
+</style>
+
+<div class="wrap">
+  <header>
+    <img class="icon" src="mas/icon.png" alt="" width="34" height="34" style="width:34px;height:34px;border-radius:9px">
+    <h1>electronic-mars</h1>
+  </header>
+  <p class="lede">Small Windows programs, made carefully. No accounts, no telemetry, no subscriptions.</p>
+
+  <h2>Programs</h2>
+  <div class="card">
+    <img class="icon" src="mas/icon.png" alt="Master Audio Switcher">
+    <div>
+      <h3>Master Audio Switcher</h3>
+      <p>Switches sound between speakers and headphones with one click on the tray
+         icon. Knows when a wireless headset is switched on even though Windows
+         does not. Volume mixer, media keys, a global shortcut. Fifteen languages.</p>
+      <div class="row">
+        <a class="btn" href="https://github.com/electronic-mars/mas/releases/latest">Download</a>
+        <a class="btn ghost" href="https://github.com/electronic-mars/mas">Source</a>
+        <a class="btn ghost" href="support.html">Support</a>
+      </div>
+      <div class="shots">
+        <img src="mas/devices.png" alt="The device list">
+        <img src="mas/mixer.png" alt="The volume mixer">
+        <img src="mas/settings.png" alt="The settings">
+      </div>
+    </div>
+  </div>
+
+  <h2>Next</h2>
+  <p class="soon">More is coming — programs and games. Watch the releases on GitHub,
+     or check back here.</p>
+
+  <footer>
+    <span>Free software, GPL-3.0</span>
+    <span><a href="https://github.com/electronic-mars">GitHub</a></span>
+  </footer>
+</div>
+</html>
