@@ -1,6 +1,15 @@
 """A tiny dependency-free runner. Run in full after every feature."""
+import os
 import sys
+import tempfile
 from pathlib import Path
+
+# The tests must not write into the real log. Importing mas.app sets logging up
+# against %LOCALAPPDATA%, and every fake device, every seeded cycle and every
+# deliberately refused switch used to land in the file we read to work out what
+# went wrong on a live machine. Redirected before mas is imported, because the
+# folder is resolved at that moment.
+os.environ["LOCALAPPDATA"] = tempfile.mkdtemp(prefix="mas-tests-")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
