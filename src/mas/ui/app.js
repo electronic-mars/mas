@@ -1,5 +1,5 @@
 import { call } from './api.js';
-import { LANGUAGES, setLang, t } from './i18n.js';
+import { LANGUAGES, ensureLang, loadLanguages, setLang, t } from './i18n.js';
 
 // The order defines how the palette looks: sound first, then screens, then what
 // goes on your head, then connectors, and marks at the end. The names are keys:
@@ -687,6 +687,9 @@ function renderAll() {
 
 async function refresh() {
   state = await call('get_state');
+  // The language file is fetched before drawing, not during: t() is called from
+  // every render function and cannot wait for a file.
+  await ensureLang(state.settings.language);
   renderAll();
 }
 
@@ -888,6 +891,7 @@ buildLcd();
 wireKnob();
 setPainting(true);
 await call('selfcheck', { from: 'ui' }).catch(() => {});
+await loadLanguages();
 await refresh();
 openTab('devices');
 if (!state.settings.onboarded) showWelcome();

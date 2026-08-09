@@ -16,7 +16,10 @@ DEFAULTS: dict[str, Any] = {
     "cycle": [],
     "mic_favorites": [],
     "icons": {},          # device id -> silhouette name
-    "language": "ru",
+    # Empty means "not chosen yet": on the first run the language is taken from
+    # Windows. Defaulting to a particular language would have shown Russian to
+    # everyone who never opened the settings.
+    "language": "",
     "autostart": False,
     "switch_communications": True,
     "sound_on_switch": False,

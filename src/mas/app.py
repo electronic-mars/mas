@@ -18,7 +18,7 @@ from .core.dongle import Dongle
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
-from .core import runtime, screen
+from .core import language, runtime, screen
 from .overlay import Overlay
 from .core.switcher import Switcher
 from .paths import is_frozen, log_path
@@ -174,6 +174,8 @@ class App:
         self.switcher = Switcher(self.cfg)
         self.meter = Meter(on_devices_changed=self._devices_changed,
                            on_default_changed=self._default_changed)
+        if not self.cfg.get("language"):
+            self.cfg.set("language", language.pick())
         self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead)
         self.players.set_priority(self.cfg.get("priority_player"))
         self.hotkeys = Hotkeys(

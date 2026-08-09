@@ -431,6 +431,43 @@ check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
 
+print("The languages")
+
+import json  # noqa: E402
+
+LOCALES = Path(__file__).resolve().parents[1] / "src" / "mas" / "ui" / "locales"
+docs = {p.stem: json.loads(p.read_text(encoding="utf-8"))
+        for p in LOCALES.glob("*.json") if p.stem != "index"}
+english = docs["en"]["strings"]
+listed = {i["code"] for i in json.loads((LOCALES / "index.json").read_text(encoding="utf-8"))}
+
+# A key missing from one language shows English instead, and that is invisible
+# until a user reports a page half in another language. The previous project drifted
+# three keys behind in fifteen languages exactly this way.
+for code, doc in sorted(docs.items()):
+    strings = doc["strings"]
+    check(f"{code}: the same set of keys as English", set(strings), set(english))
+    check(f"{code}: nothing left blank", [k for k, v in strings.items() if not v.strip()], [])
+    check(f"{code}: the placeholder survives translation",
+          [k for k, v in english.items() if "%s" in v and "%s" not in strings[k]], [])
+    check(f"{code}: named in the dropdown", code in listed, True)
+    check(f"{code}: says which language it is", bool(doc.get("name")), True)
+
+check("the dropdown lists exactly the files we ship", listed, set(docs))
+check("English is offered first",
+      json.loads((LOCALES / "index.json").read_text(encoding="utf-8"))[0]["code"], "en")
+
+# Text in a tab or on a segment cannot wrap: it is simply cut off. The budget is
+# generous — this catches a translation that ran away, not a long word.
+TIGHT = {"tab_devices": 14, "tab_mixer": 14, "tab_settings": 16, "tab_about": 18,
+         "lcd_level": 12, "lcd_signal": 12, "btn_left": 12, "btn_right": 12,
+         "hk_clear": 12, "open_btn": 14, "welcome_ok": 16}
+over = [(c, k, len(d["strings"][k])) for c, d in docs.items()
+        for k in TIGHT if len(d["strings"][k]) > TIGHT[k]]
+check("nothing overflows a tab or a button", over, [])
+
+print(f"  {len(docs)} languages, {len(english)} strings each")
+
 print("No placeholders left in the About tab")
 
 import re  # noqa: E402

@@ -30,16 +30,38 @@ jobs:
       # machine it is exactly what kept the previous icon inside the exe.
       - run: pyinstaller build/mas.spec --distpath build/mas --workpath build/work --noconfirm
 
-      - name: Pack the archive and its checksum
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+          }
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          & $iscc "/DAppVersion=$version" `
+            "/DSourceDir=$PWD\build\mas\MasterAudioSwitcher" `
+            "/O$PWD" build\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "the installer did not build" }
+
+      - name: Pack the archive and the checksums
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
           $zip = "MasterAudioSwitcher-$tag.zip"
+          $setup = "MasterAudioSwitcher-$version-setup.exe"
           Compress-Archive -Path build/mas/MasterAudioSwitcher/* -DestinationPath $zip
-          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zip" | Out-File -FilePath "$zip.sha256" -Encoding ascii
+          # One checksum file for both, so a person verifies whichever they took.
+          $lines = @()
+          foreach ($f in @($setup, $zip)) {
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            $lines += "$h  $f"
+            if ($f -eq $setup) { "SETUP_SHA=$h" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 }
+            else { "ZIP_SHA=$h" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+          $lines | Out-File -FilePath "SHA256SUMS.txt" -Encoding ascii
           "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "SHA=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SETUP=$setup" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Publish the release
         shell: pwsh
@@ -47,14 +69,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $notes = @"
-          SHA256: ``$env:SHA``
-
           Windows 11, or Windows 10 with the WebView2 runtime installed.
-          Unpack and run ``MasterAudioSwitcher.exe`` — the program lives in the tray.
 
-          The program is not code-signed, so SmartScreen will show a warning:
-          "More info" then "Run anyway". You can verify the download with
+          **$env:SETUP** — installer, per user, no administrator rights needed.
+          **$env:ZIP** — the same program as a folder, if you would rather not install.
+
+          The program lives in the tray: left click switches the sound, right click
+          opens the window.
+
+          It is not code-signed, so SmartScreen will warn about it: "More info" then
+          "Run anyway". Checksums are in ``SHA256SUMS.txt``; verify with
           ``Get-FileHash <file> -Algorithm SHA256``.
+
+          | file | SHA256 |
+          |---|---|
+          | $env:SETUP | ``$env:SETUP_SHA`` |
+          | $env:ZIP | ``$env:ZIP_SHA`` |
           "@
-          gh release create "${{ github.ref_name }}" "$env:ZIP" "$env:ZIP.sha256" `
+          gh release create "${{ github.ref_name }}" "$env:SETUP" "$env:ZIP" "SHA256SUMS.txt" `
             --title "${{ github.ref_name }}" --notes "$notes" --draft

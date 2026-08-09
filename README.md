@@ -72,8 +72,17 @@ file in is a separate, deliberate step you take yourself.
 
 ## Languages
 
-Russian, Ukrainian, English. More are planned; corrections and new translations
-are welcome.
+Fifteen: English, Russian, Ukrainian, German, Spanish, French, Italian,
+Portuguese, Polish, Czech, Dutch, Turkish, Chinese, Japanese, Korean.
+
+English, Russian and Ukrainian are written by hand. The rest are machine
+translated and then checked — corrections are very welcome, and they are the
+easiest thing to contribute: the strings are one JSON file per language in
+`src/mas/ui/locales/`, and adding a language is dropping a file in.
+
+`tools/translate_locales.py` fills in what is missing from the English source;
+it needs a `DEEPSEEK_API_KEY` and sends only the keys a language does not have
+yet.
 
 ## License
 
