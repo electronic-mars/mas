@@ -94,7 +94,9 @@ jobs:
           $version = $env:VERSION
           $zip = "MasterAudioSwitcher-$version.zip"
           $setup = "MasterAudioSwitcher-$version-setup.exe"
-          Compress-Archive -Path build/mas/MasterAudioSwitcher/* -DestinationPath $zip
+          # The folder itself, not its contents: extracting into Downloads must
+          # make one folder, not scatter an exe and an _internal directory.
+          Compress-Archive -Path build/mas/MasterAudioSwitcher -DestinationPath $zip
           # One checksum file for both, so a person verifies whichever they took.
           $lines = @()
           foreach ($f in @($setup, $zip)) {
