@@ -356,5 +356,63 @@ check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
 
+print("The engine the window is drawn with")
+
+from mas.core import runtime  # noqa: E402
+
+import winreg  # noqa: E402
+
+# The real root handles: runtime.PLACES is built with them at import time, so a
+# fake registry keyed by anything else would simply never match.
+HKLM, HKCU = winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER
+MACHINE_32 = r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{}".format(runtime.CLIENT)
+MACHINE = r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{}".format(runtime.CLIENT)
+
+
+class FakeReg:
+    """Just enough of winreg: a registry that holds the keys we hand it."""
+
+    def __init__(self, keys):
+        self.keys = keys                     # (root, path) -> value of pv
+
+    def OpenKey(self, root, path):
+        if (root, path) not in self.keys:
+            raise OSError("no such key")
+        value = self.keys[(root, path)]
+        return type("K", (), {"__enter__": lambda s: value,
+                              "__exit__": lambda s, *a: False})()
+
+    def QueryValueEx(self, key, name):
+        if key is None:
+            raise OSError("no such value")
+        return key, 1
+
+
+def version_with(keys):
+    real, runtime.winreg = runtime.winreg, FakeReg(keys)
+    try:
+        return runtime.webview2_version()
+    finally:
+        runtime.winreg = real
+
+
+# A machine-wide install lands in the 32-bit view even on 64-bit Windows, which
+# is why the plain path alone is not enough. Measured on this machine.
+check("found in the 32-bit view", version_with({(HKLM, MACHINE_32): "147.0.3912.72"}),
+      "147.0.3912.72")
+check("found on a 32-bit Windows", version_with({(HKLM, MACHINE): "120.0.0.1"}),
+      "120.0.0.1")
+check("found in a per-user install",
+      version_with({(HKCU, MACHINE): "121.0.0.2"}), "121.0.0.2")
+check("nothing installed", version_with({}), None)
+# Edge Update keeps the key after the runtime is removed and blanks the value.
+check("a leftover key is not an install", version_with({(HKLM, MACHINE_32): "0.0.0.0"}),
+      None)
+check("an empty version is not an install", version_with({(HKLM, MACHINE_32): ""}), None)
+check("a broken value does not throw",
+      version_with({(HKLM, MACHINE_32): None}), None)
+
+print(f"  on this machine: {runtime.webview2_version() or 'the runtime is missing'}")
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

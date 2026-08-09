@@ -18,7 +18,7 @@ from .core.dongle import Dongle
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
-from .core import screen
+from .core import runtime, screen
 from .overlay import Overlay
 from .core.switcher import Switcher
 from .paths import is_frozen, log_path
@@ -179,6 +179,12 @@ class App:
         self.tray: Tray | None = None
         self.overlay = Overlay()
         self._quitting = False
+        # Version of the engine the window is drawn with, None when it is not
+        # installed. Then there is no window at all, and the program lives in
+        # the tray alone — where its main job is done anyway.
+        self._engine: str | None = None
+        self._engine_asking = False
+        self._stopped = threading.Event()
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
         self._pending_tab: str | None = None
@@ -627,12 +633,50 @@ class App:
             self.set_mini(False)
             self.push_state()
 
+    def _offer_engine(self, modal: bool = False) -> None:
+        """Say that the engine the window needs is missing, and offer to get it.
+
+        A notification always; a dialog only when the person is standing at the
+        screen — they started the program by hand, or they just clicked the icon
+        asking for the window. From autostart it stays a notification, otherwise
+        it would be a modal box in the face at every sign-in.
+        """
+        if self.tray:
+            self.tray.notify("The window needs the Microsoft WebView2 runtime. "
+                             "Switching sound works without it.")
+        if not modal or self._engine_asking:
+            return
+        self._engine_asking = True
+        threading.Thread(target=self._engine_dialog, daemon=True,
+                         name="mas-engine").start()
+
+    def _engine_dialog(self) -> None:
+        MB_YESNO, MB_ICONWARNING, IDYES = 0x4, 0x30, 6
+        try:
+            answer = ctypes.windll.user32.MessageBoxW(
+                None,
+                "The window is drawn with the Microsoft WebView2 runtime, and this "
+                "computer does not have it.\n\n"
+                "Switching sound from the tray icon works without it.\n\n"
+                "Open the download page?",
+                "Master Audio Switcher", MB_YESNO | MB_ICONWARNING)
+            if answer == IDYES:
+                import webbrowser
+                webbrowser.open(runtime.DOWNLOAD_URL)
+        finally:
+            self._engine_asking = False
+
     def show(self, tab: str = "devices") -> None:
         """Python does not call JavaScript. The tab we need goes into the
         snapshot, and the interface picks it up on the next poll. Calling
         evaluate_js from a background thread into a hidden window used to hang
         the whole program dead."""
         if not self.window:
+            # Silence here would look like a broken program: the person clicked
+            # and nothing happened. If there is no window because the engine is
+            # missing, say so every time they ask — they asked, after all.
+            if self._engine is None:
+                self._offer_engine(modal=True)
             return
         # The mixer and the settings have nowhere to go in mini view — leave it.
         if tab != "devices" and self._mini:
@@ -689,6 +733,7 @@ class App:
             return
         self._quitting = True
         _log.info("exit on request")
+        self._stopped.set()          # releases run() when there is no window
         self._shutdown_com()
         if self.tray:
             self.tray.stop()
@@ -705,6 +750,13 @@ class App:
         # drags .NET along with it and costs about 90 ms, and until the tray
         # icon appears it is not needed at all.
         import webview
+
+        # Asked before anything is drawn. Without the runtime pywebview does not
+        # fail — it silently falls back to the Internet Explorer engine, and our
+        # page renders there as an empty rectangle. A black window with a title
+        # bar and no explanation is worse than no window at all.
+        self._engine = runtime.webview2_version()
+        _log.info("window engine: %s", self._engine or "MISSING")
 
         # Only now, after the window module has declared this process DPI aware,
         # does the screen report its real size. A window taller than the screen
@@ -737,17 +789,30 @@ class App:
         # it the window is dragged by any point of the page, and the sliders and
         # the knob stop working. The drag zone is set in the markup by the
         # pywebview-drag-region class.
-        self.window = webview.create_window(
-            "Master Audio Switcher", url, width=FULL_SIZE[0], height=self._full_height,
-            resizable=False, frameless=True, easy_drag=False, hidden=True,
-            background_color="#1C1F24",
-        )
+        if self._engine is not None:
+            self.window = webview.create_window(
+                "Master Audio Switcher", url, width=FULL_SIZE[0], height=self._full_height,
+                resizable=False, frameless=True, easy_drag=False, hidden=True,
+                background_color="#1C1F24",
+            )
         try:
-            webview.start()
-            # We get here both when the window was closed and when the WebView2
-            # engine crashed. Telling them apart matters: in the second case the
-            # program is obliged to say so.
-            _log.info("window loop finished (exit requested: %s)", self._quitting)
+            if self.window is None:
+                # No engine, so no window — but the program is not useless: its
+                # main job is a click on the tray icon, and that needs nothing
+                # from a browser. We keep the tray alive and wait for the exit.
+                # A manual start is told by show() further down, which is where
+                # the request for a window actually arrives; from autostart
+                # nobody asked for anything, so a notification is enough.
+                if self.launched_by_startup:
+                    self._offer_engine()
+                self._stopped.wait()
+                _log.info("exit without a window")
+            else:
+                webview.start()
+                # We get here both when the window was closed and when the
+                # WebView2 engine crashed. Telling them apart matters: in the
+                # second case the program is obliged to say so.
+                _log.info("window loop finished (exit requested: %s)", self._quitting)
         finally:
             self._shutdown_com()
             self.bridge.stop()
