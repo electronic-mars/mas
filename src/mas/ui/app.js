@@ -866,9 +866,33 @@ if (!state.settings.onboarded) showWelcome();
 
 // The only channel: the interface asks by itself, Python never calls
 // JavaScript — such a call from a background thread hung the window.
+//
+// The rhythm depends on whether anyone is looking. Visible, the level meter and
+// the knob need every tick. Hidden, the page used to keep asking five times a
+// second for a picture nobody was drawing: measured, that traffic and the work
+// behind it were most of what the program burned while idle. Hidden it asks
+// once a second, and only to notice that it has been shown again.
+const TICK_SEEN = 200, TICK_UNSEEN = 1000;
 let polling = false;
 let lastRev = -1;
-setInterval(async () => {
+let tick = TICK_SEEN;
+let timer = null;
+
+function pace(ms) {
+  if (ms === tick && timer !== null) return;
+  tick = ms;
+  clearInterval(timer);
+  timer = setInterval(poll, ms);
+}
+
+// Waking up must not wait for the slow tick, or the panel would stand frozen
+// for up to a second after the window appears. Showing the window raises these
+// events, and any of them is enough to ask right now. Which ones actually fire
+// depends on the engine, so we listen to all of them rather than pick.
+for (const ev of ['focus', 'resize', 'visibilitychange', 'pointerover'])
+  window.addEventListener(ev, () => { if (tick !== TICK_SEEN) poll(); });
+
+async function poll() {
   if (polling) return;
   polling = true;
   try {
@@ -876,6 +900,7 @@ setInterval(async () => {
     // The window is hidden, so there is nothing to draw. The rest is handled as
     // usual: Python hands out the tab signal once, and it must not be missed.
     setPainting(!m.hidden);
+    pace(m.hidden ? TICK_UNSEEN : TICK_SEEN);
     if (!m.hidden) {
       if (!knobBusy) knobValue = m.volume * 100;
       paintKnob(knobValue);
@@ -904,4 +929,6 @@ setInterval(async () => {
       lastRev = m.rev;
     }
   } catch (e) { /* program is shutting down */ } finally { polling = false; }
-}, 200);
+}
+
+pace(TICK_SEEN);

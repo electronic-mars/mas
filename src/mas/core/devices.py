@@ -128,6 +128,34 @@ def list_devices(only_active: bool = True, max_age: float = _LIST_TTL) -> list[D
     return [d for d in cached if d.active] if only_active else list(cached)
 
 
+_local = threading.local()
+FLOW_RENDER, FLOW_CAPTURE = 0, 1
+
+
+def _enumerator():
+    """One device enumerator per thread, kept for the life of that thread.
+
+    pycaw's helpers build a fresh enumerator on every call, and that is not
+    cheap: measured at 46 ms here. The meter asks for the default device every
+    two seconds, so those 46 ms were 2.3% of a processor core burned around the
+    clock — most of everything the program spent while nobody was looking.
+
+    Per thread rather than one for all: the object belongs to the COM apartment
+    that created it. And created once rather than per call for a second reason
+    recorded in Presence below — making COM objects several times a second once
+    left the whole system's audio service unresponsive.
+    """
+    enum = getattr(_local, "enum", None)
+    if enum is None:
+        from pycaw.pycaw import IMMDeviceEnumerator
+        enum = comtypes.cast(
+            comtypes.CoCreateInstance(CLSID_MMDeviceEnumerator, IMMDeviceEnumerator,
+                                      comtypes.CLSCTX_INPROC_SERVER),
+            POINTER(IMMDeviceEnumerator))
+        _local.enum = enum
+    return enum
+
+
 def default_id(is_output: bool = True, max_age: float = _DEFAULT_TTL) -> str | None:
     now = time.monotonic()
     with _lock:
@@ -135,14 +163,9 @@ def default_id(is_output: bool = True, max_age: float = _DEFAULT_TTL) -> str | N
     if value is not None and now - ts <= max_age:
         return value
 
-    from pycaw.pycaw import AudioUtilities
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            dev = AudioUtilities.GetSpeakers() if is_output else AudioUtilities.GetMicrophone()
-        # pycaw returns output as a wrapper with an id field, and recording as a
-        # raw COM pointer.
-        value = dev.id if hasattr(dev, "id") else dev.GetId()
+        flow = FLOW_RENDER if is_output else FLOW_CAPTURE
+        value = _enumerator().GetDefaultAudioEndpoint(flow, ROLE_CONSOLE).GetId()
     except Exception:
         _log.warning("could not get the default device (%s)",
                      "output" if is_output else "recording", exc_info=True)
