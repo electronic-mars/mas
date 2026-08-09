@@ -109,7 +109,9 @@ class FakeApi:
     def get_meter(self):
         return {"volume": 0.62, "muted": False, "peak": 0.22,
                 "device": "Headphones (HyperX Cloud Flight S)",
-                "tab": self.tab, "rev": 1}
+                "tab": self.tab, "rev": 1,
+                "now": {"app": "Spotify", "title": "Shiver", "artist": "Mannymore",
+                        "playing": True}}
 
     # --- what the interface tries to change ----------------------------
     def set_setting(self, key, value):
@@ -174,7 +176,8 @@ INJECT = """
   root.setProperty('--shot-w', (q.get('w') || 400) + 'px');
   root.setProperty('--shot-h', (q.get('h') || 702) + 'px');
   const act = q.get('act');
-  const wanted = { icons: '.row [data-act="icon"]', hotkey: '#hk-capture',
+  const wanted = { icons: '.row [data-act="icon"]',
+                   hotkey: '[data-capture="hotkey"]',
                    mini: '#btn-mini' }[act];
   if (!wanted) return;
   const tick = setInterval(() => {
