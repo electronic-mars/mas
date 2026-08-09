@@ -84,6 +84,7 @@ class FakeApi:
             "switch_button": "left", "hotkey": "Ctrl+Alt+H", "hotkey_ok": True,
             "auto_device": HP, "switch_microphone": True, "watch_dongle": True,
             "learn_dongle": False, "mics_expanded": False, "onboarded": True,
+            "version": __import__("mas").__version__,
             "dongle_name": "HyperX Cloud Flight S", "dongle_usb": None,
         }
 

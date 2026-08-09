@@ -356,6 +356,37 @@ check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
 
+print("No placeholders left in the About tab")
+
+import re  # noqa: E402
+
+from mas import __version__  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+APP_JS = (ROOT / "src" / "mas" / "ui" / "app.js").read_text(encoding="utf-8")
+SPEC = (ROOT / "build" / "mas.spec").read_text(encoding="utf-8")
+
+check("the support button leads somewhere real", "example.invalid" in APP_JS, False)
+check("no button points at a bare github.com",
+      'data-url="https://github.com/"' in APP_JS, False)
+check("support goes to Patreon",
+      'data-url="https://www.patreon.com/ElectronicMARS"' in APP_JS, True)
+check("GitHub goes to our repository",
+      'data-url="https://github.com/electronic-mars/mas"' in APP_JS, True)
+check("updates go to the latest release",
+      'data-url="https://github.com/electronic-mars/mas/releases/latest"' in APP_JS, True)
+
+# One source for the number. Written out twice it drifts on the first release,
+# and then the exe properties, the About tab and the release tag disagree.
+check("the page does not carry a version of its own",
+      re.search(r"\d+\.\d+\.\d+", APP_JS), None)
+check("the page takes the version from the program",
+      "state.settings.version" in APP_JS, True)
+spec_version = re.search(r'__version__ = "\(\[\^"\]\+\)"', SPEC)
+check("the build reads the version out of the package", bool(spec_version), True)
+check("and the exe gets a version resource at all", "version=VERSION_RESOURCE" in SPEC, True)
+print(f"  the version is {__version__}, and it lives in one place")
+
 print("A microphone that refused to switch")
 
 

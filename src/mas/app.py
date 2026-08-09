@@ -9,7 +9,7 @@ import time
 
 import logging
 
-from . import log
+from . import __version__, log
 from .bridge import Bridge
 from .core import devices, mixer, startup
 from .core.config import Config
@@ -237,6 +237,10 @@ class App:
         outputs = [pack(d) for d in devs if d.is_output]
         outputs.sort(key=lambda x: cycle.index(x["id"]) if x["id"] in cycle else len(cycle))
         settings = self.cfg.all()
+        # One source for the version number: the package. It used to be written
+        # out again as a literal in the page, and would have drifted from the
+        # build on the very first release.
+        settings["version"] = __version__
         settings["autostart"] = startup.is_enabled()  # source of truth is the registry
         settings["hotkey_ok"] = self.hotkeys.ok
         settings["dongle_name"] = self._dongle_name
