@@ -65,7 +65,7 @@ class Api:
             # then this is the person's base microphone.
             if device_id not in devices.tied_microphones():
                 self.app._mic_base = device_id
-            self.app.announce(self.app.switcher.switch_to(device_id))
+            self.app.go_microphone(device_id)
         return self.app.state()
 
     def toggle_cycle(self, device_id: str, enabled: bool):
@@ -339,6 +339,28 @@ class App:
             return
         self._follow_microphone(device_id)
         self.announce(dev, tray_done=True)
+
+    def go_microphone(self, device_id: str) -> None:
+        """A microphone picked by hand in the list.
+
+        Outputs get the whole ceremony in _go, including taking the tray icon
+        back when the system refuses. A microphone has no tray icon, so the
+        refusal used to pass in complete silence: announce(None) returns at once
+        and the row in the list kept showing the old choice with no explanation.
+        The switch is verified the same way — it just has to be said out loud.
+        """
+        try:
+            dev = self.switcher.switch_to(device_id)
+        except Exception:
+            _log.warning("the microphone switch failed with an error", exc_info=True)
+            dev = None
+        if dev is None:
+            _log.warning("the microphone did not switch")
+            if self.tray:
+                self.tray.notify("Windows did not hand recording to the chosen microphone")
+            self.push_state()
+            return
+        self.announce(dev)
 
     def _follow_microphone(self, output_id: str) -> None:
         """The mic follows the headset; on speakers the base one comes back.

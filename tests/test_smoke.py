@@ -356,6 +356,34 @@ check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
 
+print("A microphone that refused to switch")
+
+
+def mic_app(result):
+    """An App with only what go_microphone touches."""
+    app = App.__new__(App)
+    th = __import__("threading")
+    app._ui_lock, app._state_rev = th.Lock(), 0
+    app.said, app.announced = [], []
+    app.tray = type("T", (), {"notify": lambda s, text: app.said.append(text)})()
+    app.switcher = type("S", (), {"switch_to": staticmethod(lambda i: result)})()
+    app.announce = app.announced.append
+    return app
+
+
+# An output takes its tray icon back when the system refuses. A microphone has
+# no icon, so the refusal has to be spoken, or it passes in total silence.
+one = mic_app(None)
+one.go_microphone("mic-x")
+check("a refusal is said out loud", len(one.said), 1)
+check("nothing is announced as done", one.announced, [])
+
+mic = devices.Device(id="mic-x", name="Microphone", is_output=False, active=True)
+two = mic_app(mic)
+two.go_microphone("mic-x")
+check("a switch that worked is announced", two.announced, [mic])
+check("and nothing is said about a refusal", two.said, [])
+
 print("The engine the window is drawn with")
 
 from mas.core import runtime  # noqa: E402
