@@ -2,5 +2,5 @@
 # dropdown; a line whose account does not exist yet is simply not shown, so it
 # is safe to leave them here until the accounts are set up.
 github: [electronic-mars]
-# patreon: electronic-mars
+patreon: ElectronicMARS
 # ko_fi: electronic-mars
