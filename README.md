@@ -84,6 +84,17 @@ easiest thing to contribute: the strings are one JSON file per language in
 it needs a `DEEPSEEK_API_KEY` and sends only the keys a language does not have
 yet.
 
+## Contributing
+
+Fixing a translation is the easiest and most useful thing to do — see
+[CONTRIBUTING.md](CONTRIBUTING.md), which also explains how to get a wireless
+headset added.
+
+## Privacy
+
+Nothing is collected and nothing is sent. The details, including what the log
+contains before you attach it to a bug report, are in [PRIVACY.md](PRIVACY.md).
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
