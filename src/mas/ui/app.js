@@ -964,10 +964,6 @@ async function poll() {
       const track = [m.now.artist, m.now.title].filter(Boolean).join(' — ');
       if (!playBtn.dataset.tip) playBtn.dataset.tip = playBtn.title;
       playBtn.title = m.now.playing && track ? track : playBtn.dataset.tip;
-      // Which player the keys are talking to. It is the answer to "why do the
-      // buttons do something else than I expected": usually because the player
-      // in front of you is not the one Windows reports at all.
-      $('whom').textContent = m.now.app || '';
     }
 
     if (m.tab) openTab(m.tab === 'welcome' ? 'devices' : m.tab);

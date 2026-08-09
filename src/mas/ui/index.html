@@ -1,5 +1,8 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<!-- The static text below is English, so the page starts as English and the
+     real language replaces both the text and this attribute on first draw. It
+     said "ru" while the markup said English, which was wrong twice over. -->
+<html lang="en" data-theme="dark">
 <meta charset="utf-8">
 <title>Master Audio Switcher</title>
 <link rel="stylesheet" href="app.css">
@@ -81,10 +84,6 @@
           <svg viewBox="0 0 24 24" class="ti"><path d="M5.4 5.7 14.4 12l-9 6.3z"/><path d="M16.2 5.7h2.4v12.6h-2.4z"/></svg>
         </button>
       </div>
-      <!-- Who the keys are addressing. Without it the choice is invisible: when
-           the only player Windows knows about is not the one in front of you,
-           the keys look as though they are ignoring you. Empty when nobody. -->
-      <div class="whom micro" id="whom" aria-live="polite"></div>
     </div>
     <div class="lcdbox">
       <span class="micro lcdcap" data-t="lcd_signal">Signal</span>
