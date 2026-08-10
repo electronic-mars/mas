@@ -37,16 +37,24 @@ jobs:
       - name: The tag and the package must agree on the version
         shell: pwsh
         run: |
-          $tag = "${{ github.event_name }}" -eq "workflow_dispatch" `
-            ? "${{ inputs.version }}" : "${{ github.ref_name }}".TrimStart("v")
-          $pkg = (Select-String -Path src\mas\__init__.py `
-                  -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
-          "tag $tag, package $pkg"
-          if ("${{ github.event_name }}" -ne "workflow_dispatch" -and $tag -ne $pkg) {
-            throw "the tag says $tag and src/mas/__init__.py says $pkg"
+          # Plain if/else on purpose: a ternary split across a line continuation
+          # is exactly the kind of thing that parses on one PowerShell and not on
+          # another, and a build machine is not the place to find that out.
+          $found = Select-String -Path src/mas/__init__.py -Pattern '__version__ = "([^"]+)"'
+          if (-not $found) { throw "no __version__ in src/mas/__init__.py" }
+          $pkg = $found.Matches[0].Groups[1].Value
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = $pkg
+            "dry run, taking the version from the package: $version"
+          } else {
+            $tag = "${{ github.ref_name }}" -replace '^v', ''
+            "tag $tag, package $pkg"
+            if ($tag -ne $pkg) {
+              throw "the tag says $tag and src/mas/__init__.py says $pkg"
+            }
+            $version = $tag
           }
-          "VERSION=$(if ("${{ github.event_name }}" -eq "workflow_dispatch") { $pkg } else { $tag })" |
-            Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "VERSION=$version" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - run: python tests/test_device_icons.py
       - run: python tests/test_smoke.py
@@ -61,17 +69,29 @@ jobs:
         shell: pwsh
         run: |
           $exe = "build\mas\MasterAudioSwitcher\MasterAudioSwitcher.exe"
+          $dir = "$env:LOCALAPPDATA\MasterAudioSwitcher"
+          $log = "$dir\mas.log"
           $p = Start-Process $exe -ArgumentList "--startup" -PassThru
           Start-Sleep -Seconds 25
-          $log = "$env:LOCALAPPDATA\MasterAudioSwitcher\mas.log"
-          if ($p.HasExited) { throw "it exited on its own with $($p.ExitCode)" }
-          Stop-Process -Id $p.Id -Force
+          $alive = -not $p.HasExited
+          if ($alive) { Stop-Process -Id $p.Id -Force }
+
+          # Whatever happens next, show what it wrote. A failure here that says
+          # only "exit code 1" is a failure nobody can act on.
+          foreach ($f in @($log, "$dir\crash.log")) {
+            if (Test-Path $f) {
+              "----- $f -----"
+              Get-Content $f -Tail 60
+            } else { "----- $f : not written -----" }
+          }
+
+          if (-not $alive) { throw "it exited on its own with $($p.ExitCode)" }
           if (-not (Test-Path $log)) { throw "it started but wrote no log" }
           $text = Get-Content $log -Raw
-          if ($text -notmatch "=== start") { throw "the log has no start line" }
-          # A runner has no sound card, so plenty will be missing — but the tray,
-          # the bridge and the settings must come up regardless.
-          foreach ($mark in @("settings loaded", "bridge is up")) {
+          # A build machine has no sound card and no desktop of its own, so a lot
+          # will be missing — but the settings and the local bridge must come up,
+          # and those two prove the program is assembled and not merely present.
+          foreach ($mark in @("=== start", "settings loaded", "bridge is up")) {
             if ($text -notmatch [regex]::Escape($mark)) { throw "never got to: $mark" }
           }
           "started, ran for 25 seconds, and said so in the log"
