@@ -34,10 +34,6 @@ _log = log.get("app")
 MUTEX_NAME = "Local\\MasterAudioSwitcherSingleInstance"
 ERROR_ALREADY_EXISTS = 183
 FULL_SIZE = (440, 772)      # full window view in logical points, before fitting
-# How long a closed window is kept before it is let go. Long enough to cover
-# "wrong tab, let me look again", short enough that walking away gives the
-# memory back while the person is still in the room.
-RELEASE_AFTER_S = 60.0
 
 
 def already_running() -> bool:
@@ -208,12 +204,6 @@ class App:
         self._engine: str | None = None
         self._engine_asking = False
         self._stopped = threading.Event()
-        # Somebody asked for the window. Only the main thread may build one, so
-        # every other thread raises this flag and the loop in run() answers it.
-        self._wants_window = threading.Event()
-        # Closing hides the window and starts this timer; only when it fires is
-        # the window really let go. See hide().
-        self._release_timer: threading.Timer | None = None
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
         self._pending_tab: str | None = None
@@ -724,10 +714,12 @@ class App:
         snapshot, and the interface picks it up on the next poll. Calling
         evaluate_js from a background thread into a hidden window used to hang
         the whole program dead."""
-        if self._engine is None:
+        if not self.window:
             # Silence here would look like a broken program: the person clicked
-            # and nothing happened. They asked, so they get an answer every time.
-            self._offer_engine(modal=True)
+            # and nothing happened. If there is no window because the engine is
+            # missing, say so every time they ask — they asked, after all.
+            if self._engine is None:
+                self._offer_engine(modal=True)
             return
         # The mixer and the settings have nowhere to go in mini view — leave it.
         if tab != "devices" and self._mini:
@@ -735,16 +727,6 @@ class App:
         with self._ui_lock:
             self._pending_tab = tab
             self._state_rev += 1
-        # Coming back within the minute costs nothing: the window is still there.
-        if self._release_timer is not None:
-            self._release_timer.cancel()
-            self._release_timer = None
-        if self.window is None:
-            # It was let go. Building one is the main thread's job, so all we do
-            # here is ask — and the page inside it has to load again, which is
-            # the part a person notices.
-            self._wants_window.set()
-            return
         try:
             self.window.show()
             self._visible = True
@@ -756,20 +738,6 @@ class App:
         except Exception:
             _log.exception("the window did not show up")
 
-    def _window_ready(self) -> None:
-        """Runs once the window's own loop is up. Only then does it exist as a
-        window Windows can be asked about, which is what placing it needs."""
-        try:
-            self.window.show()
-            self._visible = True
-            self.meter.set_idle(False)
-            hwnd = screen.own_window("Master Audio Switcher")
-            if hwnd:
-                screen.place_at_tray(hwnd)
-            _log.info("window built and shown")
-        except Exception:
-            _log.exception("the window did not come up")
-
     def take_ui_signal(self) -> dict:
         with self._ui_lock:
             tab, self._pending_tab = self._pending_tab, None
@@ -777,59 +745,18 @@ class App:
                     "hidden": not self._visible, "now": self.players.snapshot()}
 
     def hide(self) -> None:
-        """Closing hides the window now and lets go of it a minute later.
-
-        A window kept alive costs the same hidden as visible: the engine holds
-        six processes and around 350 MB to draw a picture nobody is looking at,
-        and for a tray utility that is the number people quote in the comments.
-        Letting go hands all of it back — the engine's processes go to zero.
-
-        But rebuilding is not free. Not the window itself, which appears in
-        about fifty milliseconds, but the page inside it: it has to load, fetch
-        its language, ask for the state and draw. That wait was tried and it is
-        plainly noticeable — measuring when the window appeared measured the
-        wrong thing, and the person looking at it was right.
-
-        So both, in the order that suits how the program is used. Close and
-        reopen within the minute — the usual "wrong tab, let me look again" —
-        and it is instant, because the window never went anywhere. Walk away and
-        the memory comes back on its own.
-        """
         if not self.window:
             return
-        self._visible = False
-        self.meter.set_idle(True)
-        with self._ui_lock:
-            self._state_rev += 1
         try:
             self.window.hide()
         except Exception:
             _log.warning("the window did not hide", exc_info=True)
             return
-        self._arm_release()
-
-    def _arm_release(self) -> None:
-        """Start the countdown to letting the window go."""
-        if self._release_timer is not None:
-            self._release_timer.cancel()
-        self._release_timer = threading.Timer(RELEASE_AFTER_S, self._release_window)
-        self._release_timer.daemon = True
-        self._release_timer.start()
-
-    def _release_window(self) -> None:
-        """The minute is up and nobody came back — hand the memory over.
-
-        Destroying from this thread is safe: the call is posted to the window's
-        own loop, which is the same route quit() has always taken.
-        """
-        if self.window is None or self._visible or self._quitting:
-            return
-        _log.info("nobody came back for %.0f s — letting the window go",
-                  RELEASE_AFTER_S)
-        try:
-            self.window.destroy()
-        except Exception:
-            _log.warning("the window did not close", exc_info=True)
+        # The order matters: hide first, then put everything into sleep mode.
+        self._visible = False
+        self.meter.set_idle(True)
+        with self._ui_lock:
+            self._state_rev += 1      # so the page learns of it on the next poll
 
     def _shutdown_com(self) -> None:
         """Let COM go before the window unloads the .NET runtime.
@@ -850,9 +777,6 @@ class App:
         self._quitting = True
         _log.info("exit on request")
         self._stopped.set()          # releases run() when there is no window
-        self._wants_window.set()     # and wakes the loop that waits for one
-        if self._release_timer is not None:
-            self._release_timer.cancel()
         self._shutdown_com()
         if self.tray:
             self.tray.stop()
@@ -908,53 +832,30 @@ class App:
         # it the window is dragged by any point of the page, and the sliders and
         # the knob stop working. The drag zone is set in the markup by the
         # pywebview-drag-region class.
+        if self._engine is not None:
+            self.window = webview.create_window(
+                "Master Audio Switcher", url, width=FULL_SIZE[0], height=self._full_height,
+                resizable=False, frameless=True, easy_drag=False, hidden=True,
+                background_color="#1C1F24",
+            )
         try:
-            if self._engine is None:
+            if self.window is None:
                 # No engine, so no window — but the program is not useless: its
                 # main job is a click on the tray icon, and that needs nothing
                 # from a browser. We keep the tray alive and wait for the exit.
-                # A manual start is told by show(), which is where the request
-                # for a window actually arrives; from autostart nobody asked for
-                # anything, so a notification is enough.
+                # A manual start is told by show() further down, which is where
+                # the request for a window actually arrives; from autostart
+                # nobody asked for anything, so a notification is enough.
                 if self.launched_by_startup:
                     self._offer_engine()
                 self._stopped.wait()
                 _log.info("exit without a window")
             else:
-                # The window is built when it is wanted and released when it is
-                # closed, so the engine costs nothing while nobody is looking.
-                # Only this thread may build one — a window belongs to the thread
-                # that runs its message loop — so everyone else raises the flag
-                # and waits here.
-                while not self._quitting:
-                    self._wants_window.wait()
-                    self._wants_window.clear()
-                    if self._quitting:
-                        break
-                    # Re-measured every time: the screen can change between one
-                    # opening and the next, and a laptop can be plugged into a
-                    # different monitor without the program noticing otherwise.
-                    self._full_height = screen.fit_height(FULL_SIZE[1])
-                    self.window = webview.create_window(
-                        "Master Audio Switcher", url,
-                        width=FULL_SIZE[0], height=self._full_height,
-                        resizable=False, frameless=True, easy_drag=False,
-                        hidden=True, background_color="#1C1F24",
-                    )
-                    # start() returns when the window is destroyed — by our own
-                    # hide(), by quit(), or because the engine fell over. All
-                    # three end up here, and the difference is in the log.
-                    webview.start(self._window_ready)
-                    self.window = None
-                    self._visible = False
-                    self.meter.set_idle(True)
-                    # The mini view goes with the window. It is state of a
-                    # session, never written to the settings, and a new window is
-                    # built at full height — leaving the flag set produced a
-                    # full-height window with the list and the tabs hidden, which
-                    # is exactly as broken as it sounds.
-                    self._mini = False
-                    _log.info("window released (exit requested: %s)", self._quitting)
+                webview.start()
+                # We get here both when the window was closed and when the
+                # WebView2 engine crashed. Telling them apart matters: in the
+                # second case the program is obliged to say so.
+                _log.info("window loop finished (exit requested: %s)", self._quitting)
         finally:
             self._shutdown_com()
             self.bridge.stop()
