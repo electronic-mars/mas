@@ -34,6 +34,10 @@ _log = log.get("app")
 MUTEX_NAME = "Local\\MasterAudioSwitcherSingleInstance"
 ERROR_ALREADY_EXISTS = 183
 FULL_SIZE = (440, 772)      # full window view in logical points, before fitting
+# How long a closed window is kept before it is let go. Long enough to cover
+# "wrong tab, let me look again", short enough that walking away gives the
+# memory back while the person is still in the room.
+RELEASE_AFTER_S = 60.0
 
 
 def already_running() -> bool:
@@ -207,6 +211,9 @@ class App:
         # Somebody asked for the window. Only the main thread may build one, so
         # every other thread raises this flag and the loop in run() answers it.
         self._wants_window = threading.Event()
+        # Closing hides the window and starts this timer; only when it fires is
+        # the window really let go. See hide().
+        self._release_timer: threading.Timer | None = None
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
         self._pending_tab: str | None = None
@@ -728,9 +735,14 @@ class App:
         with self._ui_lock:
             self._pending_tab = tab
             self._state_rev += 1
+        # Coming back within the minute costs nothing: the window is still there.
+        if self._release_timer is not None:
+            self._release_timer.cancel()
+            self._release_timer = None
         if self.window is None:
-            # Closed means gone, not hidden. Building one is the main thread's
-            # job, so all we do here is ask; it costs about a third of a second.
+            # It was let go. Building one is the main thread's job, so all we do
+            # here is ask — and the page inside it has to load again, which is
+            # the part a person notices.
             self._wants_window.set()
             return
         try:
@@ -765,29 +777,55 @@ class App:
                     "hidden": not self._visible, "now": self.players.snapshot()}
 
     def hide(self) -> None:
-        """Closing means letting go of the window, not hiding it.
+        """Closing hides the window now and lets go of it a minute later.
 
-        A hidden window costs exactly what a visible one costs: the engine keeps
-        six processes and around 350 MB for a picture nobody is looking at, and
-        for a tray utility that is the number people quote in the comments.
-        Destroying it hands all of that back to the system; the engine's
-        processes go to zero. Opening it again costs about a third of a second,
-        which is the right trade for something that spends most of its life
-        closed.
+        A window kept alive costs the same hidden as visible: the engine holds
+        six processes and around 350 MB to draw a picture nobody is looking at,
+        and for a tray utility that is the number people quote in the comments.
+        Letting go hands all of it back — the engine's processes go to zero.
 
-        Proved before it was written: fifty create-and-destroy cycles with the
-        garbage collector off and a COM-owning thread alive throughout — the
-        combination that has crashed this program before — with no crash and six
-        megabytes of growth in total.
+        But rebuilding is not free. Not the window itself, which appears in
+        about fifty milliseconds, but the page inside it: it has to load, fetch
+        its language, ask for the state and draw. That wait was tried and it is
+        plainly noticeable — measuring when the window appeared measured the
+        wrong thing, and the person looking at it was right.
+
+        So both, in the order that suits how the program is used. Close and
+        reopen within the minute — the usual "wrong tab, let me look again" —
+        and it is instant, because the window never went anywhere. Walk away and
+        the memory comes back on its own.
         """
         if not self.window:
             return
-        # The order matters: everything goes to sleep first, because destroy()
-        # ends the window loop and run() carries straight on.
         self._visible = False
         self.meter.set_idle(True)
         with self._ui_lock:
             self._state_rev += 1
+        try:
+            self.window.hide()
+        except Exception:
+            _log.warning("the window did not hide", exc_info=True)
+            return
+        self._arm_release()
+
+    def _arm_release(self) -> None:
+        """Start the countdown to letting the window go."""
+        if self._release_timer is not None:
+            self._release_timer.cancel()
+        self._release_timer = threading.Timer(RELEASE_AFTER_S, self._release_window)
+        self._release_timer.daemon = True
+        self._release_timer.start()
+
+    def _release_window(self) -> None:
+        """The minute is up and nobody came back — hand the memory over.
+
+        Destroying from this thread is safe: the call is posted to the window's
+        own loop, which is the same route quit() has always taken.
+        """
+        if self.window is None or self._visible or self._quitting:
+            return
+        _log.info("nobody came back for %.0f s — letting the window go",
+                  RELEASE_AFTER_S)
         try:
             self.window.destroy()
         except Exception:
@@ -813,6 +851,8 @@ class App:
         _log.info("exit on request")
         self._stopped.set()          # releases run() when there is no window
         self._wants_window.set()     # and wakes the loop that waits for one
+        if self._release_timer is not None:
+            self._release_timer.cancel()
         self._shutdown_com()
         if self.tray:
             self.tray.stop()
@@ -908,6 +948,12 @@ class App:
                     self.window = None
                     self._visible = False
                     self.meter.set_idle(True)
+                    # The mini view goes with the window. It is state of a
+                    # session, never written to the settings, and a new window is
+                    # built at full height — leaving the flag set produced a
+                    # full-height window with the list and the tabs hidden, which
+                    # is exactly as broken as it sounds.
+                    self._mini = False
                     _log.info("window released (exit requested: %s)", self._quitting)
         finally:
             self._shutdown_com()
