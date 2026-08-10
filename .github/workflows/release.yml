@@ -89,10 +89,20 @@ jobs:
           if (-not (Test-Path $log)) { throw "it started but wrote no log" }
           $text = Get-Content $log -Raw
           # A build machine has no sound card and no desktop of its own, so a lot
-          # will be missing — but the settings and the local bridge must come up,
-          # and those two prove the program is assembled and not merely present.
-          foreach ($mark in @("=== start", "settings loaded", "bridge is up")) {
-            if ($text -notmatch [regex]::Escape($mark)) { throw "never got to: $mark" }
+          # will be missing — these three are what prove the executable is
+          # assembled rather than merely present.
+          #
+          # The settings line is matched either way on purpose: a build machine is
+          # always a first run, and a first run says "no settings yet" instead of
+          # "settings loaded". Insisting on the second is what failed the first
+          # time this step ever ran — the program was fine, the check was not.
+          $marks = @{
+            "the start line"    = "=== start"
+            "the settings"      = "settings loaded|no settings yet"
+            "the local bridge"  = "bridge is up"
+          }
+          foreach ($name in $marks.Keys) {
+            if ($text -notmatch $marks[$name]) { throw "never got to: $name" }
           }
           "started, ran for 25 seconds, and said so in the log"
 
