@@ -17,6 +17,10 @@ from mas.core import devices  # noqa: E402
 from mas.core.config import DEFAULTS  # noqa: E402
 from mas.core.switcher import Switcher  # noqa: E402
 
+# Kept before anything replaces it: fake_world below swaps default_id for a stub,
+# and the test of its own logging needs the real one.
+REAL_DEFAULT_ID = devices.default_id
+
 _passed, _failed = 0, 0
 
 
@@ -437,6 +441,48 @@ check("a margin is left at the top and the bottom", room_for(700, 1.0), 700 - 24
 check("an absurdly short screen still leaves a window", room_for(200, 1.0),
       screen.MIN_HEIGHT)
 check("the window never grows beyond what it asked for", room_for(4000, 1.0), 772)
+
+print("A machine with no audio devices")
+
+# Found on the build machine, which has no sound card: the log filled with a
+# stack trace twice a second for as long as the program ran. The one file we
+# have to work from must not be buried by a condition that never changes.
+import logging  # noqa: E402
+
+
+class Counter(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.said = []
+
+    def emit(self, record):
+        self.said.append(record.levelno)
+
+
+counter = Counter()
+logging.getLogger("mas.devices").addHandler(counter)
+real_enum, devices._enumerator = devices._enumerator, None
+
+
+def no_devices():
+    raise OSError("no endpoint here")
+
+
+devices._quiet[True] = False
+devices._enumerator = no_devices
+for _ in range(5):
+    REAL_DEFAULT_ID(is_output=True, max_age=0.0)
+check("five attempts, one complaint",
+      [n for n in counter.said if n >= logging.WARNING], [logging.WARNING])
+
+counter.said.clear()
+devices._enumerator = lambda: type("E", (), {"GetDefaultAudioEndpoint":
+    lambda self, f, r: type("D", (), {"GetId": lambda s: "id-back"})()})()
+check("and it says so when a device comes back",
+      REAL_DEFAULT_ID(is_output=True, max_age=0.0), "id-back")
+check("exactly once", len(counter.said), 1)
+devices._enumerator = real_enum
+logging.getLogger("mas.devices").removeHandler(counter)
 
 print("A command that cannot be carried out")
 

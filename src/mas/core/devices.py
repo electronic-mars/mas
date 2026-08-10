@@ -87,6 +87,8 @@ _DEFAULT_TTL = 0.5
 _lock = threading.Lock()
 _cache: dict = {"devices": None, "ts": 0.0}
 _default_cache: dict = {True: (None, 0.0), False: (None, 0.0)}
+# Whether we have already complained that there is no default device, per flow.
+_quiet: dict = {True: False, False: False}
 
 
 def _enumerate():
@@ -163,13 +165,25 @@ def default_id(is_output: bool = True, max_age: float = _DEFAULT_TTL) -> str | N
     if value is not None and now - ts <= max_age:
         return value
 
+    kind = "output" if is_output else "recording"
     try:
         flow = FLOW_RENDER if is_output else FLOW_CAPTURE
         value = _enumerator().GetDefaultAudioEndpoint(flow, ROLE_CONSOLE).GetId()
     except Exception:
-        _log.warning("could not get the default device (%s)",
-                     "output" if is_output else "recording", exc_info=True)
+        # Said once, not on every attempt. There is no default device when they
+        # are all disabled, or on a machine that has no sound card at all — and
+        # the meter asks twice a second, for as long as the program runs. On a
+        # build machine that produced fifteen identical stack traces in twenty
+        # five seconds; on a person's machine it would bury everything else in
+        # the one file we have to work from.
+        if not _quiet[is_output]:
+            _quiet[is_output] = True
+            _log.warning("no default device (%s) — will stay quiet about it "
+                         "until one appears", kind, exc_info=True)
         return None
+    if _quiet[is_output]:
+        _quiet[is_output] = False
+        _log.info("the default device (%s) is readable again", kind)
     with _lock:
         _default_cache[is_output] = (value, now)
     return value
