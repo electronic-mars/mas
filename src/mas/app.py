@@ -204,7 +204,8 @@ class App:
             self.cfg.set("language", language.pick())
         # The tray and the notifications speak the same language as the window.
         strings.use(self.cfg.get("language"))
-        self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead)
+        self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead,
+                               on_new_app=self.push_state)
         self.players.set_priority(self.cfg.get("priority_player"))
         self.hotkeys = Hotkeys(
             {"switch": self.cycle, "play": lambda: self.players.command("play")},

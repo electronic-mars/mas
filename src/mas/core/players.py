@@ -63,10 +63,15 @@ class Track:
 
 
 class Players(threading.Thread):
-    def __init__(self, on_track=None, on_dead=None):
+    def __init__(self, on_track=None, on_dead=None, on_new_app=None):
         super().__init__(daemon=True, name="mas-players")
         self._on_track = on_track      # call when the track or the player changed
         self._on_dead = on_dead        # call when the player does not respond at all
+        # Call when a player is seen for the first time. Without it the settings
+        # list is whatever existed at the moment the window was opened, and a
+        # player that started later never appears in it — the page only refetches
+        # the state when it is told the state changed.
+        self._on_new_app = on_new_app
         # Player -> the state it froze in. A closed tab leaves a record of
         # itself in the system, and that record stays frozen in "playing"
         # forever: there is nobody left to send commands to. We skip such
@@ -170,11 +175,16 @@ class Players(threading.Thread):
 
     def _note(self, sessions) -> None:
         """Remember everyone we have seen, so the settings have a list to offer."""
+        fresh = []
         with self._lock:
             for s in sessions:
                 app = s.source_app_user_model_id
                 if app and app not in self._seen:
                     self._seen[app] = self._short(app)
+                    fresh.append(self._seen[app])
+        if fresh and self._on_new_app:
+            _log.info("a player we had not seen before: %s", ", ".join(fresh))
+            self._on_new_app()          # outside the lock: it goes off to the window
 
     def _pick(self, sessions):
         """Who to address the command to. The rule is described in the module header."""
@@ -446,6 +456,12 @@ class Players(threading.Thread):
                 ctl.GlobalSystemMediaTransportControlsSessionManager.request_async())
             self.available = True
             _log.info("the player list is available")
+            # Look straight away rather than on the next tick. With nothing
+            # playing yet the tick is twelve seconds out, and for those twelve
+            # seconds the settings offered an empty list of players — which is
+            # exactly the window in which a person opens the program they have
+            # just started.
+            self._jobs.put(("refresh", None))
         except Exception:
             _log.warning("the player list is unavailable, staying on media keys",
                          exc_info=True)

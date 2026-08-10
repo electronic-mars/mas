@@ -345,6 +345,21 @@ check("its name is remembered for the settings list",
 check("it is offered even while it is not running",
       named._pick([opera]).source_app_user_model_id, "Opera")
 
+# A player that starts after the window was opened must reach the settings list.
+# The page fetches the state only when it is told the state changed, so a player
+# discovered quietly stayed invisible until something unrelated forced a refresh
+# — which is how an empty dropdown appeared with Spotify playing in plain sight.
+told = []
+late = Players(on_new_app=lambda: told.append(1))
+late._note([opera])
+check("the window is told about a player it had not seen", len(told), 1)
+late._note([opera])
+check("and not told again about the same one", len(told), 1)
+late._note([opera, spotify])
+check("but told when another one turns up", len(told), 2)
+check("both are in the list now",
+      [a["name"] for a in late.known_apps()], ["Opera", "Spotify"])
+
 # Taking the nomination away must actually change what happens. Without this the
 # un-nominated player kept winning as "the one controlled last", and the setting
 # looked as though it had not applied at all.
