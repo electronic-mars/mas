@@ -734,5 +734,140 @@ check("a broken value does not throw",
 
 print(f"  on this machine: {runtime.webview2_version() or 'the runtime is missing'}")
 
+
+# --------------------------------------------------------------------------
+# Working out an unknown dongle. This is the one piece where a wrong answer is
+# worse than no answer: a byte that only looked like the state means headphones
+# that seize the sound at random, and nobody would connect that to a wizard they
+# ran once. So the cases that must be refused matter more than the ones that work.
+print("\nWorking out an unknown dongle")
+from mas.core.dongle import KNOWN, deduce  # noqa: E402
+
+
+def b(*vals):
+    return bytes(vals)
+
+
+# The real HyperX, as recorded over three power cycles.
+hx = deduce([b(0x0B, 0, 0xBB, 1, 1)] * 2, [b(0x0B, 0, 0xBB, 1, 3)] * 2)
+check("the HyperX rule is recovered from its reports",
+      {k: hx[k] for k in ("report", "state_at", "on", "off")},
+      {"report": 0x0B, "state_at": 4, "on": 0x01, "off": 0x03})
+check("and it is the rule that ships", hx["marker"], KNOWN[(0x0951, 0x16EA)]["marker"])
+
+# A battery byte differs between one on and one off just as convincingly. Two
+# cycles are what throws it out — this is the whole reason the wizard has four
+# steps instead of two.
+noisy_on = [b(0x0B, 0, 0xBB, 90, 1), b(0x0B, 0, 0xBB, 88, 1)]
+noisy_off = [b(0x0B, 0, 0xBB, 87, 3), b(0x0B, 0, 0xBB, 86, 3)]
+check("a battery reading is not mistaken for the state",
+      deduce(noisy_on, noisy_off)["state_at"], 4)
+check("nothing is claimed when the only difference wanders",
+      deduce([b(0x0B, 0, 90)], [b(0x0B, 0, 87)])["state_at"], 2)
+check("a byte that wanders inside one state is refused",
+      deduce([b(0x0B, 90), b(0x0B, 88)], [b(0x0B, 87), b(0x0B, 86)]), None)
+check("silence on one side decides nothing", deduce([b(0x0B, 1)], []), None)
+check("two states that look identical decide nothing",
+      deduce([b(0x0B, 0, 1)], [b(0x0B, 0, 1)]), None)
+check("reports of another kind are not compared",
+      deduce([b(0x01, 1)], [b(0x02, 3)]), None)
+# Nothing steady to anchor on: position 0 stands in, and it holds the report id
+# that was matched already, so the check passes without pretending to mean more.
+check("with no steady byte the marker falls back to the report id",
+      deduce([b(0x0B, 1)], [b(0x0B, 3)])["marker"], (0, 0x0B))
+# A report where everything moves is a stream of something else that happened to
+# stop; the quiet one next to it is the real signal.
+mixed = deduce([b(0x0B, 1, 9, 4), b(0x0B, 1, 9, 4), b(0x0C, 0, 0xBB, 1)],
+               [b(0x0B, 2, 7, 5), b(0x0B, 2, 7, 5), b(0x0C, 0, 0xBB, 3)])
+check("the cleaner of two reports is chosen", mixed["report"], 0x0C)
+check("and its marker is the byte that never moved", mixed["marker"], (2, 0xBB))
+# Shorter than the position being read: the decoder must not run off the end.
+rule = dict(KNOWN[(0x0951, 0x16EA)])
+check("a truncated report decodes to nothing",
+      __import__("mas.core.dongle", fromlist=["Dongle"]).Dongle(
+          0x0951, 0x16EA, None, rule=rule)._decode(b(0x0B, 0, 0xBB)), None)
+
+
+# The wizard end to end, with the dongle replaced by hand-fed bytes. What is
+# checked here is the plumbing around the deduction: that reports land in the
+# step that was running, that the learned rule is saved where sync_dongle looks
+# for it, and that the report offered to a person holds what happened.
+print("\nThe teaching wizard, end to end")
+import mas.app as app_mod  # noqa: E402
+
+
+class FakeDongle:
+    started = []
+
+    def __init__(self, vid, pid, on_change, rule=None, learn=False):
+        self.on_change, self.learn = on_change, learn
+        FakeDongle.started.append((vid, pid, learn))
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+
+def wizard_app():
+    app = App.__new__(App)
+    app.cfg = FakeConfig(auto_device="id-hp", dongle_rules={})
+    app._wiz = app._wiz_dongle = app.dongle = None
+    app._dongle_name = app._dongle_usb = app._dongle_on = None
+    app._known_cache = [{"id": "id-hp", "name": "Cloud Flight S"}]
+    app._known_pinned = "id-hp"
+    app.push_state = lambda: None
+    return app
+
+
+FakeDongle.started.clear()
+real_dongle, app_mod.Dongle = app_mod.Dongle, FakeDongle
+real_ids, app_mod.devices.usb_ids_of = app_mod.devices.usb_ids_of, lambda i: (0x1234, 0x5678)
+real_product, app_mod.product_name = app_mod.product_name, lambda v, p: "Test Dongle"
+try:
+    app = wizard_app()
+    check("the wizard opens the dongle", app.wizard_start()["running"], True)
+    check("and it opens it to listen, not to decode", FakeDongle.started[-1], (0x1234, 0x5678, True))
+    check("nothing is filed before the first step", app.wizard_state()["heard"], 0)
+    # A report that arrives between steps belongs to nobody, and must not be
+    # filed under whichever step happens to come next.
+    app._wizard_report(b"\x0b\x00\xbb\x01\x01")
+    for step, byte in (("on1", 1), ("off1", 3), ("on2", 1), ("off2", 3)):
+        app.wizard_step(step)
+        app._wizard_report(bytes((0x0B, 0, 0xBB, 1, byte)))
+    check("each step kept its own reports", app.wizard_state()["counts"],
+          {"on1": 1, "off1": 1, "on2": 1, "off2": 1})
+    done = app.wizard_finish()
+    check("the headset was worked out", done["ok"], True)
+    check("it is named after the dongle", done["name"], "Test Dongle")
+    check("the rule is saved where the listener looks for it",
+          app.dongle_rule((0x1234, 0x5678))["state_at"], 4)
+    check("and watching is on without another click", app.cfg.get("watch_dongle"), True)
+    check("the wizard let the dongle go", app._wiz, None)
+    check("the report says what was found", "byte 4: on 0x01, off 0x03" in done["report"], True)
+    check("and carries the raw lines", "0b 00 bb 01 03" in done["report"], True)
+    check("the report form is prefilled, not sent", done["url"].startswith(
+        "https://github.com/electronic-mars/mas/issues/new?template=dongle.yml"), True)
+    check("and it fills the fields the template asks for",
+          all(f"&{f}=" in done["url"] for f in ("title", "model", "ids", "reports", "worked")),
+          True)
+
+    # Nothing switched: the same reports in every step. Saying so plainly beats
+    # saving a rule that would fire at random.
+    app = wizard_app()
+    app.wizard_start()
+    for step in App.WIZARD_STEPS:
+        app.wizard_step(step)
+        app._wizard_report(b"\x0b\x00\xbb\x01\x01")
+    done = app.wizard_finish()
+    check("a headset that never changed is not guessed at", done["ok"], False)
+    check("and nothing is saved", app.cfg.get("dongle_rules"), {})
+    check("but the report is still offered", "no byte told" in done["report"], True)
+finally:
+    app_mod.Dongle = real_dongle
+    app_mod.devices.usb_ids_of = real_ids
+    app_mod.product_name = real_product
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

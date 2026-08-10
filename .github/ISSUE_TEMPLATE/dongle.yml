@@ -8,8 +8,15 @@ body:
       value: >
         Windows does not report when a headset on a USB dongle is switched on or
         off — the audio endpoint stays alive either way. The dongle itself sends
-        a short status report, and the program can use it once that report has
-        been decoded. This is what the recording below is for.
+        a short status report, and the program reads it once it knows what to
+        look for.
+
+
+        **You do not have to fill this in by hand.** Settings → Diagnostics →
+        Teach this dongle walks you through switching the headset on and off
+        twice, works the report out on the spot, and its "Send to the developer"
+        button opens this form already filled in. Sending it is what puts your
+        headset in the next release for everyone else with the same one.
   - type: input
     id: model
     attributes:
@@ -22,19 +29,26 @@ body:
     attributes:
       label: Vendor and product id
       description: >
-        Device Manager → the dongle → Details → Hardware Ids. Or take it from
-        the first line of the recording below.
+        Device Manager → the dongle → Details → Hardware Ids, if you are filling
+        this in by hand. The wizard knows it already.
       placeholder: "0951:16EA"
     validations:
       required: true
+  - type: input
+    id: worked
+    attributes:
+      label: Did the program work it out on your machine?
+      description: >
+        The wizard answers this for you. "no" is just as useful to send: it means
+        the reports need a look by hand.
+      placeholder: "yes / no"
   - type: textarea
     id: reports
     attributes:
-      label: Recorded reports
+      label: What the dongle said
       description: >
-        Settings → Diagnostics → Learn this dongle, then switch the headset on
-        and off about six times. The folder button opens the file. Paste its
-        contents here — it is a list of hex lines and nothing else.
+        Filled in by the wizard. By hand: Settings → Diagnostics opens the folder
+        with `dongle-learn.txt`, which holds the same lines.
       render: text
     validations:
       required: true

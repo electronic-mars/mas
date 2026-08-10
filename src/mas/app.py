@@ -14,7 +14,7 @@ from .bridge import Bridge
 from .core import devices, mixer, startup
 from .core.config import Config
 from .core.dongle import KNOWN as KNOWN_DONGLES
-from .core.dongle import Dongle
+from .core.dongle import MAX_CAPTURE, Dongle, deduce, product_name
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
@@ -101,9 +101,27 @@ class Api:
             self.app.hotkeys.bind("play", value)
         elif key == "priority_player":
             self.app.players.set_priority(value)
-        elif key in ("auto_device", "watch_dongle", "learn_dongle"):
+        elif key in ("auto_device", "watch_dongle"):
             self.app.sync_auto_device()
         return self.app.state()
+
+    # --- teaching an unknown dongle ------------------------------------
+    def dongle_wizard(self, action: str, step: str = ""):
+        """One entry point for the wizard: start, step, poll, finish, cancel."""
+        app = self.app
+        if action == "start":
+            return app.wizard_start()
+        if action == "step":
+            return app.wizard_step(step)
+        if action == "poll":
+            return app.wizard_state()
+        if action == "finish":
+            return app.wizard_finish()
+        if action == "cancel":
+            app.wizard_stop()
+            app.sync_dongle()
+            return {"running": False}
+        raise ValueError(f"no such action: {action}")
 
     # --- mixer and volume --------------------------------------------
     def get_mixer(self):
@@ -235,7 +253,19 @@ class App:
         self._dongle_usb: str | None = None
         # Last known headset state: None means we have not heard from it yet.
         self._dongle_on: bool | None = None
+        # The teaching wizard, while it is running: its buckets and its own
+        # listener, which holds the dongle instead of the watcher above.
+        self._wiz: dict | None = None
+        self._wiz_dongle: Dongle | None = None
         self._jobs: queue.SimpleQueue = queue.SimpleQueue()
+
+    def device_name(self, device_id: str) -> str:
+        """The name of an endpoint, present or not. From the cached list, so it
+        costs nothing — enumerating the disabled ones takes half a second."""
+        if not device_id:
+            return ""
+        return next((d["name"] for d in self.known_outputs_cached(device_id)
+                     if d["id"] == device_id), "")
 
     # --- state for the interface ---------------------------------------
     def state(self) -> dict:
@@ -438,32 +468,185 @@ class App:
         self._auto_prev = None
         self.sync_dongle()
 
+    def dongle_ids(self) -> tuple[int, int] | None:
+        """The USB identifiers of the priority device, if it has any."""
+        auto = self.cfg.get("auto_device")
+        return devices.usb_ids_of(auto) if auto else None
+
+    def dongle_rule(self, ids: tuple[int, int]) -> dict | None:
+        """A shipped model first, then whatever this copy worked out itself."""
+        rule = KNOWN_DONGLES.get(ids)
+        if rule is not None:
+            return rule
+        return self.cfg.get("dongle_rules").get(f"{ids[0]:04X}:{ids[1]:04X}")
+
     def sync_dongle(self) -> None:
         """Start or stop the dongle listener to match the current settings."""
         if self.dongle is not None:
             self.dongle.stop()
             self.dongle = None
-        auto = self.cfg.get("auto_device")
         self._dongle_name = self._dongle_usb = None
-        if not auto:
-            return
-        ids = devices.usb_ids_of(auto)
+        ids = self.dongle_ids()
         if ids is None:
             return                            # not USB — no dongle can be here
         self._dongle_usb = f"{ids[0]:04X}:{ids[1]:04X}"
-        rule = KNOWN_DONGLES.get(ids)
+        rule = self.dongle_rule(ids)
         if rule is None:
-            # An unknown dongle: there is no decoding for it, but its reports
-            # can be written to a file and a model added from them.
-            if self.cfg.get("learn_dongle"):
-                self.dongle = Dongle(ids[0], ids[1], None, learn=True)
-                self.dongle.start()
-            return
+            return                            # unknown: the wizard is offered instead
         self._dongle_name = rule["name"]      # the interface will show a toggle
-        if not self.cfg.get("watch_dongle"):
-            return
-        self.dongle = Dongle(ids[0], ids[1], self._dongle_changed)
+        if self._wiz is not None or not self.cfg.get("watch_dongle"):
+            return                            # the wizard is holding the dongle
+        self.dongle = Dongle(ids[0], ids[1], self._dongle_changed, rule=rule)
         self.dongle.start()
+
+    # --- teaching an unknown dongle ----------------------------------------
+    # Four steps, not two: one on and one off would also be told apart by a
+    # battery reading or a counter, and a wrong byte means headphones that grab
+    # the sound at random. Two full cycles throw those out — see dongle.deduce.
+    WIZARD_STEPS = ("on1", "off1", "on2", "off2")
+
+    def wizard_start(self) -> dict:
+        """Begin teaching. Listening runs from here to the end without a break:
+        the reports simply land in the bucket of whichever step is running, so
+        nothing is lost while the person is reaching for the headset."""
+        self.wizard_stop()
+        ids = self.dongle_ids()
+        if ids is None:
+            return {"error": "no_dongle"}
+        self._wiz = {"ids": ids, "step": "", "last": 0.0,
+                     "steps": {s: [] for s in self.WIZARD_STEPS}}
+        self.sync_dongle()                    # let go of the watcher, if any
+        self._wiz_dongle = Dongle(ids[0], ids[1], self._wizard_report, learn=True)
+        self._wiz_dongle.start()
+        return self.wizard_state()
+
+    def wizard_step(self, step: str) -> dict:
+        """Move to a step. Everything arriving from now on belongs to it."""
+        if self._wiz is None:
+            return {"error": "not_running"}
+        if step not in self.WIZARD_STEPS:
+            raise ValueError(f"no such step: {step}")
+        self._wiz["step"] = step
+        self._wiz["last"] = 0.0
+        return self.wizard_state()
+
+    def _wizard_report(self, data: bytes) -> None:
+        """Called from a dongle thread for every report that arrives."""
+        wiz = self._wiz
+        if wiz is None or wiz["step"] not in wiz["steps"]:
+            return
+        bucket = wiz["steps"][wiz["step"]]
+        if len(bucket) < MAX_CAPTURE:
+            bucket.append(data)
+        wiz["last"] = time.monotonic()
+
+    def wizard_state(self) -> dict:
+        """What the page needs to draw the current step.
+
+        "settled" is the answer to the only hard question here: has the dongle
+        finished speaking? A headset takes seconds to power up and then sends
+        several reports in a row; moving on in the middle of that would file the
+        rest of them under the next step.
+        """
+        wiz = self._wiz
+        if wiz is None:
+            return {"running": False}
+        counts = {s: len(v) for s, v in wiz["steps"].items()}
+        heard = counts.get(wiz["step"], 0)
+        return {"running": True, "step": wiz["step"], "counts": counts,
+                "heard": heard,
+                "settled": bool(heard) and time.monotonic() - wiz["last"] > 1.2}
+
+    def wizard_stop(self) -> None:
+        if self._wiz_dongle is not None:
+            self._wiz_dongle.stop()
+            self._wiz_dongle = None
+        self._wiz = None
+
+    def wizard_finish(self) -> dict:
+        """Read the four buckets, save what was learned, and prepare the report."""
+        wiz = self._wiz
+        if wiz is None:
+            return {"error": "not_running"}
+        ids = wiz["ids"]
+        steps = wiz["steps"]
+        on = steps["on1"] + steps["on2"]
+        off = steps["off1"] + steps["off2"]
+        rule = deduce(on, off) if on and off else None
+        usb = f"{ids[0]:04X}:{ids[1]:04X}"
+        name = (product_name(*ids)
+                or self.device_name(self.cfg.get("auto_device")) or usb)
+        if rule is not None:
+            rule = {**rule, "name": name}
+            rules = {**self.cfg.get("dongle_rules"), usb: rule}
+            self.cfg.set("dongle_rules", rules)
+            # They just taught it; switching it on themselves afterwards would be
+            # a step that exists only to be clicked.
+            self.cfg.set("watch_dongle", True)
+        text = self._wizard_report_text(usb, name, rule, steps)
+        self.wizard_stop()
+        self.sync_dongle()
+        self.push_state()
+        return {"ok": rule is not None, "name": name, "usb": usb,
+                "detail": self._wizard_detail(rule), "report": text,
+                "url": self._wizard_issue_url(usb, name, rule is not None, text)}
+
+    @staticmethod
+    def _wizard_detail(rule: dict | None) -> str:
+        if rule is None:
+            return ""
+        pos, val = rule["marker"]
+        return (f"report 0x{rule['report']:02X}, byte {rule['state_at']}: "
+                f"on 0x{rule['on']:02X}, off 0x{rule['off']:02X} "
+                f"(marker byte {pos} = 0x{val:02X})")
+
+    def _wizard_report_text(self, usb: str, name: str, rule: dict | None,
+                            steps: dict) -> str:
+        """The whole finding as plain text, ready to be read by a person.
+
+        Repeated lines are collapsed: a dongle that says the same thing forty
+        times adds nothing but length, and the count says it better.
+        """
+        out = [f"Dongle: {usb} — {name or 'unnamed'}",
+               f"Audio device: {self.device_name(self.cfg.get('auto_device'))}",
+               f"Program: {__version__}", ""]
+        if rule is None:
+            out.append("Result: no byte told the two states apart.")
+        else:
+            out.append(f"Result: {self._wizard_detail(rule)}")
+            if rule.get("also"):
+                out.append("Other bytes that would have worked too: " + ", ".join(
+                    f"byte {i}: on 0x{a:02X}, off 0x{b:02X}" for i, a, b in rule["also"]))
+        for step in self.WIZARD_STEPS:
+            seen: dict[str, int] = {}
+            for data in steps[step]:
+                line = data.hex(" ")
+                seen[line] = seen.get(line, 0) + 1
+            out.append("")
+            out.append(f"[{step}] {len(steps[step])} reports")
+            out.extend(f"  {line}" + (f"   ×{n}" if n > 1 else "")
+                       for line, n in seen.items())
+        return "\n".join(out)
+
+    @staticmethod
+    def _wizard_issue_url(usb: str, name: str, ok: bool, text: str) -> str:
+        """The report form, with its fields already filled in.
+
+        Through the template rather than a blank issue: the template carries the
+        label and the questions, and its field ids are what these parameters
+        fill. Sending it is the person's click and their decision — the program
+        itself sends nothing anywhere, ever.
+        """
+        from urllib.parse import urlencode
+        query = urlencode({
+            "template": "dongle.yml",
+            "title": f"Dongle: {name or usb}",
+            "model": name,
+            "ids": usb,
+            "reports": text,
+            "worked": "yes" if ok else "no",
+        })
+        return f"https://github.com/electronic-mars/mas/issues/new?{query}"
 
     def _dongle_changed(self, on: bool) -> None:
         """The dongle reported that the headset was turned on or off.
@@ -755,6 +938,11 @@ class App:
         # The order matters: hide first, then put everything into sleep mode.
         self._visible = False
         self.meter.set_idle(True)
+        if self._wiz is not None:
+            # The wizard lives in the window. Closing it mid-way would otherwise
+            # leave the dongle held open by a listener nobody can reach again.
+            self.wizard_stop()
+            self.sync_dongle()
         with self._ui_lock:
             self._state_rev += 1      # so the page learns of it on the next poll
 

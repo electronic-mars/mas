@@ -44,6 +44,10 @@ KNOWN = {
                        "on": 0x01, "off": 0x03},
 }
 
+# A dongle that talks a lot would fill memory while the wizard is waiting for the
+# person to reach for the headset. One report is enough; two hundred is generous.
+MAX_CAPTURE = 200
+
 
 class _GUID(ctypes.Structure):
     _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
@@ -143,6 +147,75 @@ def find_collections(vid: int, pid: int) -> list[str]:
     return out
 
 
+def product_name(vid: int, pid: int) -> str:
+    """What the dongle calls itself. Only used to name things for a person —
+    nothing depends on it, and plenty of dongles answer with nothing at all."""
+    for path in find_collections(vid, pid):
+        h = k32.CreateFileW(path, 0, FILE_SHARE_RW, None, OPEN_EXISTING, 0, None)
+        if h == INVALID:
+            continue
+        buf = ctypes.create_unicode_buffer(126)     # the API's own limit
+        ok = hid.HidD_GetProductString(wintypes.HANDLE(h), buf, ctypes.sizeof(buf))
+        k32.CloseHandle(wintypes.HANDLE(h))
+        if ok and buf.value.strip():
+            return buf.value.strip()
+    return ""
+
+
+def deduce(on_reports: list[bytes], off_reports: list[bytes]) -> dict | None:
+    """Work out from captured reports which byte says the headset is on.
+
+    The two lists hold everything the dongle said across two separate on/off
+    cycles. Two cycles is what makes the answer trustworthy: a battery reading
+    or a rolling counter also differs between one "on" and one "off", but it
+    does not hold the very same value across two of them — and holding the same
+    value in every "on" and a different same value in every "off" is the whole
+    test here.
+
+    Returns a rule in the shape of the KNOWN entries, or None when nothing in
+    the reports tells the two states apart.
+    """
+    def by_id(reports: list[bytes]) -> dict[int, list[bytes]]:
+        out: dict[int, list[bytes]] = {}
+        for d in reports:
+            if d:
+                out.setdefault(d[0], []).append(d)
+        return out
+
+    on_by, off_by = by_id(on_reports), by_id(off_reports)
+    best = None
+    for rid in sorted(set(on_by) & set(off_by)):
+        ons, offs = on_by[rid], off_by[rid]
+        width = min(min(len(d) for d in ons), min(len(d) for d in offs))
+        steady: list[tuple[int, int]] = []   # never changes — a candidate marker
+        differs: list[tuple[int, int, int]] = []
+        for i in range(1, width):
+            a = {d[i] for d in ons}
+            b = {d[i] for d in offs}
+            if len(a) != 1 or len(b) != 1:
+                continue                      # wanders inside a state — not a state byte
+            if a == b:
+                steady.append((i, a.pop()))
+            else:
+                differs.append((i, a.pop(), b.pop()))
+        # Fewer differing bytes means a cleaner signal: a report whose every byte
+        # changes is a stream of something else that merely happened to stop.
+        if differs and (best is None or len(differs) < len(best[1])):
+            best = (rid, differs, steady)
+    if best is None:
+        return None
+    rid, differs, steady = best
+    at, on, off = differs[0]
+    # A marker is a second byte that never moves, so the rule refuses reports it
+    # was not written for. When there is no such byte, position 0 stands in: it
+    # holds the report id, which was already matched, so the check costs nothing.
+    marker = next(((i, v) for i, v in steady if v), (0, rid))
+    return {"report": rid, "marker": marker, "state_at": at, "on": on, "off": off,
+            # Other bytes that told the states apart just as well. Nothing reads
+            # this; it goes into the report so a second pair of eyes has it.
+            "also": differs[1:]}
+
+
 def learn_write(line: str) -> None:
     """Append a line to the learning file. The file stays on disk: the program
     sends nothing anywhere, showing it to someone is the user's decision."""
@@ -157,15 +230,17 @@ def learn_write(line: str) -> None:
 class Dongle(threading.Thread):
     """Listens to the dongle and calls the handler when the headset state changes.
 
-    In learning mode there is no decoding: every report that arrives is simply
-    written to a file, so that a new model can be added from it later.
+    In learning mode there is no decoding: every report that arrives is written
+    to a file and handed to the handler as raw bytes, which is how the wizard
+    works out an unknown dongle for itself.
     """
 
-    def __init__(self, vid: int, pid: int, on_change, learn: bool = False):
+    def __init__(self, vid: int, pid: int, on_change, rule: dict | None = None,
+                 learn: bool = False):
         super().__init__(daemon=True, name="mas-dongle")
         self.vid, self.pid = vid, pid
         self.learn = learn
-        self._rule = None if learn else KNOWN[(vid, pid)]
+        self._rule = None if learn else (rule or KNOWN[(vid, pid)])
         self._on_change = on_change
         self._stop = threading.Event()
         self._state: bool | None = None
@@ -239,6 +314,11 @@ class Dongle(threading.Thread):
                     learn_write(f"{time.strftime('%H:%M:%S')}  {self.vid:04X}:{self.pid:04X}"
                                 f"  {path.split('#')[1] if '#' in path else ''}"
                                 f"  {data.hex(' ')}")
+                    if self._on_change is not None:
+                        try:
+                            self._on_change(data)
+                        except Exception:
+                            _log.exception("report handler crashed")
                     continue
                 state = self._decode(data)
                 if state is None or state == self._state:

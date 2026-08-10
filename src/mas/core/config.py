@@ -48,9 +48,11 @@ DEFAULTS: dict[str, Any] = {
     # Watch the headset through its USB dongle. Needed only where the dongle is
     # always plugged in and Windows does not see the headset being switched on.
     "watch_dongle": False,
-    # Write the reports of an unknown dongle to a file so its model can be added
-    # from them. Nothing is sent anywhere, the file sits next to the settings.
-    "learn_dongle": False,
+    # Dongles this copy of the program worked out for itself, "0951:16EA" -> rule.
+    # A shipped model is nobody's to wait for: the wizard watches the headset be
+    # switched on and off and writes down what changed, and the headset works
+    # here from that moment on, release or no release.
+    "dongle_rules": {},
     "mics_expanded": False,   # the microphone section is collapsed by default
     "onboarded": False,
 }

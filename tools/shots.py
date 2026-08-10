@@ -89,7 +89,7 @@ class FakeApi:
                         {"id": "OperaSoftware.OperaWebBrowser.1779790930",
                          "name": "Opera"}],
             "auto_device": HP, "switch_microphone": True, "watch_dongle": True,
-            "learn_dongle": False, "mics_expanded": False, "onboarded": True,
+            "mics_expanded": False, "onboarded": True,
             "version": __import__("mas").__version__,
             "dongle_name": "HyperX Cloud Flight S", "dongle_usb": None,
         }
@@ -151,6 +151,33 @@ class FakeApi:
     def set_mini(self, **kw):
         return True
 
+    def open_data_folder(self):
+        return True
+
+    def dongle_wizard(self, action, step=""):
+        """Enough of the wizard to draw it. The step it stops on is set by the
+        screen being taken, so both the waiting step and the result can be shown
+        on a machine with no unknown dongle anywhere near it."""
+        if action == "finish":
+            return {"ok": True, "name": "Cloud Flight S Wireless",
+                    "usb": "046D:0A5B",
+                    "detail": "report 0x0B, byte 4: on 0x01, off 0x03",
+                    "report": "\n".join((
+                        "Dongle: 046D:0A5B — Cloud Flight S Wireless",
+                        "Audio device: Headphones (HyperX Cloud Flight S)",
+                        "Program: 1.0.0", "",
+                        "Result: report 0x0B, byte 4: on 0x01, off 0x03 "
+                        "(marker byte 2 = 0xBB)", "",
+                        "[on1] 2 reports", "  0b 00 bb 01 01   ×2", "",
+                        "[off1] 1 reports", "  0b 00 bb 01 03", "",
+                        "[on2] 1 reports", "  0b 00 bb 01 01", "",
+                        "[off2] 1 reports", "  0b 00 bb 01 03")),
+                    "url": "https://github.com/electronic-mars/mas/issues/new"}
+        if action == "cancel":
+            return {"running": False}
+        return {"running": True, "step": step or "on1", "heard": 2, "settled": True,
+                "counts": {"on1": 2, "off1": 0, "on2": 0, "off2": 0}}
+
 
 # An action that cannot be expressed through settings: a button click. The script
 # waits for the element to appear, because the interface is built after page load.
@@ -178,13 +205,23 @@ INJECT = """
   const act = q.get('act');
   const wanted = { icons: '.row [data-act="icon"]',
                    hotkey: '[data-capture="hotkey"]',
-                   mini: '#btn-mini' }[act];
+                   mini: '#btn-mini',
+                   teach: '[data-act="teach"]',
+                   'teach-done': '[data-act="teach"]' }[act];
   if (!wanted) return;
   const tick = setInterval(() => {
     const el = document.querySelector(wanted);
     if (!el) return;
     clearInterval(tick);
     el.click();
+    // The wizard is four steps deep. Walking it here rather than faking the
+    // last screen means the screenshot shows the panel a person actually gets.
+    if (act !== 'teach-done') return;
+    const walk = setInterval(() => {
+      const next = document.querySelector('.wiz [data-wiz="next"]:not([disabled])');
+      if (next) next.click();
+      else if (document.querySelector('.wiz .log')) clearInterval(walk);
+    }, 60);
   }, 50);
 })();
 </script>
@@ -250,8 +287,13 @@ SCREENS = [
     ("07-settings-light", {"tab": "settings", "theme": "light"}, WIN_H, ""),
     ("08-settings-full-dark", {"tab": "settings", "theme": "dark"}, TALL, ""),
     ("09-settings-full-light", {"tab": "settings", "theme": "light"}, TALL, ""),
-    ("10-settings-learn", {"tab": "settings", "theme": "dark", "dongle_name": None,
-                           "dongle_usb": "046D:0A5B", "learn_dongle": True}, TALLER, ""),
+    ("10-settings-teach", {"tab": "settings", "theme": "dark", "dongle_name": None,
+                           "dongle_usb": "046D:0A5B"}, TALLER, ""),
+    # The wizard itself: the step that waits, and the answer it arrives at.
+    ("27-teach-step", {"tab": "settings", "theme": "dark", "dongle_name": None,
+                       "dongle_usb": "046D:0A5B"}, WIN_H, "teach"),
+    ("28-teach-done", {"tab": "settings", "theme": "dark", "dongle_name": None,
+                       "dongle_usb": "046D:0A5B"}, WIN_H, "teach-done"),
     ("11-hotkey-capture", {"tab": "settings", "theme": "dark"}, TALL, "hotkey"),
     ("12-hotkey-empty", {"tab": "settings", "theme": "dark", "hotkey": ""}, TALL, ""),
     ("13-icons-sheet", {"tab": "devices", "theme": "dark"}, WIN_H, "icons"),

@@ -77,13 +77,19 @@ Tests:
 
 ## Wireless headsets
 
-Only dongles whose status report has been decoded are supported. Right now that
-is **HyperX Cloud Flight S** (`0951:16EA`).
+One dongle is recognised out of the box: **HyperX Cloud Flight S** (`0951:16EA`).
 
-If you have a different wireless headset, the program can learn it: it records
-the reports the dongle sends while you switch the headset on and off, and the
-recording stays in a file on your computer. Nothing is uploaded — sending that
-file in is a separate, deliberate step you take yourself.
+Any other one the program works out for itself. Settings → Diagnostics → Teach
+this dongle asks you to switch the headset on and off twice, watches what the
+dongle says each time, and finds the byte that changes with it. Two cycles and
+not one, because a battery reading also differs between a single on and a single
+off — and a byte that only looked like the state would mean headphones seizing
+the sound at random.
+
+The answer is saved on your machine and takes effect immediately: no release to
+wait for. It is not sent anywhere. At the end there is a button that opens a
+report already filled in, and pressing it is what adds your headset to the next
+version for everyone else who owns one — but that press is yours to make.
 
 ## Languages
 

@@ -609,14 +609,18 @@ function renderSettings() {
       // does not work for the priority device: the names there run half a line.
       stRow(t('language'), '', `<select id="lang-select" class="narrow">${langOptions}</select>`),
     ])}
-     ${state.settings.dongle_usb && !state.settings.dongle_name ? `
      <h2 class="sec micro">${secIcon('sec-diag')}${t('diag')}</h2>
      ${group([
-      toggle('learn_dongle', t('learn'), t('learn_d').replace('%s', state.settings.dongle_usb)),
-      state.settings.learn_dongle
-        ? stRow(t('learn_open'), '', `<button class="seg drop" data-act="folder">${t('open_btn')}</button>`)
+      // Offered only for a dongle nothing is known about: for a recognised one
+      // the switch above already does the job, and teaching it again could only
+      // replace a verified rule with a guess.
+      state.settings.dongle_usb && !state.settings.dongle_name
+        ? stRow(t('teach'), t('teach_d').replace('%s', state.settings.dongle_usb),
+          `<button class="seg drop" data-act="teach">${t('teach_btn')}</button>`, { stack: true })
         : '',
-    ])}` : ''}`;
+      stRow(t('learn_open'), t('learn_open_d'),
+        `<button class="seg drop" data-act="folder">${t('open_btn')}</button>`),
+    ])}`;
 }
 
 function renderAbout() {
@@ -675,6 +679,115 @@ function showWelcome() {
     await call('complete_onboarding').catch(() => {});
     $('overlays').innerHTML = '';
   });
+}
+
+// -------------------------------------------------------- teaching a dongle
+// Four steps and not two, for the reason set out in core/dongle.py: one "on"
+// and one "off" would also be told apart by a battery reading, and a wrong byte
+// means headphones that seize the sound at random.
+const WIZ_STEPS = ['on1', 'off1', 'on2', 'off2'];
+// How long a step waits before letting you move on regardless. A dongle that
+// says nothing is a real outcome — it just has to be reached, not sat in.
+const WIZ_PATIENCE = 25000;
+
+function escapeText(s) {
+  return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function showDongleWizard() {
+  let idx = 0, heard = 0, ready = false, result = null, timer = null, since = 0;
+
+  const finished = () => idx === WIZ_STEPS.length - 1;
+
+  function draw() {
+    if (result) {
+      $('overlays').innerHTML = `<div class="welcome wiz" id="wiz">
+          <h2>${result.ok ? t('wiz_ok') : t('wiz_no')}</h2>
+          <div class="note">${result.ok
+    ? t('wiz_ok_d').replace('%s', escapeText(result.name))
+    : t('wiz_no_d')}</div>
+          <div class="log">${escapeText(result.report)}</div>
+          <button class="btn" data-url="${encodeURI(result.url)}">${t('wiz_send')}</button>
+          <button class="btn ghost" data-wiz="close">${t('wiz_close')}</button>
+        </div>`;
+      $('wiz').addEventListener('click', onClick);
+      return;
+    }
+    $('overlays').innerHTML = `<div class="welcome wiz" id="wiz">
+        <div class="step">${t('wiz_step').replace('%1', idx + 1).replace('%2', WIZ_STEPS.length)}</div>
+        <h2>${t('wiz_title')}</h2>
+        <div class="act">${t('wiz_' + WIZ_STEPS[idx])}</div>
+        <div class="heard"></div>
+        <button class="btn" data-wiz="next" style="margin-top:14px">
+          ${finished() ? t('wiz_finish') : t('wiz_next')}</button>
+        <button class="btn ghost" data-wiz="close">${t('wiz_cancel')}</button>
+      </div>`;
+    $('wiz').addEventListener('click', onClick);
+    paint();
+  }
+
+  // Only the counter and the button change while a step runs. Redrawing the
+  // whole panel for that would blink the instruction the person is reading.
+  function paint() {
+    const line = document.querySelector('.wiz .heard');
+    const next = document.querySelector('.wiz [data-wiz="next"]');
+    if (line) {
+      line.innerHTML = heard
+        ? t('wiz_heard').replace('%s', `<b>${heard}</b>`)
+        : t('wiz_waiting');
+    }
+    if (next) next.disabled = !ready;
+  }
+
+  async function tick() {
+    const st = await call('dongle_wizard', { action: 'poll' }).catch(() => null);
+    if (!st || !st.running) return;
+    heard = st.heard || 0;
+    // "Settled" means the dongle has stopped talking: a headset takes seconds to
+    // power up and then sends several reports in a row, and moving on in the
+    // middle of that would file the rest of them under the next step.
+    ready = st.settled || Date.now() - since > WIZ_PATIENCE;
+    paint();
+  }
+
+  async function enter(i) {
+    idx = i;
+    heard = 0;
+    ready = false;
+    since = Date.now();
+    draw();
+    await call('dongle_wizard', { action: 'step', step: WIZ_STEPS[i] }).catch(() => {});
+  }
+
+  // The handler goes on the panel, which draw() replaces every step: on the
+  // overlay container it would pile up one dead listener per opening, each with
+  // its own idea of which step we are on.
+  async function onClick(e) {
+    const btn = e.target.closest('[data-wiz]');
+    if (!btn) return;
+    if (btn.dataset.wiz === 'close') {
+      clearInterval(timer);
+      $('overlays').innerHTML = '';
+      if (!result) call('dongle_wizard', { action: 'cancel' }).catch(() => {});
+      return;
+    }
+    if (!ready) return;
+    btn.disabled = true;
+    ready = false;
+    if (!finished()) return void enter(idx + 1);
+    clearInterval(timer);
+    result = await call('dongle_wizard', { action: 'finish' }).catch(() => null);
+    if (!result) return void ($('overlays').innerHTML = '');
+    state = await call('get_state');
+    renderAll();          // the switch above appears the moment the rule is saved
+    draw();
+  }
+
+  call('dongle_wizard', { action: 'start' }).then((st) => {
+    if (!st || !st.running) throw new Error('the dongle did not open');
+    timer = setInterval(tick, 400);
+    return enter(0);
+  }).catch(() => { $('overlays').innerHTML = ''; });
 }
 
 // -------------------------------------------------------------------- shared
@@ -792,6 +905,7 @@ document.addEventListener('click', async (e) => {
   const urlBtn = e.target.closest('[data-url]');
   if (urlBtn) return void call('open_url', { url: urlBtn.dataset.url }).catch(() => {});
 
+  if (e.target.closest('[data-act="teach"]')) return void showDongleWizard();
   if (e.target.closest('[data-act="folder"]')) return void call('open_data_folder').catch(() => {});
   if (e.target.closest('[data-act="quit"]')) return void call('quit').catch(() => {});
 });
