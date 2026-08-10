@@ -1,6 +1,9 @@
-# The "Sponsor" button in the repository header. Each line adds one entry to the
-# dropdown; a line whose account does not exist yet is simply not shown, so it
-# is safe to leave them here until the accounts are set up.
+# The "Sponsor" button in the repository header.
+#
+# One entry, because one is what works. GitHub Sponsors supports the country the
+# author lives in and pays straight to a bank account; Ko-fi and Patreon both
+# need a PayPal registered in that same country, and the only PayPal available
+# here belongs to another one. Uncomment them if that ever changes.
 github: [electronic-mars]
-patreon: ElectronicMARS
-# ko_fi: electronic-mars
+# patreon: ElectronicMARS
+# ko_fi: electronicmars
