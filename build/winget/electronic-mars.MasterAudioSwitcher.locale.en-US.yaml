@@ -1,0 +1,42 @@
+# What a person sees in `winget show` and on winget.run. Keep it factual: this
+# is a package index, not a shop window.
+PackageIdentifier: electronic-mars.MasterAudioSwitcher
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: electronic-mars
+PublisherUrl: https://github.com/electronic-mars
+PublisherSupportUrl: https://github.com/electronic-mars/mas/issues
+PackageName: Master Audio Switcher
+PackageUrl: https://github.com/electronic-mars/mas
+License: GPL-3.0-or-later
+LicenseUrl: https://github.com/electronic-mars/mas/blob/main/LICENSE
+Copyright: Copyright (C) 2026 Master Audio Switcher contributors
+ShortDescription: Switch sound between speakers and headphones from the tray.
+Description: |-
+  A tray utility for Windows. One click on the tray icon moves the sound to the
+  next device you marked.
+
+  It also knows when a wireless headset on a USB dongle is switched on or off,
+  which Windows itself does not report — the dongle's own status report is read
+  over HID, read-only. A priority device takes the sound the moment it appears
+  and gives it back when it goes away, and the microphone can follow its headset.
+
+  There is a volume mixer with per-application levels, media keys aimed at a
+  player you nominate rather than the one Windows guessed, and a global shortcut
+  that works over a fullscreen game.
+
+  Nothing is collected and nothing is sent. Fifteen languages.
+Moniker: mas
+Tags:
+- audio
+- audio-switcher
+- headphones
+- open-source
+- sound
+- speakers
+- tray
+- volume
+- volume-mixer
+ReleaseNotesUrl: https://github.com/electronic-mars/mas/releases/latest
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

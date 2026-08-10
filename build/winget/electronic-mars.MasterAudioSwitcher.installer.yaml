@@ -1,0 +1,26 @@
+# The installer itself. Two fields have to be filled in for every release —
+# they are marked TODO — and everything else stays as it is.
+#
+# The silent switches matter: winget refuses a package whose installer cannot
+# install without a person clicking through it. Inno Setup handles that on its
+# own, and the two message boxes in our script are the suppressible kind, so in
+# silent mode they answer themselves with the safe default (settings kept).
+PackageIdentifier: electronic-mars.MasterAudioSwitcher
+PackageVersion: 1.0.0
+InstallerType: inno
+Scope: user                 # installs into %LOCALAPPDATA%, never asks for admin
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+ProductCode: '{7C4E3F2A-9B51-4D8E-A6C7-2F1D0B8E5A34}_is1'
+ReleaseDate: 2026-01-01     # TODO: the date of the release being submitted
+Installers:
+- Architecture: x64
+  # TODO: the exact download URL of the setup .exe from the GitHub release
+  InstallerUrl: https://github.com/electronic-mars/mas/releases/download/v1.0.0/MasterAudioSwitcher-1.0.0-setup.exe
+  # TODO: from SHA256SUMS.txt in the same release, upper case, no spaces
+  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.9.0

@@ -1,0 +1,21 @@
+# Version manifest — the file that ties the other two together.
+#
+# Submitting to winget needs no developer account, no country and no identity
+# check: it is a pull request of three small files to microsoft/winget-pkgs,
+# validated by a bot and reviewed by people. That is the whole process, and it is
+# the reason this is worth doing before, or instead of, the Microsoft Store.
+#
+# Fill in PackageVersion and the two fields marked TODO in the installer file,
+# then copy all three into
+#   manifests/e/electronic-mars/MasterAudioSwitcher/<version>/
+# in a fork of https://github.com/microsoft/winget-pkgs and open a pull request.
+#
+# Easier: install `wingetcreate` and let it do the work —
+#   winget install Microsoft.WingetCreate
+#   wingetcreate new https://github.com/electronic-mars/mas/releases/download/v1.0.0/MasterAudioSwitcher-1.0.0-setup.exe
+# It downloads the file, computes the hash, asks the questions and opens the PR.
+PackageIdentifier: electronic-mars.MasterAudioSwitcher
+PackageVersion: 1.0.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.9.0
