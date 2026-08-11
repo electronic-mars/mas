@@ -884,5 +884,68 @@ finally:
     app_mod.devices.usb_ids_of = real_ids
     app_mod.product_name = real_product
 
+
+# --------------------------------------------------------------------------
+print("\nAutostart points at a copy, not at a name")
+from mas.core import startup  # noqa: E402
+
+here = str(Path(sys.executable))
+check("the same command is recognised as ours",
+      startup._normalise(f'"{here}" --startup'), startup._normalise(f'"{here}" --startup'))
+check("case and quoting do not make it a different one",
+      startup._normalise(f'{here.upper()} --startup'),
+      startup._normalise(f'"{here}" --startup'))
+# The case reported from a live machine: the build folder moved, the entry did
+# not, and the settings went on saying autostart was on while Windows started
+# an old copy from the old path every morning.
+check("another folder is another program",
+      startup._normalise(r'"C:\old\build\MasterAudioSwitcher.exe" --startup')
+      == startup._normalise(r'"C:\new\build\MasterAudioSwitcher.exe" --startup'), False)
+check("and so are different arguments",
+      startup._normalise(f'"{here}"') == startup._normalise(f'"{here}" --startup'), False)
+
+
+# --------------------------------------------------------------------------
+print("\nThe window title and the tray button")
+
+
+def titled(playing, artist="", title=""):
+    app = App.__new__(App)
+    app.players = type("P", (), {"snapshot": lambda s: {
+        "playing": playing, "artist": artist, "title": title}})()
+    return app.window_title()
+
+
+check("while the music plays the button is the track",
+      titled(True, "Mannymore", "Shiver"), "Mannymore — Shiver")
+check("an unnamed artist does not leave a dash", titled(True, "", "Shiver"), "Shiver")
+check("paused, it is the program again", titled(False, "Mannymore", "Shiver"),
+      "Master Audio Switcher")
+# A player can report itself playing and name nothing at all. A blank taskbar
+# button would look like a program that had lost its own name.
+check("a nameless track is not shown", titled(True), "Master Audio Switcher")
+
+
+def pressed(button, visible, switch_button="left"):
+    """Which of the two things a tray click did."""
+    app = App.__new__(App)
+    app.cfg = FakeConfig(switch_button=switch_button)
+    app._visible = visible
+    done = []
+    app.cycle = lambda: done.append("switched")
+    app.show = lambda tab="devices": done.append("shown")
+    app.hide = lambda: done.append("hidden")
+    app._button(button)
+    return done
+
+
+check("the switching button switches", pressed("left", False), ["switched"])
+check("and goes on switching with the window open", pressed("left", True), ["switched"])
+check("the other button opens the window", pressed("right", False), ["shown"])
+# The point of the change: pressing the same button again is the obvious thing
+# to try, and it used to do nothing — the cross in the corner was the only exit.
+check("and closes it when it is already open", pressed("right", True), ["hidden"])
+check("swapped buttons swap both jobs", pressed("left", True, "right"), ["hidden"])
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

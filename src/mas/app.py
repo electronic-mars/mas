@@ -34,6 +34,9 @@ _log = log.get("app")
 MUTEX_NAME = "Local\\MasterAudioSwitcherSingleInstance"
 ERROR_ALREADY_EXISTS = 183
 FULL_SIZE = (440, 772)      # full window view in logical points, before fitting
+# The window is created under this name, and goes back to it whenever there is
+# no track to show. It is also what the window is first found by — see own_hwnd.
+WINDOW_TITLE = "Master Audio Switcher"
 
 
 def already_running() -> bool:
@@ -258,7 +261,18 @@ class App:
         # listener, which holds the dongle instead of the watcher above.
         self._wiz: dict | None = None
         self._wiz_dongle: Dongle | None = None
+        # What the window is called right now, and its handle. The title follows
+        # the track, so the handle has to be remembered rather than looked up by
+        # a name that no longer stands still.
+        self._title = WINDOW_TITLE
+        self._hwnd: int | None = None
         self._jobs: queue.SimpleQueue = queue.SimpleQueue()
+
+    def own_hwnd(self) -> int | None:
+        """Our window, found once and kept."""
+        if self._hwnd is None:
+            self._hwnd = screen.own_window(WINDOW_TITLE)
+        return self._hwnd
 
     def device_name(self, device_id: str) -> str:
         """The name of an endpoint, present or not. From the cached list, so it
@@ -744,6 +758,11 @@ class App:
     def _button(self, pressed: str) -> None:
         if pressed == self.cfg.get("switch_button"):
             self.cycle()
+        elif self._visible:
+            # The button that opened the window closes it. Until now the only
+            # way back was the cross in the corner, and pressing the icon again
+            # — the obvious thing to try — did nothing at all.
+            self.hide()
         else:
             self.show("devices")
 
@@ -777,10 +796,44 @@ class App:
                 return track
         return f"Master Audio Switcher — {self._device_tip}"
 
+    def window_title(self) -> str:
+        """What the taskbar button says.
+
+        While the music plays it is the track, the way Spotify does it, and for
+        the same reason: the button is the one place the track can be read
+        without switching to the program at all.
+        """
+        now = self.players.snapshot()
+        if now["playing"]:
+            track = " — ".join(x for x in (now["artist"], now["title"]) if x)
+            if track:
+                return track
+        return WINDOW_TITLE
+
+    def refresh_title(self) -> None:
+        """Put the current title on the window.
+
+        Only while it is visible: hidden, it has no taskbar button to read, and
+        the call is not free — it crosses to the interface thread and waits for
+        it. Measured on this machine at well under a millisecond, but it is
+        skipped when there is nothing to show for it.
+        """
+        if not self.window or not self._visible:
+            return
+        title = self.window_title()
+        if title == self._title:
+            return
+        try:
+            self.window.set_title(title)
+            self._title = title
+        except Exception:
+            _log.warning("the window title did not change", exc_info=True)
+
     def refresh_tip(self) -> None:
         """The track changed — refresh the tooltip without touching the icon."""
         if self.tray:
             self.tray.set_tip(self.tray_tip())
+        self.refresh_title()
 
     def _player_dead(self, who: str) -> None:
         """The player is listed in the system but does not answer: usually the
@@ -848,7 +901,7 @@ class App:
         runs: otherwise one day a person gets a stub of a window at start and
         decides the program is broken.
         """
-        hwnd = screen.own_window("Master Audio Switcher")
+        hwnd = self.own_hwnd()
         if not hwnd:
             return False
         if height:
@@ -915,9 +968,10 @@ class App:
             self.window.show()
             self._visible = True
             self.meter.set_idle(False)
-            hwnd = screen.own_window("Master Audio Switcher")
+            hwnd = self.own_hwnd()
             if hwnd and screen.place_at_tray(hwnd):
                 pass          # the window went to the corner where the tray is
+            self.refresh_title()
             _log.info("window shown, tab %s", tab)
         except Exception:
             _log.exception("the window did not show up")
@@ -939,6 +993,15 @@ class App:
         # The order matters: hide first, then put everything into sleep mode.
         self._visible = False
         self.meter.set_idle(True)
+        if self._title != WINDOW_TITLE:
+            # Back to the program's own name. A hidden window has no taskbar
+            # button to read a track from, and Alt+Tab would still be offering
+            # a song title with nothing behind it.
+            try:
+                self.window.set_title(WINDOW_TITLE)
+                self._title = WINDOW_TITLE
+            except Exception:
+                _log.warning("the window title did not go back", exc_info=True)
         if self._wiz is not None:
             # The wizard lives in the window. Closing it mid-way would otherwise
             # leave the dongle held open by a listener nobody can reach again.
@@ -1023,7 +1086,7 @@ class App:
         # pywebview-drag-region class.
         if self._engine is not None:
             self.window = webview.create_window(
-                "Master Audio Switcher", url, width=FULL_SIZE[0], height=self._full_height,
+                WINDOW_TITLE, url, width=FULL_SIZE[0], height=self._full_height,
                 resizable=False, frameless=True, easy_drag=False, hidden=True,
                 background_color="#1C1F24",
             )
