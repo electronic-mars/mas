@@ -14,6 +14,13 @@ _log = log.get("screen")
 user32 = ctypes.windll.user32
 shell32 = ctypes.windll.shell32
 
+# A window handle is a handle, not an int. Undeclared, ctypes cuts whatever
+# comes back down to 32 bits — harmless for window handles, which Windows
+# promises will fit, and not harmless at all for the module handle next door,
+# where the same omission cost this program an access violation on every run.
+user32.FindWindowW.restype = wintypes.HWND
+user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+
 ABM_GETTASKBARPOS = 0x00000005
 SPI_GETWORKAREA = 0x0030
 EDGES = {0: "left", 1: "top", 2: "right", 3: "bottom"}

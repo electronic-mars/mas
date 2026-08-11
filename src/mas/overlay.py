@@ -24,6 +24,7 @@ _log = log.get("overlay")
 # structures, and ours would clash with them.
 user32 = ctypes.WinDLL("user32")
 gdi32 = ctypes.WinDLL("gdi32")
+k32 = ctypes.WinDLL("kernel32")
 
 WS_POPUP = 0x80000000
 WS_EX_LAYERED = 0x00080000
@@ -119,6 +120,18 @@ class _WNDCLASS(ctypes.Structure):
 user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT,
                                   wintypes.WPARAM, wintypes.LPARAM]
 user32.DefWindowProcW.restype = ctypes.c_longlong
+# Undeclared, ctypes assumes a function returns a 32-bit int. A module handle is
+# the address the executable is loaded at, and on 64-bit Windows that is a
+# 64-bit number: 0x7FF67BC00000 came back as 0x7BC00000, with the top half
+# thrown away. Windows then dereferenced that garbage while registering the
+# class and creating the window — an access violation on every run, sometimes
+# three, always in this thread. It never killed the program because Windows
+# handles it, and the address is randomised at boot, so how far it went wrong
+# differed from morning to morning. Declared, it is simply correct.
+k32.GetModuleHandleW.restype = wintypes.HMODULE
+k32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+user32.RegisterClassW.restype = wintypes.ATOM
+user32.RegisterClassW.argtypes = [ctypes.POINTER(_WNDCLASS)]
 user32.CreateWindowExW.restype = wintypes.HWND
 user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR,
                                    wintypes.DWORD, ctypes.c_int, ctypes.c_int,
@@ -224,9 +237,14 @@ class Overlay(threading.Thread):
     def _create(self) -> None:
         wc = _WNDCLASS()
         wc.lpfnWndProc = self._proc
-        wc.hInstance = ctypes.windll.kernel32.GetModuleHandleW(None)
+        wc.hInstance = k32.GetModuleHandleW(None)
         wc.lpszClassName = "MasOverlay"
-        user32.RegisterClassW(ctypes.byref(wc))
+        if not user32.RegisterClassW(ctypes.byref(wc)):
+            # Said out loud: without the class there is no window, and a
+            # notification that never appears looks like a setting that does
+            # nothing rather than like something broken.
+            _log.warning("overlay window class was not registered (error %s)",
+                         k32.GetLastError())
         self._hwnd = user32.CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW
             | WS_EX_TOPMOST | WS_EX_NOACTIVATE,

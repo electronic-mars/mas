@@ -947,5 +947,27 @@ check("the other button opens the window", pressed("right", False), ["shown"])
 check("and closes it when it is already open", pressed("right", True), ["hidden"])
 check("swapped buttons swap both jobs", pressed("left", True, "right"), ["hidden"])
 
+
+# --------------------------------------------------------------------------
+# The notification window is created from a module handle. Undeclared, ctypes
+# assumes any function returns a 32-bit int, and on 64-bit Windows that cuts an
+# address in half: 0x7FF67BC00000 arrived as 0x7BC00000. Windows dereferenced
+# the remains and raised an access violation on every single run — handled, so
+# nothing ever crashed, and 269 of them piled up in the crash log unnoticed.
+print("\nHandles come back whole")
+import ctypes as _ct  # noqa: E402
+from ctypes import wintypes  # noqa: E402
+
+from mas import overlay as overlay_mod  # noqa: E402
+
+_probe = _ct.WinDLL("kernel32")
+_probe.GetModuleHandleW.restype = wintypes.HMODULE
+_probe.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+check("the module handle is not cut in half",
+      overlay_mod.k32.GetModuleHandleW(None), _probe.GetModuleHandleW(None))
+check("and it is the whole address, not its lower half",
+      _probe.GetModuleHandleW(None) > 0xFFFFFFFF
+      or overlay_mod.k32.GetModuleHandleW(None) == _probe.GetModuleHandleW(None), True)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
