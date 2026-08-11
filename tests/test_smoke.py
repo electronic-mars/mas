@@ -1043,6 +1043,33 @@ check("another host is refused", refuses("https://evil.example.com/setup.exe"), 
 check("a lookalike host is refused", refuses("https://github.com.evil.net/setup.exe"), True)
 
 
+# A redirect is somebody else's instruction. GitHub answers the download address
+# with one, pointing at its own file store, so redirects have to be followed —
+# but each hop gets the same test, or the test on the first address is decoration.
+def redirect_to(url):
+    handler = update._CheckedRedirects()
+    try:
+        handler.redirect_request(None, None, 302, "Found", {}, url)
+        return "followed"
+    except ValueError:
+        return "refused"
+    except Exception:
+        return "refused"      # it got past the check and failed on the fake request
+
+
+check("a redirect to a stranger is refused",
+      redirect_to("https://evil.example.com/setup.exe"), "refused")
+check("a redirect downgrading to http is refused",
+      redirect_to("http://objects.githubusercontent.com/x"), "refused")
+
+# The name of the downloaded file is ours, never one taken from the address:
+# otherwise where we write would be chosen by whoever wrote the release
+# description.
+check("the download has a name of our own choosing",
+      'folder() / "update-setup.exe"'
+      in (ROOT / "src" / "mas" / "core" / "update.py").read_text(encoding="utf-8"), True)
+
+
 def feed(doc):
     """latest() against a made-up release description."""
     import io as _io

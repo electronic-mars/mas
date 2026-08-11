@@ -82,12 +82,35 @@ def is_newer(offered: str, current: str) -> bool:
     return as_numbers(offered) > as_numbers(current)
 
 
-def _open(url: str):
-    if urlparse(url).scheme != "https":
+def _allow(url: str) -> str:
+    where = urlparse(url)
+    if where.scheme != "https":
         raise ValueError("updates are only fetched over https")
-    if urlparse(url).hostname not in ALLOWED_HOSTS:
-        raise ValueError(f"downloads from {urlparse(url).hostname} are not allowed")
-    return urllib.request.urlopen(url, timeout=TIMEOUT_S)
+    if where.hostname not in ALLOWED_HOSTS:
+        raise ValueError(f"{where.hostname} is not a host we fetch updates from")
+    return url
+
+
+class _CheckedRedirects(urllib.request.HTTPRedirectHandler):
+    """Every hop gets the same test as the first one.
+
+    The address we ask for is checked, and then GitHub answers with a redirect
+    to its own file store — which is why that store is on the list. But a
+    redirect is somebody else's instruction, and following it unexamined would
+    make the check on the first address decorative. The signature would still
+    catch a substituted file; this is about not going there at all.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _allow(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_fetch = urllib.request.build_opener(_CheckedRedirects)
+
+
+def _open(url: str):
+    return _fetch.open(_allow(url), timeout=TIMEOUT_S)
 
 
 def latest() -> dict:
@@ -156,7 +179,11 @@ def folder() -> Path:
 
 def download(url: str, on_progress=None) -> Path:
     """Fetch the installer, reporting how far along it is. Returns the file."""
-    target = folder() / Path(urlparse(url).path).name
+    # One fixed name, never one taken from the address. A name that arrives from
+    # outside is a name somebody else chose, and we would be choosing where to
+    # write from it; there is also only ever one of these, so a fresh download
+    # replacing the last is exactly right.
+    target = folder() / "update-setup.exe"
     with _open(url) as answer:
         total = int(answer.headers.get("Content-Length") or 0)
         if total > MAX_BYTES:

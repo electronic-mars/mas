@@ -341,8 +341,8 @@ class App:
 
     def update_install(self) -> dict:
         if not self._up_found:
-            return self._update_set(state="failed", detail="nothing to install") \
-                or self.update_state()
+            self._update_set(state="failed", detail="release")
+            return self.update_state()
         self._update_set(state="downloading", detail="", percent=0)
         threading.Thread(target=self._update_install, daemon=True,
                          name="mas-update").start()
