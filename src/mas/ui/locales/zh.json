@@ -112,6 +112,18 @@
     "wiz_no": "没有结果",
     "wiz_no_d": "报告中无法区分两种状态。发送它们仍然值得：程序遗漏的，人可能看得出来。",
     "wiz_send": "发送给开发者",
-    "wiz_close": "关闭"
+    "wiz_close": "关闭",
+    "up_store": "更新通过 Microsoft Store 自动送达。",
+    "up_checking": "正在检查",
+    "up_current": "已是最新版本",
+    "up_available": "安装版本 %s",
+    "up_downloading": "正在下载",
+    "up_verifying": "正在验证签名",
+    "up_installing": "正在安装，程序将重启",
+    "up_retry": "重试",
+    "up_failed": "失败：%s",
+    "up_why_network": "无法访问互联网",
+    "up_why_signature": "下载的文件没有开发者的签名",
+    "up_why_release": "版本描述看起来不对劲"
   }
 }

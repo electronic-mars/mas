@@ -24,3 +24,7 @@ __pycache__/
 # Logs and settings live in the user profile, but just in case
 *.log
 crash.log
+
+# The release signing key, if it is ever generated here. It belongs in the
+# repository secrets and nowhere else.
+/.update-signing-key.pem

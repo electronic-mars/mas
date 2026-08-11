@@ -112,6 +112,18 @@
     "wiz_no": "Nic z tego nie wyszło",
     "wiz_no_d": "Nic w raportach nie odróżniało tych dwóch stanów. Wysłanie ich nadal ma sens: to, czego program nie zauważył, człowiek może dostrzec.",
     "wiz_send": "Wyślij do dewelopera",
-    "wiz_close": "Zamknij"
+    "wiz_close": "Zamknij",
+    "up_store": "Aktualizacje przychodzą przez Microsoft Store, same.",
+    "up_checking": "Sprawdzanie",
+    "up_current": "To jest najnowsza wersja",
+    "up_available": "Zainstaluj wersję %s",
+    "up_downloading": "Pobieranie",
+    "up_verifying": "Sprawdzanie podpisu",
+    "up_installing": "Instalowanie, program uruchomi się ponownie",
+    "up_retry": "Spróbuj ponownie",
+    "up_failed": "Nie zadziałało: %s",
+    "up_why_network": "nie można było połączyć się z internetem",
+    "up_why_signature": "pobrany plik nie jest podpisany przez dewelopera",
+    "up_why_release": "opis wydania nie wygląda dobrze"
   }
 }

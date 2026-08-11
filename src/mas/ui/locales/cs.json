@@ -112,6 +112,18 @@
     "wiz_no": "Nic z toho nebylo",
     "wiz_no_d": "V hlášeních nebylo poznat ty dva stavy. Přesto stojí za to je poslat: co program přehlédl, může vidět člověk.",
     "wiz_send": "Poslat vývojáři",
-    "wiz_close": "Zavřít"
+    "wiz_close": "Zavřít",
+    "up_store": "Aktualizace přicházejí přes Microsoft Store, samy.",
+    "up_checking": "Kontroluji",
+    "up_current": "Toto je nejnovější verze",
+    "up_available": "Nainstalovat verzi %s",
+    "up_downloading": "Stahuji",
+    "up_verifying": "Ověřuji podpis",
+    "up_installing": "Instaluji, program se restartuje",
+    "up_retry": "Zkusit znovu",
+    "up_failed": "Nepovedlo se: %s",
+    "up_why_network": "nepodařilo se připojit k internetu",
+    "up_why_signature": "stažený soubor není podepsaný vývojářem",
+    "up_why_release": "popis vydání nevypadá správně"
   }
 }

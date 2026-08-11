@@ -112,6 +112,18 @@
     "wiz_no": "Ça n'a rien donné",
     "wiz_no_d": "Rien dans les rapports n'a permis de distinguer les deux états. Les envoyer vaut quand même le coup : ce que le programme a manqué, une personne pourra le voir.",
     "wiz_send": "Envoyer au développeur",
-    "wiz_close": "Fermer"
+    "wiz_close": "Fermer",
+    "up_store": "Les mises à jour arrivent via le Microsoft Store, toutes seules.",
+    "up_checking": "Vérification",
+    "up_current": "Vous avez la version la plus récente",
+    "up_available": "Installer la version %s",
+    "up_downloading": "Téléchargement",
+    "up_verifying": "Vérification de la signature",
+    "up_installing": "Installation, le programme va redémarrer",
+    "up_retry": "Réessayer",
+    "up_failed": "Échec : %s",
+    "up_why_network": "impossible de joindre Internet",
+    "up_why_signature": "le fichier téléchargé n'est pas signé par le développeur",
+    "up_why_release": "la description de la version ne semble pas correcte"
   }
 }

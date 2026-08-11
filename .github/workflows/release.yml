@@ -139,6 +139,21 @@ jobs:
           "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "SETUP=$setup" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Sign the release and describe it for the updater
+        shell: pwsh
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          # The program will not install anything this key did not sign, so a
+          # release published without it is a release nobody can update to.
+          # Better to stop here than to find that out from the first complaint.
+          if (-not $env:UPDATE_SIGNING_KEY) { throw "UPDATE_SIGNING_KEY is not set" }
+          python -m pip install --quiet cryptography
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$env:SETUP"
+          python tools/sign_release.py "$env:SETUP" "${{ github.ref_name }}" "$url"
+          if ($LASTEXITCODE -ne 0) { throw "the release was not signed" }
+          Get-Content latest.json
+
       - name: Publish the release
         # A dry run builds everything and publishes nothing.
         if: github.event_name != 'workflow_dispatch'
@@ -164,7 +179,7 @@ jobs:
           | $env:SETUP | ``$env:SETUP_SHA`` |
           | $env:ZIP | ``$env:ZIP_SHA`` |
           "@
-          gh release create "${{ github.ref_name }}" "$env:SETUP" "$env:ZIP" "SHA256SUMS.txt" `
+          gh release create "${{ github.ref_name }}" "$env:SETUP" "$env:ZIP" "SHA256SUMS.txt" latest.json `
             --title "${{ github.ref_name }}" --notes "$notes" --draft
 
       - name: Keep the files from a dry run
@@ -176,3 +191,4 @@ jobs:
             MasterAudioSwitcher-*.zip
             MasterAudioSwitcher-*-setup.exe
             SHA256SUMS.txt
+            latest.json

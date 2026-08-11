@@ -92,6 +92,8 @@ class FakeApi:
             "mics_expanded": False, "onboarded": True,
             "version": __import__("mas").__version__,
             "dongle_name": "HyperX Cloud Flight S", "dongle_usb": None,
+            "from_store": False,
+            "update": {"state": "idle", "detail": "", "percent": 0, "notes": ""},
         }
 
     # --- what the interface reads -------------------------------------
@@ -302,6 +304,17 @@ SCREENS = [
     ("16-welcome-light", {"tab": "devices", "theme": "light", "onboarded": False}, WIN_H, ""),
     ("17-about-dark", {"tab": "about", "theme": "dark"}, WIN_H, ""),
     ("18-about-light", {"tab": "about", "theme": "light"}, WIN_H, ""),
+    # Every state the update button can be in, because each one is a sentence a
+    # person reads and none of them should look like a program in trouble.
+    ("29-update-available", {"tab": "about", "theme": "dark", "update": {
+        "state": "available", "detail": "1.1.0", "percent": 0, "notes": ""}}, WIN_H, ""),
+    ("30-update-downloading", {"tab": "about", "theme": "dark", "update": {
+        "state": "downloading", "detail": "", "percent": 62, "notes": ""}}, WIN_H, ""),
+    ("31-update-current", {"tab": "about", "theme": "dark", "update": {
+        "state": "current", "detail": "1.0.0", "percent": 0, "notes": ""}}, WIN_H, ""),
+    ("32-update-failed", {"tab": "about", "theme": "dark", "update": {
+        "state": "failed", "detail": "signature", "percent": 0, "notes": ""}}, WIN_H, ""),
+    ("33-update-store", {"tab": "about", "theme": "dark", "from_store": True}, WIN_H, ""),
     # Mini view: the same height the interface asks Python for.
     ("25-mini-dark", {"tab": "devices", "theme": "dark"}, 250, "mini"),
     ("26-mini-light", {"tab": "devices", "theme": "light"}, 250, "mini"),

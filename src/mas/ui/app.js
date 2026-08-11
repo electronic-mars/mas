@@ -623,6 +623,52 @@ function renderSettings() {
     ])}`;
 }
 
+// ------------------------------------------------------------------ updating
+// A copy from the Microsoft Store is updated by the Store: quietly, in the
+// background, better than we could. A copy from the releases page has nobody to
+// do that for it, so it gets the button. One program, one build — which of the
+// two it is, Windows is asked at startup.
+let upClearing = null;
+
+function updateBlock() {
+  if (state.settings.from_store) {
+    return `<div class="micro store">${t('up_store')}</div>`;
+  }
+  const up = state.settings.update || { state: 'idle' };
+  const busy = ['checking', 'downloading', 'checking_file', 'installing'].includes(up.state);
+  const label = {
+    idle: t('updates'),
+    checking: t('up_checking'),
+    current: t('up_current'),
+    available: t('up_available').replace('%s', up.detail || ''),
+    downloading: `${t('up_downloading')} ${up.percent || 0}%`,
+    checking_file: t('up_verifying'),
+    installing: t('up_installing'),
+    failed: t('up_retry'),
+  }[up.state] || t('updates');
+
+  // The answer to a check is not a state to sit in: three seconds and the
+  // button is a button again, so nobody is left looking at a stale report.
+  if (up.state === 'current' && !upClearing) {
+    upClearing = setTimeout(() => {
+      upClearing = null;
+      call('update_action', { action: 'forget' }).catch(() => {});
+    }, 3000);
+  }
+
+  const bar = up.state === 'downloading'
+    ? `<div class="upbar"><i style="width:${up.percent || 0}%"></i></div>` : '';
+  // Named reasons get a sentence of their own; anything else — an HTTP code,
+  // say — is shown as it came, because it is the thing worth searching for.
+  const named = { network: t('up_why_network'), signature: t('up_why_signature'),
+    release: t('up_why_release') }[up.detail];
+  const why = up.state === 'failed'
+    ? `<div class="micro fail">${t('up_failed').replace('%s', named || esc(up.detail || ''))}</div>` : '';
+  const kind = up.state === 'available' ? 'btn' : 'btn ghost';
+  return `<button class="${kind}" data-act="update" ${busy ? 'disabled' : ''}>
+      ${secIcon('ui-refresh')}${label}</button>${bar}${why}`;
+}
+
 function renderAbout() {
   $('panel-about').innerHTML = `<div class="about">
       <img class="logo" src="icons/app/icon_512.png" alt="">
@@ -631,7 +677,7 @@ function renderAbout() {
       <p>${t('about_text')}</p>
       <button class="btn" data-url="https://www.patreon.com/ElectronicMARS">${secIcon('ui-heart')}${t('donate')}</button>
       <button class="btn ghost" data-url="https://github.com/electronic-mars/mas">${secIcon('ui-github')}${t('github')}</button>
-      <button class="btn ghost" data-url="https://github.com/electronic-mars/mas/releases/latest">${secIcon('ui-refresh')}${t('updates')}</button>
+      ${updateBlock()}
       <button class="btn ghost quit" data-act="quit" style="margin-top:16px">${secIcon('ui-exit')}${t('quit')}</button>
     </div>`;
 }
@@ -690,10 +736,6 @@ const WIZ_STEPS = ['on1', 'off1', 'on2', 'off2'];
 // says nothing is a real outcome — it just has to be reached, not sat in.
 const WIZ_PATIENCE = 25000;
 
-function escapeText(s) {
-  return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-}
-
 function showDongleWizard() {
   let idx = 0, heard = 0, ready = false, result = null, timer = null, since = 0;
 
@@ -704,9 +746,9 @@ function showDongleWizard() {
       $('overlays').innerHTML = `<div class="welcome wiz" id="wiz">
           <h2>${result.ok ? t('wiz_ok') : t('wiz_no')}</h2>
           <div class="note">${result.ok
-    ? t('wiz_ok_d').replace('%s', escapeText(result.name))
+    ? t('wiz_ok_d').replace('%s', esc(result.name))
     : t('wiz_no_d')}</div>
-          <div class="log">${escapeText(result.report)}</div>
+          <div class="log">${esc(result.report)}</div>
           <button class="btn" data-url="${encodeURI(result.url)}">${t('wiz_send')}</button>
           <button class="btn ghost" data-wiz="close">${t('wiz_close')}</button>
         </div>`;
@@ -904,6 +946,16 @@ document.addEventListener('click', async (e) => {
 
   const urlBtn = e.target.closest('[data-url]');
   if (urlBtn) return void call('open_url', { url: urlBtn.dataset.url }).catch(() => {});
+
+  const upBtn = e.target.closest('[data-act="update"]');
+  if (upBtn) {
+    // "Available" is the only state where the button installs. Everywhere else
+    // — including after a failure — it goes back to asking.
+    const now = state.settings.update?.state;
+    state = await call('update_action',
+      { action: now === 'available' ? 'install' : 'check' }).catch(() => state);
+    return renderAll();
+  }
 
   if (e.target.closest('[data-act="teach"]')) return void showDongleWizard();
   if (e.target.closest('[data-act="folder"]')) return void call('open_data_folder').catch(() => {});

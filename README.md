@@ -45,6 +45,25 @@ reporting to them; an unsigned program that synthesises keystrokes and reads HID
 looks alarming to a heuristic, and there is nothing to be done about that short
 of a paid certificate.
 
+## Updating
+
+**About → Check for updates.** It fetches the new installer, checks it and
+restarts the program. Nothing happens without that press: there is no
+background checking, and no version of this program contacts anything on its
+own.
+
+The check is a signature, not a checksum. Each release is signed on the build
+server with a key that exists only in this repository's secrets, and the
+program carries the public half compiled into it. An installer that key did not
+sign is deleted rather than run — so nobody who does not hold the private key
+can hand a running copy an executable, whatever they manage to put in front of
+it. Windows does the checking, through its own CNG; there is no cryptography
+written here.
+
+If you installed from the Microsoft Store, there is no button: the Store brings
+updates on its own, and it does it better. Same program, same build — it asks
+Windows which of the two it is.
+
 ## Requirements
 
 - Windows 11 (Windows 10 should work; less tested)

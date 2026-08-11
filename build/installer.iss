@@ -118,6 +118,12 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; \
     Flags: nowait postinstall skipifsilent
+; The program updating itself runs this installer silently and then quits, so
+; that its own files can be replaced. Silent means the tick box above is skipped,
+; and without this line the update would end with the program simply gone. The
+; flag is ours and is passed only on that path, so an ordinary silent install —
+; the one a system administrator runs — still finishes without starting anything.
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: WasStartedByTheProgram
 
 [Code]
 { The interface is a page drawn by the WebView2 runtime. Windows 11 has it;
@@ -133,6 +139,13 @@ begin
      RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) or
      RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version))
     and (Version <> '') and (Version <> '0.0.0.0');
+end;
+
+{ True when the program itself started us to update, which it signals with
+  /RELAUNCH=1. Then it is owed a restart; nothing else here passes that. }
+function WasStartedByTheProgram: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
 end;
 
 procedure InitializeWizard;

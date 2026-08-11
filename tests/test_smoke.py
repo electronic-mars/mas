@@ -649,8 +649,14 @@ check("support goes to Patreon",
       'data-url="https://www.patreon.com/ElectronicMARS"' in APP_JS, True)
 check("GitHub goes to our repository",
       'data-url="https://github.com/electronic-mars/mas"' in APP_JS, True)
-check("updates go to the latest release",
-      'data-url="https://github.com/electronic-mars/mas/releases/latest"' in APP_JS, True)
+# Updating is no longer a link to a page for the person to work out for
+# themselves — the button does the whole thing, so the address moved into
+# core/update.py, where it is checked against the host allowlist.
+check("the About tab no longer sends people off to fetch it by hand",
+      "releases/latest" in APP_JS, False)
+check("and the release feed points at our repository",
+      'FEED = "https://github.com/electronic-mars/mas/releases/'
+      in (ROOT / "src" / "mas" / "core" / "update.py").read_text(encoding="utf-8"), True)
 
 # One source for the number. Written out twice it drifts on the first release,
 # and then the exe properties, the About tab and the release tag disagree.
@@ -968,6 +974,117 @@ check("the module handle is not cut in half",
 check("and it is the whole address, not its lower half",
       _probe.GetModuleHandleW(None) > 0xFFFFFFFF
       or overlay_mod.k32.GetModuleHandleW(None) == _probe.GetModuleHandleW(None), True)
+
+
+# --------------------------------------------------------------------------
+# Updating. The program downloads an executable and runs it, so the only part
+# that really matters is the refusing: a file that is not ours must never reach
+# the point of being started, whatever it claims about itself.
+print("\nUpdating, and everything it must refuse")
+from mas.core import update  # noqa: E402
+
+check("a later version is newer", update.is_newer("1.2.0", "1.1.9"), True)
+check("the same one is not", update.is_newer("1.2.0", "1.2.0"), False)
+check("an earlier one is not", update.is_newer("1.1.9", "1.2.0"), False)
+# 1.10 after 1.9 is the classic: compared as text, "1.10" sorts before "1.9"
+# and everyone stops receiving updates at the tenth release.
+check("ten comes after nine", update.is_newer("1.10.0", "1.9.0"), True)
+check("a leading v changes nothing", update.is_newer("v1.3.0", "1.2.0"), True)
+check("nonsense does not read as newer", update.is_newer("", "1.0.0"), False)
+
+# Signature checking, against a key made for this test alone.
+TEST_KEY = bytes.fromhex(
+    "d84ffcde6bb4ce5270a914480f32a6ac272dabe7b257dc7358462eb082d196f7"
+    "21c02ec96fd5ca6512afa56fc23741c163b97ac4ee6123e61d5b78542f7be3be")
+TEST_SIG = bytes.fromhex(
+    "1925fbad23d654d8ad90bcb4d12b3a2557695007c21cc256ea22e6960f107119"
+    "75f49845a9f88af2db5ebffa9611561e034ed53cb3065c39e7c08658e6ccc6f4")
+PAYLOAD = b"pretend this is an installer\n"
+
+signed = Path(tempfile.mkdtemp(prefix="mas-update-")) / "setup.exe"
+signed.write_bytes(PAYLOAD)
+real_key, update.PUBLIC_KEY = update.PUBLIC_KEY, TEST_KEY
+try:
+    check("a genuine installer is accepted", update.verify(signed, TEST_SIG), True)
+    signed.write_bytes(PAYLOAD + b"x")     # one byte added by somebody
+    check("a changed installer is refused", update.verify(signed, TEST_SIG), False)
+    signed.write_bytes(PAYLOAD)
+    bad = bytearray(TEST_SIG)
+    bad[0] ^= 0x01
+    check("a forged signature is refused", update.verify(signed, bytes(bad)), False)
+    check("a signature of the wrong size is refused", update.verify(signed, b"short"), False)
+    update.PUBLIC_KEY = bytes(64)
+    # A build with no key in it must refuse everything rather than trust
+    # everything: getting that backwards would install whatever turned up.
+    check("a build carrying no key installs nothing",
+          update.verify(signed, TEST_SIG), False)
+finally:
+    update.PUBLIC_KEY = real_key
+check("the release key is in this build", len(update.PUBLIC_KEY) == 64
+      and any(update.PUBLIC_KEY), True)
+
+# Where a download may come from. The signature already makes substitution
+# pointless, but a release description pointing somewhere else is a bad sign in
+# itself and is worth refusing before the first byte, not after the last.
+
+
+def refuses(url):
+    try:
+        update._open(url)
+        return False
+    except ValueError:
+        return True
+    except Exception:
+        return True     # it got as far as the network, which is not the point here
+
+
+check("plain http is refused", refuses("http://github.com/x"), True)
+check("another host is refused", refuses("https://evil.example.com/setup.exe"), True)
+check("a lookalike host is refused", refuses("https://github.com.evil.net/setup.exe"), True)
+
+
+def feed(doc):
+    """latest() against a made-up release description."""
+    import io as _io
+    import json as _json
+
+    class Answer:
+        def read(self, n=None):
+            return _json.dumps(doc).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    real, update._open = update._open, lambda url: Answer()
+    try:
+        return update.latest()
+    except Exception as e:
+        return type(e).__name__
+    finally:
+        update._open = real
+
+
+good = {"version": "1.4.0", "notes": "hello",
+        "platforms": {"windows-x86_64": {
+            "url": "https://github.com/electronic-mars/mas/releases/download/v1.4.0/s.exe",
+            "signature": "ab" * 64}}}
+check("a good release description is read", feed(good)["version"], "1.4.0")
+check("one with no signature is refused",
+      feed({"version": "1.4.0", "platforms": {"windows-x86_64": {"url": good[
+          "platforms"]["windows-x86_64"]["url"]}}}), "ValueError")
+check("one for another platform only is refused",
+      feed({"version": "1.4.0", "platforms": {"linux-x86_64": {}}}), "ValueError")
+check("one pointing at a stranger is refused",
+      feed({"version": "1.4.0", "platforms": {"windows-x86_64": {
+          "url": "https://files.example.com/s.exe", "signature": "ab" * 64}}}),
+      "ValueError")
+
+# This machine is not a Store install, and the program has to know that or it
+# would hide the update button from everybody.
+check("an ordinary copy knows it is not from the Store", update.from_store(), False)
 
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

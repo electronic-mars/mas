@@ -112,6 +112,18 @@
     "wiz_no": "Bir şey çıkmadı",
     "wiz_no_d": "Raporlarda iki durumu ayırt eden bir şey yoktu. Yine de göndermeye değer: programın kaçırdığını bir insan görebilir.",
     "wiz_send": "Geliştiriciye gönder",
-    "wiz_close": "Kapat"
+    "wiz_close": "Kapat",
+    "up_store": "Güncellemeler Microsoft Store üzerinden kendiliğinden gelir.",
+    "up_checking": "Kontrol ediliyor",
+    "up_current": "Bu en yeni sürüm",
+    "up_available": "%s sürümünü yükle",
+    "up_downloading": "İndiriliyor",
+    "up_verifying": "İmza kontrol ediliyor",
+    "up_installing": "Yükleniyor, program yeniden başlayacak",
+    "up_retry": "Tekrar dene",
+    "up_failed": "Olmadı: %s",
+    "up_why_network": "internete ulaşılamadı",
+    "up_why_signature": "indirilen dosya geliştirici tarafından imzalanmamış",
+    "up_why_release": "sürüm açıklaması doğru görünmüyor"
   }
 }

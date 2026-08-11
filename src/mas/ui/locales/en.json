@@ -112,6 +112,18 @@
     "wiz_no": "Nothing came of it",
     "wiz_no_d": "Nothing in the reports told the two states apart. Sending them is still worth it: what the program missed, a person may see.",
     "wiz_send": "Send to the developer",
-    "wiz_close": "Close"
+    "wiz_close": "Close",
+    "up_store": "Updates arrive through the Microsoft Store, on their own.",
+    "up_checking": "Checking",
+    "up_current": "This is the newest version",
+    "up_available": "Install version %s",
+    "up_downloading": "Downloading",
+    "up_verifying": "Checking the signature",
+    "up_installing": "Installing, the program will restart",
+    "up_retry": "Try again",
+    "up_failed": "Did not work: %s",
+    "up_why_network": "could not reach the internet",
+    "up_why_signature": "the downloaded file is not signed by the developer",
+    "up_why_release": "the release description does not look right"
   }
 }

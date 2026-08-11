@@ -18,7 +18,7 @@ from .core.dongle import MAX_CAPTURE, Dongle, deduce, product_name
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
-from .core import language, runtime, screen, strings
+from .core import language, runtime, screen, strings, update
 from .overlay import Overlay
 from .core.switcher import Switcher
 from .paths import is_frozen, log_path
@@ -107,6 +107,18 @@ class Api:
         elif key in ("auto_device", "watch_dongle"):
             self.app.sync_auto_device()
         return self.app.state()
+
+    # --- updating ------------------------------------------------------
+    def update_action(self, action: str):
+        """One entry point: check, install, poll, forget."""
+        app = self.app
+        if action == "check":
+            return app.update_check()
+        if action == "install":
+            return app.update_install()
+        if action == "forget":
+            return app.update_forget()
+        raise ValueError(f"no such action: {action}")
 
     # --- teaching an unknown dongle ------------------------------------
     def dongle_wizard(self, action: str, step: str = ""):
@@ -266,6 +278,10 @@ class App:
         # a name that no longer stands still.
         self._title = WINDOW_TITLE
         self._hwnd: int | None = None
+        # Where the update button has got to, and what the release page offered.
+        self._up: dict = {"state": "idle", "detail": "", "percent": 0, "notes": ""}
+        self._up_lock = threading.Lock()
+        self._up_found: dict | None = None
         self._jobs: queue.SimpleQueue = queue.SimpleQueue()
 
     def own_hwnd(self) -> int | None:
@@ -273,6 +289,105 @@ class App:
         if self._hwnd is None:
             self._hwnd = screen.own_window(WINDOW_TITLE)
         return self._hwnd
+
+    # --- updating -------------------------------------------------------
+    # The whole thing is one small state, read by the page four times a second
+    # while anything is happening and left alone otherwise. Every ending is
+    # named: "failed" carries a reason, because a button that quietly returns to
+    # how it was is the one thing worse than a button that says what went wrong.
+    def update_state(self) -> dict:
+        with self._up_lock:
+            return dict(self._up)
+
+    def _update_set(self, **fields) -> None:
+        with self._up_lock:
+            self._up.update(fields)
+        self.push_state()
+
+    def update_forget(self) -> dict:
+        """Back to the plain button — the page asks for this after showing an
+        answer that has been read."""
+        self._update_set(state="idle", detail="", percent=0)
+        return self.update_state()
+
+    def update_check(self) -> dict:
+        if update.from_store():
+            return self.update_state()      # the Store does this, and does it better
+        self._update_set(state="checking", detail="", percent=0)
+        threading.Thread(target=self._update_check, daemon=True, name="mas-update").start()
+        return self.update_state()
+
+    def _update_check(self) -> None:
+        try:
+            found = update.latest()
+        except Exception as e:
+            _log.warning("could not ask about updates", exc_info=True)
+            return self._update_set(state="failed", detail=self._why(e))
+        if not update.is_newer(found["version"], __version__):
+            _log.info("version %s is the newest there is", __version__)
+            return self._update_set(state="current", detail=found["version"])
+        _log.info("version %s is available, we are %s", found["version"], __version__)
+        self._up_found = found
+        self._update_set(state="available", detail=found["version"],
+                         notes=found.get("notes", ""))
+
+    def update_install(self) -> dict:
+        if not self._up_found:
+            return self._update_set(state="failed", detail="nothing to install") \
+                or self.update_state()
+        self._update_set(state="downloading", detail="", percent=0)
+        threading.Thread(target=self._update_install, daemon=True,
+                         name="mas-update").start()
+        return self.update_state()
+
+    def _update_install(self) -> None:
+        found = self._up_found
+        try:
+            def progress(got: int, total: int) -> None:
+                # Without a length there is no percentage to show, and inventing
+                # one that creeps along is worse than showing none.
+                if total:
+                    self._update_set(percent=min(100, round(got * 100 / total)))
+
+            path = update.download(found["url"], progress)
+        except Exception as e:
+            _log.warning("the update did not download", exc_info=True)
+            return self._update_set(state="failed", detail=self._why(e))
+
+        self._update_set(state="checking_file", percent=100)
+        try:
+            signature = bytes.fromhex(found["signature"])
+        except ValueError:
+            signature = b""
+        if not update.verify(path, signature):
+            # Loudly, and the file goes. Something is calling itself our release
+            # and is not, and the one thing that must not happen next is running it.
+            _log.error("the downloaded installer is not signed by us — deleting it")
+            path.unlink(missing_ok=True)
+            return self._update_set(state="failed", detail="signature")
+        _log.info("the installer is signed by us, handing over")
+        self._update_set(state="installing")
+        try:
+            update.install(path)
+        except Exception as e:
+            _log.exception("the installer would not start")
+            return self._update_set(state="failed", detail=self._why(e))
+        self.quit()          # release our files: the installer is replacing them
+
+    @staticmethod
+    def _why(e: Exception) -> str:
+        """A reason short enough for the panel and specific enough to act on."""
+        import socket
+        import urllib.error
+        if isinstance(e, urllib.error.HTTPError):
+            return f"HTTP {e.code}"
+        if isinstance(e, (urllib.error.URLError, socket.timeout, OSError)):
+            return "network"
+        if isinstance(e, ValueError):
+            # Our own refusals: a release description that is incomplete, or
+            # points somewhere we do not fetch from. The log has the specifics.
+            return "release"
+        return type(e).__name__
 
     def device_name(self, device_id: str) -> str:
         """The name of an endpoint, present or not. From the cached list, so it
@@ -309,6 +424,13 @@ class App:
         settings["hotkey_ok"] = self.hotkeys.ok["switch"]
         settings["hotkey_play_ok"] = self.hotkeys.ok["play"]
         settings["players"] = self.players.known_apps()
+        # Installed from the Store, updating is the Store's job: the button
+        # would be against its rules and would duplicate work already done.
+        settings["from_store"] = update.from_store()
+        # The update button's whole state travels with everything else, so the
+        # page needs no poller of its own: the counter it already watches is
+        # bumped on every step, including each slice of the download.
+        settings["update"] = self.update_state()
         settings["dongle_name"] = self._dongle_name
         settings["dongle_usb"] = self._dongle_usb
         known = self.known_outputs_cached(settings.get("auto_device", ""))

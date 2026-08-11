@@ -112,6 +112,18 @@
     "wiz_no": "Nichts dabei herausgekommen",
     "wiz_no_d": "In den Meldungen konnte man die beiden Zustände nicht unterscheiden. Sie zu senden lohnt sich trotzdem: Was das Programm übersehen hat, sieht vielleicht ein Mensch.",
     "wiz_send": "An den Entwickler senden",
-    "wiz_close": "Schließen"
+    "wiz_close": "Schließen",
+    "up_store": "Updates kommen über den Microsoft Store, von selbst.",
+    "up_checking": "Prüfe",
+    "up_current": "Das ist die neueste Version",
+    "up_available": "Version %s installieren",
+    "up_downloading": "Lade herunter",
+    "up_verifying": "Prüfe die Signatur",
+    "up_installing": "Installiere, das Programm startet neu",
+    "up_retry": "Nochmal versuchen",
+    "up_failed": "Hat nicht geklappt: %s",
+    "up_why_network": "das Internet war nicht erreichbar",
+    "up_why_signature": "die heruntergeladene Datei ist nicht vom Entwickler signiert",
+    "up_why_release": "die Versionsbeschreibung sieht nicht richtig aus"
   }
 }

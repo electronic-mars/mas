@@ -112,6 +112,18 @@
     "wiz_no": "何も得られませんでした",
     "wiz_no_d": "レポートには2つの状態を区別するものはありませんでした。それでも送信する価値はあります。プログラムが見逃したものを、人間が見つけられるかもしれません。",
     "wiz_send": "開発者に送信",
-    "wiz_close": "閉じる"
+    "wiz_close": "閉じる",
+    "up_store": "更新はMicrosoft Storeから自動で届きます。",
+    "up_checking": "確認中",
+    "up_current": "最新バージョンです",
+    "up_available": "バージョン%sをインストール",
+    "up_downloading": "ダウンロード中",
+    "up_verifying": "署名を確認中",
+    "up_installing": "インストール中、プログラムが再起動します",
+    "up_retry": "再試行",
+    "up_failed": "失敗しました: %s",
+    "up_why_network": "インターネットに接続できませんでした",
+    "up_why_signature": "ダウンロードしたファイルが開発者によって署名されていません",
+    "up_why_release": "リリースの説明が正しくないようです"
   }
 }

@@ -112,6 +112,18 @@
     "wiz_no": "Er is niets uitgekomen",
     "wiz_no_d": "Niets in de meldingen onderscheidde de twee toestanden. Toch de moeite waard om ze te sturen: wat het programma miste, kan een mens zien.",
     "wiz_send": "Stuur naar de ontwikkelaar",
-    "wiz_close": "Sluiten"
+    "wiz_close": "Sluiten",
+    "up_store": "Updates komen via de Microsoft Store, vanzelf.",
+    "up_checking": "Bezig met controleren",
+    "up_current": "Dit is de nieuwste versie",
+    "up_available": "Versie %s installeren",
+    "up_downloading": "Bezig met downloaden",
+    "up_verifying": "Handtekening controleren",
+    "up_installing": "Bezig met installeren, het programma wordt opnieuw gestart",
+    "up_retry": "Opnieuw proberen",
+    "up_failed": "Niet gelukt: %s",
+    "up_why_network": "geen internetverbinding",
+    "up_why_signature": "het gedownloade bestand is niet ondertekend door de ontwikkelaar",
+    "up_why_release": "de releasebeschrijving ziet er niet goed uit"
   }
 }
