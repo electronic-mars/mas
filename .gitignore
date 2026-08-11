@@ -4,6 +4,7 @@
 /build/mas/
 /build/work/
 /build/verify-localappdata/
+/build/msix-out/
 
 # Environment and caches
 /.venv/

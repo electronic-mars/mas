@@ -570,7 +570,10 @@ function renderSettings() {
   // right column.
   $('panel-settings').innerHTML =
     `<h2 class="lbl micro">${secIcon('sec-startup')}${t('startup')}</h2>
-     ${group([toggle('autostart', t('autostart'), t('autostart_d'))])}
+     ${group([state.settings.from_store
+    ? stRow(t('autostart'), t('autostart_store'),
+      `<button class="seg drop" data-act="startup">${t('open_btn')}</button>`)
+    : toggle('autostart', t('autostart'), t('autostart_d'))])}
      <h2 class="sec micro">${secIcon('sec-auto')}${t('auto')}</h2>
      ${group([
       stRow(t('auto_device'), t('auto_device_d'),
@@ -957,6 +960,7 @@ document.addEventListener('click', async (e) => {
     return renderAll();
   }
 
+  if (e.target.closest('[data-act="startup"]')) return void call('open_startup_settings').catch(() => {});
   if (e.target.closest('[data-act="teach"]')) return void showDongleWizard();
   if (e.target.closest('[data-act="folder"]')) return void call('open_data_folder').catch(() => {});
   if (e.target.closest('[data-act="quit"]')) return void call('quit').catch(() => {});

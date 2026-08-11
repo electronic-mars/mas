@@ -124,6 +124,7 @@
     "up_failed": "Nie zadziałało: %s",
     "up_why_network": "nie można było połączyć się z internetem",
     "up_why_signature": "pobrany plik nie jest podpisany przez dewelopera",
-    "up_why_release": "opis wydania nie wygląda dobrze"
+    "up_why_release": "opis wydania nie wygląda dobrze",
+    "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam."
   }
 }

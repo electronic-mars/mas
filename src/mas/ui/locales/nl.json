@@ -124,6 +124,7 @@
     "up_failed": "Niet gelukt: %s",
     "up_why_network": "geen internetverbinding",
     "up_why_signature": "het gedownloade bestand is niet ondertekend door de ontwikkelaar",
-    "up_why_release": "de releasebeschrijving ziet er niet goed uit"
+    "up_why_release": "de releasebeschrijving ziet er niet goed uit",
+    "autostart_store": "Windows bewaart de lijst met opstartprogramma's uit de Store. De schakelaar hiervoor staat daar."
   }
 }

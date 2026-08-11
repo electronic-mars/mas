@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The manifest for the Microsoft Store build. Filled in by tools/make_msix.py.
+
+  Identity Name and Publisher are not ours to invent: Partner Center assigns
+  them when the app name is reserved, and they are shown there under Product
+  management → App identity. A package whose identity does not match is
+  refused at upload, so they arrive from outside rather than being written here.
+
+  The fourth number of the version is reserved for the Store and must stay 0.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="@IDENTITY_NAME@"
+            Publisher="@PUBLISHER@"
+            Version="@VERSION@"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Master Audio Switcher</DisplayName>
+    <PublisherDisplayName>@PUBLISHER_DISPLAY@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- 17763 is the oldest Windows 10 that still gets security updates and
+         still runs the WebView2 runtime the window is drawn with. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0"
+                        MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+@RESOURCES@
+  </Resources>
+
+  <Capabilities>
+    <!-- A desktop program in a package: it switches audio endpoints and reads
+         a USB dongle, neither of which the sandboxed capabilities cover. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="MasterAudioSwitcher" Executable="MasterAudioSwitcher.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Master Audio Switcher"
+                          Description="Switch sound between speakers and headphones with one click on the tray icon."
+                          BackgroundColor="transparent"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
+                         Square71x71Logo="Assets\SmallTile.png"
+                         Square310x310Logo="Assets\LargeTile.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Inside a package the Run registry key is virtualised: writing it
+             changes nothing outside. This is the supported way, and Windows
+             lists it in Settings → Startup like any other entry. Off by
+             default — the person turns it on, as they do everywhere else. -->
+        <desktop:Extension Category="windows.startupTask"
+                           Executable="MasterAudioSwitcher.exe"
+                           EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="MasterAudioSwitcher"
+                               Enabled="false"
+                               DisplayName="Master Audio Switcher" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

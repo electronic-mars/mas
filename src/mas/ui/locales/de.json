@@ -124,6 +124,7 @@
     "up_failed": "Hat nicht geklappt: %s",
     "up_why_network": "das Internet war nicht erreichbar",
     "up_why_signature": "die heruntergeladene Datei ist nicht vom Entwickler signiert",
-    "up_why_release": "die Versionsbeschreibung sieht nicht richtig aus"
+    "up_why_release": "die Versionsbeschreibung sieht nicht richtig aus",
+    "autostart_store": "Windows speichert die Startliste für Programme aus dem Store. Der Schalter dafür befindet sich dort."
   }
 }

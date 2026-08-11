@@ -124,6 +124,7 @@
     "up_failed": "Nepovedlo se: %s",
     "up_why_network": "nepodařilo se připojit k internetu",
     "up_why_signature": "stažený soubor není podepsaný vývojářem",
-    "up_why_release": "popis vydání nevypadá správně"
+    "up_why_release": "popis vydání nevypadá správně",
+    "autostart_store": "Windows uchovává seznam spouštěných programů z obchodu Store. Přepínač pro tento program najdete tam."
   }
 }

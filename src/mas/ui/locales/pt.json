@@ -124,6 +124,7 @@
     "up_failed": "Não funcionou: %s",
     "up_why_network": "não foi possível acessar a internet",
     "up_why_signature": "o arquivo baixado não está assinado pelo desenvolvedor",
-    "up_why_release": "a descrição da versão não parece correta"
+    "up_why_release": "a descrição da versão não parece correta",
+    "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá."
   }
 }

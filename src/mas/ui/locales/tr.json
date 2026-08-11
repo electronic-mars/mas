@@ -124,6 +124,7 @@
     "up_failed": "Olmadı: %s",
     "up_why_network": "internete ulaşılamadı",
     "up_why_signature": "indirilen dosya geliştirici tarafından imzalanmamış",
-    "up_why_release": "sürüm açıklaması doğru görünmüyor"
+    "up_why_release": "sürüm açıklaması doğru görünmüyor",
+    "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır."
   }
 }

@@ -178,6 +178,14 @@ class Api:
         webbrowser.open(url)
         return True
 
+    def open_startup_settings(self):
+        """Windows' own startup list. In a package that is where autostart
+        actually lives — our registry entry would be written into the package's
+        private copy of the registry and start nothing."""
+        import subprocess
+        subprocess.Popen(["explorer", "ms-settings:startupapps"])
+        return True
+
     def open_data_folder(self):
         """Show the log folder — nobody types a %LOCALAPPDATA% path by hand."""
         from .paths import data_dir
@@ -1301,7 +1309,10 @@ def main() -> int:
     gc.disable()
     log.setup()
     set_app_id()
-    _log.info("=== start, frozen=%s ===", is_frozen())
+    # Which of the two builds this is decides who updates it, and it is the
+    # first thing worth knowing when reading somebody else's log.
+    _log.info("=== start, frozen=%s, from=%s ===", is_frozen(),
+              "the Microsoft Store" if update.from_store() else "the releases page")
     if already_running():
         _log.warning("an instance is already running, exiting")
         return 0

@@ -124,6 +124,7 @@
     "up_failed": "Non funziona: %s",
     "up_why_network": "impossibile raggiungere internet",
     "up_why_signature": "il file scaricato non è firmato dallo sviluppatore",
-    "up_why_release": "la descrizione della versione non sembra corretta"
+    "up_why_release": "la descrizione della versione non sembra corretta",
+    "autostart_store": "Windows conserva l'elenco dei programmi all'avvio per quelli dello Store. L'interruttore per questo si trova lì."
   }
 }

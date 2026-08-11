@@ -124,6 +124,7 @@
     "up_failed": "실패했습니다: %s",
     "up_why_network": "인터넷에 연결할 수 없음",
     "up_why_signature": "다운로드한 파일이 개발자 서명이 없음",
-    "up_why_release": "릴리스 설명이 올바르지 않음"
+    "up_why_release": "릴리스 설명이 올바르지 않음",
+    "autostart_store": "Windows는 Store에서 가져온 프로그램의 시작 목록을 유지합니다. 이 프로그램의 스위치는 거기에 있습니다."
   }
 }
