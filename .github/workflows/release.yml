@@ -151,11 +151,6 @@ jobs:
           # every tag has the exact package that matches it.
           python tools/make_msix.py build/mas/MasterAudioSwitcher
           if ($LASTEXITCODE -ne 0) { throw "the Store package did not build" }
-          if (-not $env:MSIX_IDENTITY_NAME) {
-            "::warning::built with a stand-in identity. Set the repository variables " +
-            "MSIX_IDENTITY_NAME, MSIX_PUBLISHER and MSIX_PUBLISHER_DISPLAY from " +
-            "Partner Center (Product management -> App identity) before uploading."
-          }
 
       - name: Keep the Store package
         uses: actions/upload-artifact@v4

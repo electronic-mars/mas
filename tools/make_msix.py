@@ -6,15 +6,13 @@ The Store signs the package itself after certification, so nothing here needs a
 certificate: that is the whole reason the Store build is a package and the
 release build is an installer, which would need a paid one.
 
-Identity and Publisher come from Partner Center — Product management → App
-identity — through the environment, because a package whose identity does not
-match the reserved app is refused at upload. Without them it still builds, with
-values good enough to install on this machine for testing and no good at all
-for submitting.
-
-    set MSIX_IDENTITY_NAME=12345ElectronicMars.MasterAudioSwitcher
-    set MSIX_PUBLISHER=CN=ABCD1234-...
-    set MSIX_PUBLISHER_DISPLAY=electronic-mars
+Identity and Publisher are assigned by Partner Center when the app name is
+reserved — Product management → App identity — and a package whose identity does
+not match is refused at upload. They are written in below rather than kept
+somewhere private: they are printed inside every copy of the published package,
+so there is nothing to protect, and a build that needs no setting up is a build
+that cannot be run wrong. The environment still overrides them, which is what a
+second app or a test identity would use.
 """
 import os
 import shutil
@@ -26,6 +24,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from mas import __version__  # noqa: E402
+
+# Assigned by Partner Center for this app and never changing.
+IDENTITY_NAME = "ElectronicMARS.MasterAudioSwitcher"
+PUBLISHER = "CN=952B5818-8749-4493-B354-6D30C3A586B7"
+PUBLISHER_DISPLAY = "Electronic MARS"
+STORE_ID = "9N9J77WKQ4X6"          # the address the app will live at once live
 
 TEMPLATE = ROOT / "build" / "msix" / "AppxManifest.xml.in"
 SOURCE_ICON = ROOT / "src" / "mas" / "ui" / "icons" / "app" / "icon_512.png"
@@ -119,10 +123,9 @@ def main() -> int:
     resources = "\n".join(f'    <Resource Language="{code}" />' for code in languages())
     manifest = TEMPLATE.read_text(encoding="utf-8")
     for mark, value in (
-        ("@IDENTITY_NAME@", os.environ.get("MSIX_IDENTITY_NAME",
-                                           "ElectronicMars.MasterAudioSwitcher")),
-        ("@PUBLISHER@", os.environ.get("MSIX_PUBLISHER", "CN=electronic-mars")),
-        ("@PUBLISHER_DISPLAY@", os.environ.get("MSIX_PUBLISHER_DISPLAY", "electronic-mars")),
+        ("@IDENTITY_NAME@", os.environ.get("MSIX_IDENTITY_NAME", IDENTITY_NAME)),
+        ("@PUBLISHER@", os.environ.get("MSIX_PUBLISHER", PUBLISHER)),
+        ("@PUBLISHER_DISPLAY@", os.environ.get("MSIX_PUBLISHER_DISPLAY", PUBLISHER_DISPLAY)),
         # The fourth number belongs to the Store and must be left at zero.
         ("@VERSION@", f"{__version__}.0"),
         ("@RESOURCES@", resources),
@@ -139,9 +142,7 @@ def main() -> int:
         raise SystemExit("makeappx refused the package")
     print(f"{package.name}: {package.stat().st_size / 1024 / 1024:.1f} MB, "
           f"{len(languages())} languages")
-    if "MSIX_IDENTITY_NAME" not in os.environ:
-        print("built with a stand-in identity: good enough to install here for "
-              "testing, not good enough to upload")
+    print(f"identity: {os.environ.get('MSIX_IDENTITY_NAME', IDENTITY_NAME)}")
     return 0
 
 
