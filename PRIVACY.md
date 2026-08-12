@@ -14,22 +14,33 @@ the promise, so here they are.
   records device names, which device the sound was moved to, and, while the
   media keys are in use, **the name of the track that is playing**. Keep that in
   mind before attaching a log to a bug report — you can delete lines first.
-- **Dongle reports**, only if you use the learning mode for a wireless headset,
-  and only in a file you can read yourself.
+- **Dongle reports**, only if you teach the program a wireless headset it does
+  not know, and only in a file you can read yourself.
 
 Nothing in that folder leaves it. Deleting the folder resets the program to a
 fresh install; the uninstaller offers to do it for you.
 
 ## What leaves your computer
 
-Two things, both only when you press something:
+Nothing at all until you press something. There is no background activity of any
+kind: the program makes no request on startup, on a timer, or while it sits in
+the tray.
 
-- **Check for updates** opens the releases page of the project in your browser.
+- **Check for updates** asks GitHub for the description of the newest release —
+  one small file — and tells you whether there is one. If you then choose to
+  install it, the installer is downloaded from GitHub and checked against a
+  signature before it is run. GitHub sees what it sees for any download,
+  including your address; the program sends no identifier, no version report and
+  nothing about your machine. In the Microsoft Store version this button does
+  not exist, because the Store brings updates itself.
+- **Send to the developer**, at the end of teaching an unknown headset, opens a
+  page in your browser with the report already filled in. Nothing is sent until
+  you press the button on that page, and you can read and edit every line first.
 - **Support development** and **GitHub** open their pages in your browser.
 
 That is all. There is no telemetry, no usage statistics, no crash reporting, no
-automatic update, no license check, and no analytics of any kind. The program
-does not ask who you are and has nowhere to send it if it did.
+automatic or silent updating, no license check, and no analytics of any kind.
+The program does not ask who you are and has nowhere to send it if it did.
 
 ## What the program reads on your computer
 
