@@ -270,8 +270,13 @@ function wireKnob() {
   }, { passive: false });
 
   el.addEventListener('keydown', (e) => {
-    const step = { ArrowUp: 2, ArrowRight: 2, ArrowDown: -2, ArrowLeft: -2 }[e.key];
-    if (step) { e.preventDefault(); setKnob(knobValue + step); }
+    // The arrows were here; the rest is what anyone who reaches a slider by
+    // keyboard tries next, and what every other slider in Windows answers to.
+    const step = { ArrowUp: 2, ArrowRight: 2, ArrowDown: -2, ArrowLeft: -2,
+      PageUp: 10, PageDown: -10 }[e.key];
+    if (step) { e.preventDefault(); return setKnob(knobValue + step); }
+    if (e.key === 'Home') { e.preventDefault(); return setKnob(0); }
+    if (e.key === 'End') { e.preventDefault(); return setKnob(100); }
   });
 }
 
@@ -686,6 +691,20 @@ function renderAbout() {
 }
 
 // -------------------------------------------------------------- icon palette
+// Escape closes whatever is open over the page. Clicking the backdrop already
+// did, but a backdrop is a thing you have to know about, and Escape is the thing
+// everyone tries first — including everyone who is not using a mouse at all.
+function closeOnEscape(close) {
+  const onKey = (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    document.removeEventListener('keydown', onKey, true);
+    close();
+  };
+  document.addEventListener('keydown', onKey, true);
+  return () => document.removeEventListener('keydown', onKey, true);
+}
+
 function openIconSheet(deviceId, currentGlyph) {
   $('overlays').innerHTML = `<div class="sheet" id="sheet"><div class="box">
       <div class="micro">${t('icon_title')}</div>
@@ -695,14 +714,18 @@ function openIconSheet(deviceId, currentGlyph) {
     (document.documentElement.dataset.theme === 'light' ? iconLight(g, 32) : iconDark(g, 32))}"
                 srcset="${glyphSrcset(g, g === currentGlyph)}" alt="${g}"></button>`).join('')}</div>
     </div></div>`;
+  const drop = closeOnEscape(() => { $('overlays').innerHTML = ''; });
   $('sheet').addEventListener('click', async (e) => {
     const btn = e.target.closest('.gi');
     if (btn) {
       state = await call('set_icon', { device_id: deviceId, glyph: btn.dataset.glyph });
       renderAll();
     }
-    if (btn || e.target.id === 'sheet') $('overlays').innerHTML = '';
+    if (btn || e.target.id === 'sheet') { drop(); $('overlays').innerHTML = ''; }
   });
+  // The first glyph takes focus, so the palette can be walked with Tab and
+  // chosen with Enter without ever reaching for the mouse.
+  $('sheet').querySelector('.gi')?.focus();
 }
 
 // ------------------------------------------------------------------- welcome
@@ -811,6 +834,7 @@ function showDongleWizard() {
     const btn = e.target.closest('[data-wiz]');
     if (!btn) return;
     if (btn.dataset.wiz === 'close') {
+      dropEscape();
       clearInterval(timer);
       $('overlays').innerHTML = '';
       if (!result) call('dongle_wizard', { action: 'cancel' }).catch(() => {});
@@ -828,11 +852,19 @@ function showDongleWizard() {
     draw();
   }
 
+  // Escape leaves the wizard the way Cancel does — the dongle has to be let go,
+  // or the listener stays open with nobody able to reach it.
+  const dropEscape = closeOnEscape(() => {
+    clearInterval(timer);
+    $('overlays').innerHTML = '';
+    if (!result) call('dongle_wizard', { action: 'cancel' }).catch(() => {});
+  });
+
   call('dongle_wizard', { action: 'start' }).then((st) => {
     if (!st || !st.running) throw new Error('the dongle did not open');
     timer = setInterval(tick, 400);
     return enter(0);
-  }).catch(() => { $('overlays').innerHTML = ''; });
+  }).catch(() => { dropEscape(); $('overlays').innerHTML = ''; });
 }
 
 // -------------------------------------------------------------------- shared
