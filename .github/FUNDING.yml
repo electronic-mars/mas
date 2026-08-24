@@ -1,9 +1,11 @@
 # The "Sponsor" button in the repository header.
 #
-# One entry, because one is what works. GitHub Sponsors supports the country the
-# author lives in and pays straight to a bank account; Ko-fi and Patreon both
-# need a PayPal registered in that same country, and the only PayPal available
-# here belongs to another one. Uncomment them if that ever changes.
-github: [electronic-mars]
-# patreon: ElectronicMARS
+# Patreon, because Patreon is the one that exists. GitHub Sponsors would take no
+# fee and would suit this audience better — an open source tray utility is found
+# by developers, and developers are already on GitHub — but it needs a Stripe
+# account whose country matches the bank account behind it, and that has not been
+# set up. When it is, add the github line back: two entries are allowed, and the
+# repository header shows both.
+patreon: ElectronicMARS
+# github: [electronic-mars]
 # ko_fi: electronicmars
