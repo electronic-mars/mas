@@ -110,6 +110,18 @@ def languages() -> list[str]:
     return list(LISTING_LANGUAGES)
 
 
+def setting(name: str, fallback: str) -> str:
+    """An override from the environment, but only a real one.
+
+    os.environ.get(name, fallback) hands back the fallback when the variable is
+    absent and the empty string when it is present and empty — and a workflow
+    that writes an undefined repository variable into the environment produces
+    exactly that. It cost a build: the identity went into the manifest empty,
+    and makeappx refused a package whose Name violated a minimum length of three.
+    """
+    return os.environ.get(name) or fallback
+
+
 def main() -> int:
     payload = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / "mas" / "MasterAudioSwitcher"
     if not (payload / "MasterAudioSwitcher.exe").is_file():
@@ -124,14 +136,23 @@ def main() -> int:
     resources = "\n".join(f'    <Resource Language="{code}" />' for code in languages())
     manifest = TEMPLATE.read_text(encoding="utf-8")
     for mark, value in (
-        ("@IDENTITY_NAME@", os.environ.get("MSIX_IDENTITY_NAME", IDENTITY_NAME)),
-        ("@PUBLISHER@", os.environ.get("MSIX_PUBLISHER", PUBLISHER)),
-        ("@PUBLISHER_DISPLAY@", os.environ.get("MSIX_PUBLISHER_DISPLAY", PUBLISHER_DISPLAY)),
+        ("@IDENTITY_NAME@", setting("MSIX_IDENTITY_NAME", IDENTITY_NAME)),
+        ("@PUBLISHER@", setting("MSIX_PUBLISHER", PUBLISHER)),
+        ("@PUBLISHER_DISPLAY@", setting("MSIX_PUBLISHER_DISPLAY", PUBLISHER_DISPLAY)),
         # The fourth number belongs to the Store and must be left at zero.
         ("@VERSION@", f"{__version__}.0"),
         ("@RESOURCES@", resources),
     ):
         manifest = manifest.replace(mark, value)
+    # Said here rather than by makeappx, which reports it as a schema violation
+    # on a line number and leaves you to work out which value went missing.
+    for mark in ("@IDENTITY_NAME@", "@PUBLISHER@", "@PUBLISHER_DISPLAY@",
+                 "@VERSION@", "@RESOURCES@"):
+        if mark in manifest:
+            raise SystemExit(f"{mark} was never filled in")
+    if '=""' in manifest:
+        raise SystemExit("the manifest has an empty attribute — a setting resolved "
+                         "to nothing, and makeappx would refuse the package")
     (layout / "AppxManifest.xml").write_text(manifest, encoding="utf-8")
 
     package = OUT / f"MasterAudioSwitcher-{__version__}.msix"
@@ -143,7 +164,7 @@ def main() -> int:
         raise SystemExit("makeappx refused the package")
     print(f"{package.name}: {package.stat().st_size / 1024 / 1024:.1f} MB, "
           f"{len(languages())} languages")
-    print(f"identity: {os.environ.get('MSIX_IDENTITY_NAME', IDENTITY_NAME)}")
+    print(f"identity: {setting('MSIX_IDENTITY_NAME', IDENTITY_NAME)}")
     return 0
 
 

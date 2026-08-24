@@ -141,10 +141,6 @@ jobs:
 
       - name: Build the Microsoft Store package
         shell: pwsh
-        env:
-          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
-          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
-          MSIX_PUBLISHER_DISPLAY: ${{ vars.MSIX_PUBLISHER_DISPLAY }}
         run: |
           # Not attached to the release: this file goes to Partner Center by
           # hand, and the Store signs it there. It rides along as an artifact so

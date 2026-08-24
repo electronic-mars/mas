@@ -1113,5 +1113,45 @@ check("one pointing at a stranger is refused",
 # would hide the update button from everybody.
 check("an ordinary copy knows it is not from the Store", update.from_store(), False)
 
+
+# --------------------------------------------------------------------------
+# A build server that writes an undefined repository variable into the
+# environment sets it to the empty string, and dict.get returns its default only
+# for a key that is missing — not for one that is present and empty. The Store
+# package went out with an empty identity, and makeappx refused it over a name
+# shorter than three characters. The failure landed three steps and two minutes
+# away from the mistake, which is why it is caught here instead.
+print("\nSettings that arrive empty")
+sys.path.insert(0, str(ROOT / "tools"))
+import make_msix  # noqa: E402
+
+
+def resolved(value):
+    """What the packager settles on when the variable is absent, empty, or real."""
+    had = os.environ.get("MSIX_IDENTITY_NAME")
+    if value is None:
+        os.environ.pop("MSIX_IDENTITY_NAME", None)
+    else:
+        os.environ["MSIX_IDENTITY_NAME"] = value
+    try:
+        return make_msix.setting("MSIX_IDENTITY_NAME", "the-real-one")
+    finally:
+        os.environ.pop("MSIX_IDENTITY_NAME", None)
+        if had is not None:
+            os.environ["MSIX_IDENTITY_NAME"] = had
+
+
+check("a variable that is not set falls back", resolved(None), "the-real-one")
+check("a variable that is set but empty falls back too", resolved(""), "the-real-one")
+check("a real value still overrides", resolved("Someone.Else"), "Someone.Else")
+check("the identity that ships is a usable one",
+      len(make_msix.IDENTITY_NAME) >= 3 and "." in make_msix.IDENTITY_NAME, True)
+# The workflow used to hand these in from repository variables that were never
+# created. They live in the source now, and passing them again is how the empty
+# string got in.
+check("the release build no longer passes an identity in",
+      "vars.MSIX_IDENTITY_NAME" in (ROOT / ".github" / "workflows"
+                                    / "release.yml").read_text(encoding="utf-8"), False)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
