@@ -35,8 +35,8 @@ k32 = ctypes.WinDLL("kernel32")
 # server's secrets. Replacing this constant is what changes who is allowed to
 # publish an update — see tools/make_update_key.py.
 PUBLIC_KEY = bytes.fromhex(
-    "facd1f635477b55562f6633f393ff1000d2efd585cfab69955c75bfc1807deaf"
-    "7affd410753978ddca96e736c6a379928adfe8c3fbc4f8f590f00c46b67ffdae")
+    "bfe40bea68546228719e6ce386b051232a8f2a2d27fa2ce51493276cabcf9d07"
+    "f0aea21dd8def972e74b32691537e65ba349133706fb7d06678a361004c8abc9")
 
 FEED = "https://github.com/electronic-mars/mas/releases/latest/download/latest.json"
 # Where a download is allowed to come from. The signature already makes a

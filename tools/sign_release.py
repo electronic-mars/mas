@@ -52,9 +52,24 @@ def main() -> int:
             "windows-x86_64": {"url": url, "signature": raw.hex()},
         },
     }
+    # Check our own work with the program's own code, against the key the
+    # program actually carries. A private key that has drifted from the public
+    # half compiled into the build produces a release nobody can install, and
+    # nobody finds out until the first person presses the update button. Here it
+    # costs a second and stops the build.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from mas.core import update
+    if not update.verify(installer, raw):
+        raise SystemExit(
+            "the signature does not match the key inside the program. The private "
+            f"key in {SECRET_NAME} is not the pair of PUBLIC_KEY in "
+            "src/mas/core/update.py — releasing this would ship an update nobody "
+            "can install.")
+
     out = installer.parent / "latest.json"
     out.write_text(json.dumps(feed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"signed {installer.name} ({len(payload)} bytes) -> {out.name}")
+    print(f"signed {installer.name} ({len(payload)} bytes) -> {out.name}, "
+          "and the program's own checker accepts it")
     return 0
 
 
