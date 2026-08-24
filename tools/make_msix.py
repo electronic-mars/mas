@@ -92,21 +92,22 @@ def assets(into: Path) -> None:
             draw(src, px, into / f"Square44x44Logo.targetsize-{px}_altform-unplated.png")
 
 
-# Our own codes are what the interface files are named by. Windows wants proper
-# tags, and refuses the package outright over one it does not know — "zh" is not
-# a language to it, only "zh-Hans" or "zh-Hant" are. And our Portuguese is the
-# Brazilian one, which is a different tag from plain "pt".
-AS_WINDOWS_CALLS_IT = {"zh": "zh-Hans", "pt": "pt-BR"}
+# The languages the Store listing is written in — not the languages the program
+# speaks. Declaring all fifteen here asks Partner Center for fifteen store
+# listings, one per language, and the submission stays incomplete until every
+# one of them is written. Deleting them on the languages page does not help:
+# that list is rebuilt from the package on every visit.
+#
+# The program is unaffected either way. It picks its language from Windows and
+# reads its own files in the package; these declarations are for Windows'
+# resource system, which the interface does not use.
+#
+# Add a tag here when a store listing in that language actually exists.
+LISTING_LANGUAGES = ("en-us",)
 
 
 def languages() -> list[str]:
-    """Every language the program is translated into, declared to the Store so
-    the listing can be shown in them. Taken from the locale folder, so adding a
-    language is still only dropping a file in."""
-    import json
-    index = ROOT / "src" / "mas" / "ui" / "locales" / "index.json"
-    return [AS_WINDOWS_CALLS_IT.get(item["code"], item["code"])
-            for item in json.loads(index.read_text(encoding="utf-8"))]
+    return list(LISTING_LANGUAGES)
 
 
 def main() -> int:
