@@ -3,6 +3,16 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.2
+
+- clicking the tray icon brings the window in front of what is already open. It
+  did appear before — behind the browser, behind the editor — because Windows
+  gives the foreground to whoever the person last interacted with, and clicking a
+  tray icon counts as talking to the shell, not to us;
+- the tray icon is the right one from the moment it appears. It used to show the
+  default speakers and change to the real device a second later, at the wrong
+  size on a scaled display into the bargain.
+
 ## 1.0.1
 
 - the update button now finishes what it starts. In 1.0.0 the program handed
