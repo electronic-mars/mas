@@ -3,6 +3,14 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.3
+
+- the window opens on machines whose port range starts low. The interface is
+  served over a local address, Windows was asked for any free port, and it could
+  hand out one that the browser engine refuses to load a page from — the window
+  then came up empty with ERR_UNSAFE_PORT. Seen in the wild on 1723, which is
+  PPTP. The port is now chosen above all of them.
+
 ## 1.0.2
 
 - clicking the tray icon brings the window in front of what is already open. It

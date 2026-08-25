@@ -19,6 +19,21 @@ _log = log.get("bridge")
 TOKEN_HEADER = "X-MAS-Token"
 _TOKEN_MARK = "%%MAS_TOKEN%%"  # must not match a JS var name, or substitution breaks it
 
+# The window is drawn by WebView2, which is Chromium, and Chromium refuses to
+# open a page on any of the ports once used by services it does not want a web
+# page talking to — SMTP, NFS, PPTP and their neighbours. Asking Windows for
+# "any free port" is therefore not safe: the answer can be one of those, and the
+# window comes up as ERR_UNSAFE_PORT with no hint as to why. It happened on a
+# machine whose dynamic port range had been moved down to start at 1024, and the
+# port handed out was 1723, which is PPTP.
+#
+# The whole list lives in net/base/port_util.cc in Chromium; the largest entry in
+# it is 10080. Rather than copy eighty numbers that someone may add to, we simply
+# stay above all of them.
+FIRST_SAFE_PORT = 10081
+LAST_PORT = 65535
+PORT_TRIES = 50
+
 
 class Bridge:
     def __init__(self, api: object, ui_dir_override: Path | None = None):
@@ -35,7 +50,19 @@ class Bridge:
     def start(self) -> str:
         handler = _make_handler(self)
         ThreadingHTTPServer.daemon_threads = True  # request threads do not outlive exit
-        self._srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        for _ in range(PORT_TRIES):
+            want = FIRST_SAFE_PORT + secrets.randbelow(LAST_PORT - FIRST_SAFE_PORT + 1)
+            try:
+                self._srv = ThreadingHTTPServer(("127.0.0.1", want), handler)
+                break
+            except OSError:
+                continue        # somebody else has it; there are fifty thousand more
+        else:
+            # Fifty taken ports in a row means something is very wrong with this
+            # machine, and a window that might not open beats no program at all.
+            _log.warning("no free port above %d after %d tries — letting Windows "
+                         "choose, which it may choose badly", FIRST_SAFE_PORT, PORT_TRIES)
+            self._srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         self.port = self._srv.server_address[1]
         threading.Thread(target=self._srv.serve_forever, daemon=True, name="mas-bridge").start()
         _log.info("bridge is up on %s, interface from %s", self.url, self.ui_dir)

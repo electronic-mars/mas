@@ -1153,5 +1153,28 @@ check("the release build no longer passes an identity in",
       "vars.MSIX_IDENTITY_NAME" in (ROOT / ".github" / "workflows"
                                     / "release.yml").read_text(encoding="utf-8"), False)
 
+# A window that will not open, on a machine whose port range starts low. Windows
+# was asked for any free port and handed out 1723 — PPTP, one of the ports
+# Chromium refuses to load a page from, so the interface came up as
+# ERR_UNSAFE_PORT. Every one of those ports is at or below 10080
+# (net/base/port_util.cc), so staying above them is the whole fix, and this is
+# where it stays fixed.
+print("\nThe port the interface is served on")
+from mas.bridge import Bridge, FIRST_SAFE_PORT  # noqa: E402
+
+CHROMIUM_REFUSES = 10080
+
+check("the floor is above every port Chromium refuses",
+      FIRST_SAFE_PORT > CHROMIUM_REFUSES, True)
+_ports = []
+for _ in range(25):
+    _b = Bridge(object())
+    _b.start()
+    _ports.append(_b.port)
+    _b.stop()
+check("every port actually bound clears that floor",
+      min(_ports) > CHROMIUM_REFUSES, True)
+check("and they are not all the same one", len(set(_ports)) > 1, True)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
