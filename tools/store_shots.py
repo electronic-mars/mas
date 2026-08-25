@@ -31,6 +31,8 @@ SHOTS = [
     ("04-mixer-dark", "dark"),
     ("06-settings-dark", "dark"),
     ("02-devices-light", "light"),
+    ("25-mini-dark", "dark"),
+    ("26-mini-light", "light"),
     ("17-about-dark", "dark"),
 ]
 
@@ -39,7 +41,13 @@ def compose(name: str, theme: str) -> Path:
     window = Image.open(SRC / f"{name}.png").convert("RGBA")
     # Fit the window to the canvas height with a margin, keeping its proportions.
     margin = 60
-    scale = (CANVAS[1] - margin * 2) / window.height
+    room = CANVAS[1] - margin * 2
+    # Down to fit, never up. The screenshots are taken at double resolution, so
+    # the tall window has detail to spare and shrinks cleanly; the mini view is
+    # short enough that fitting it to the canvas would stretch it past what was
+    # drawn and soften every letter on it. It is shown at its own pixels instead,
+    # which is also honest about it being the small window.
+    scale = min(room / window.height, 1.0)
     size = (round(window.width * scale), round(window.height * scale))
     window = window.resize(size, Image.LANCZOS)
 
