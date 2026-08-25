@@ -32,9 +32,13 @@ Light theme, the welcome screen and the rest are in [docs/screens](docs/screens)
 
 ## Install
 
-Get the installer or the archive from
+From the [Microsoft Store](https://apps.microsoft.com/detail/9N9J77WKQ4X6), which is the easy way: it installs and
+updates the program for you, and Windows already trusts what the Store hands it.
+
+Or take the installer or the archive from
 [Releases](https://github.com/electronic-mars/mas/releases/latest). The installer
-is per user and needs no administrator rights.
+is per user and needs no administrator rights. The two are the same program; the
+copy from here updates itself, the copy from the Store is updated by the Store.
 
 The program is not code-signed, so Windows SmartScreen will warn about it:
 **More info → Run anyway**. Every release carries `SHA256SUMS.txt`, and the
