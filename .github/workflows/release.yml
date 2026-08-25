@@ -171,6 +171,14 @@ jobs:
 
       - name: Publish the release
         # A dry run builds everything and publishes nothing.
+        #
+        # Everything else publishes for real, the moment the tag is pushed.
+        # It used to stop at a draft, so that nothing reached anybody without
+        # a deliberate press. In practice the press came every time anyway,
+        # minutes later, and the pause only made it easy to forget a release
+        # sitting finished and invisible. Pushing a version tag is itself the
+        # deliberate act; the safe rehearsal is the dry run above, which builds
+        # the whole thing and publishes none of it.
         if: github.event_name != 'workflow_dispatch'
         shell: pwsh
         env:
@@ -195,7 +203,7 @@ jobs:
           | $env:ZIP | ``$env:ZIP_SHA`` |
           "@
           gh release create "${{ github.ref_name }}" "$env:SETUP" "$env:ZIP" "SHA256SUMS.txt" latest.json `
-            --title "${{ github.ref_name }}" --notes "$notes" --draft
+            --title "${{ github.ref_name }}" --notes "$notes"
 
       - name: Keep the files from a dry run
         if: github.event_name == 'workflow_dispatch'
