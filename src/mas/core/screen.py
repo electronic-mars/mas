@@ -13,6 +13,7 @@ _log = log.get("screen")
 
 user32 = ctypes.windll.user32
 shell32 = ctypes.windll.shell32
+kernel32 = ctypes.windll.kernel32
 
 # A window handle is a handle, not an int. Undeclared, ctypes cuts whatever
 # comes back down to 32 bits — harmless for window handles, which Windows
@@ -20,6 +21,7 @@ shell32 = ctypes.windll.shell32
 # where the same omission cost this program an access violation on every run.
 user32.FindWindowW.restype = wintypes.HWND
 user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+user32.GetForegroundWindow.restype = wintypes.HWND
 
 ABM_GETTASKBARPOS = 0x00000005
 SPI_GETWORKAREA = 0x0030
@@ -27,6 +29,8 @@ EDGES = {0: "left", 1: "top", 2: "right", 3: "bottom"}
 # Below this the window stops being a window: the front panel alone is 250
 # points, and squeezing the device list to nothing defeats the whole program.
 MIN_HEIGHT = 420
+SW_SHOW = 5
+SW_RESTORE = 9
 
 
 class _APPBARDATA(ctypes.Structure):
@@ -88,6 +92,42 @@ def own_window(title: str) -> int | None:
     pid = wintypes.DWORD()
     user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
     return hwnd if pid.value == os.getpid() else None
+
+
+def to_front(hwnd: int) -> bool:
+    """Put our window in front of everything, including of whatever is there now.
+
+    Showing a window is not the same as being given the keyboard. Windows only
+    hands the foreground to the process the person last interacted with, and a
+    click on a tray icon is an interaction with the shell, not with us. So the
+    window appeared — behind the browser, behind the editor — and the click read
+    as "nothing happened". The way through is the documented one: attach our
+    input queue to the queue of whoever holds the foreground, which makes us, for
+    that instant, the same interaction, and ask again. Detached immediately after,
+    because leaving two threads sharing an input queue makes both of them wait on
+    each other.
+    """
+    h = wintypes.HWND(hwnd)
+    user32.ShowWindow(h, SW_RESTORE if user32.IsIconic(h) else SW_SHOW)
+    if user32.SetForegroundWindow(h):
+        return True
+    front = user32.GetForegroundWindow()
+    ours = kernel32.GetCurrentThreadId()
+    theirs = user32.GetWindowThreadProcessId(front, None) if front else 0
+    if not theirs or theirs == ours:
+        _log.info("the window is up but the foreground was refused")
+        return False
+    if not user32.AttachThreadInput(ours, theirs, True):
+        _log.info("could not borrow the foreground thread's input")
+        return False
+    try:
+        user32.BringWindowToTop(h)
+        won = bool(user32.SetForegroundWindow(h))
+        if not won:
+            _log.info("the foreground was refused even after attaching")
+        return won
+    finally:
+        user32.AttachThreadInput(ours, theirs, False)
 
 
 def place_at_tray(hwnd: int, margin: int = 12) -> bool:

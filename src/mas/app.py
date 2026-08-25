@@ -1099,8 +1099,9 @@ class App:
             self._visible = True
             self.meter.set_idle(False)
             hwnd = self.own_hwnd()
-            if hwnd and screen.place_at_tray(hwnd):
-                pass          # the window went to the corner where the tray is
+            if hwnd:
+                screen.place_at_tray(hwnd)   # the corner where the tray is
+                screen.to_front(hwnd)        # and in front of what is already open
             self.refresh_title()
             _log.info("window shown, tab %s", tab)
         except Exception:
@@ -1260,12 +1261,14 @@ class App:
         # created there are later released by the garbage collector from another
         # thread, and the process crashes.
         self.switcher.seed_if_empty()
+        # The icon first, before anything is waited for. It is what puts the
+        # program in the tray at all, and the wait below is about the window.
+        self.refresh_tray()
         # We wait not "two seconds just in case" but for exactly what we are
         # waiting for: the first binding of the meter to a device. The window
         # used to appear 2.5 s after a manual start only because of that pause.
         if not self.meter.ready.wait(timeout=2.0):
             _log.info("the meter did not bind within 2 s — showing the window as is")
-        self.refresh_tray()
         self.sync_auto_device()
         # A manual start is obliged to show the window: Windows hides a new icon
         # in the tray overflow, and the person decides the program did not
@@ -1308,6 +1311,13 @@ def main() -> int:
     # at all.
     gc.disable()
     log.setup()
+    # Before anything measures the screen. pywebview calls exactly this when it
+    # starts the window (platforms/winforms.py), and until then Windows lies to
+    # us about sizes: the tray asks for a 16-pixel icon on a 125% display, we
+    # draw one, and a second later the truth arrives and the icon is redrawn at
+    # 20, blurred in between. Calling it first costs nothing — the second call
+    # from inside pywebview simply finds it already done.
+    ctypes.windll.user32.SetProcessDPIAware()
     set_app_id()
     # Which of the two builds this is decides who updates it, and it is the
     # first thing worth knowing when reading somebody else's log.

@@ -105,6 +105,10 @@ class Tray:
         )
         self._stop = threading.Event()
         self._queue: queue.Queue = queue.Queue()
+        # The icon is not shown until we know which one to show. It used to
+        # appear as the default speakers and change to the real device a moment
+        # later, and that blink is the first thing a person sees of the program.
+        self._shown = False
 
     # --- appearance --------------------------------------------------
     # The tray icon is a shared Windows resource. Changing it from arbitrary
@@ -128,11 +132,28 @@ class Tray:
             self._glyph = glyph
             self.icon.icon = load_glyph(glyph, self._light)
             self.icon.title = tooltip  # Windows cuts tooltips longer than 128 chars
+            self._show()
         elif kind == "tip":
             self.icon.title = job[1]
         elif kind == "notify":
             _, message, title = job
             self.icon.notify(message, title)
+
+    def _show(self) -> None:
+        """Into the tray, once, whichever of the two reasons arrives first."""
+        if not self._shown:
+            self._shown = True
+            self.icon.visible = True
+            _log.info("icon in the tray: %s", self._glyph)
+
+    def _show_anyway(self) -> None:
+        """A safety net. Waiting for the right icon must never end with no icon
+        at all: if the device cannot be read, the program still has to be in the
+        tray, because that is where its only certain way out lives."""
+        if not self._stop.wait(3.0):
+            if not self._shown:
+                _log.warning("no device came within 3 s — showing the default icon")
+            self._show()
 
     def _worker(self) -> None:
         while not self._stop.is_set():
@@ -202,9 +223,9 @@ class Tray:
     def run(self) -> None:
         def setup(icon):
             self._install_icon_loader()
-            icon.visible = True
             self._install_mouse_hook()
             threading.Thread(target=self._worker, daemon=True, name="mas-tray-jobs").start()
+            threading.Thread(target=self._show_anyway, daemon=True, name="mas-tray-show").start()
             threading.Thread(target=self._theme_poller, daemon=True, name="mas-theme").start()
 
         self.icon.run(setup=setup)
