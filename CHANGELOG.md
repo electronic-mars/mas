@@ -3,6 +3,17 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.1
+
+- the update button now finishes what it starts. In 1.0.0 the program handed
+  over to the installer and quit, and the installer — running silently, with
+  nobody to answer its questions — took the safe default for both of them and
+  gave up: first because the program was still closing, then because the program
+  will not close on request, since closing its window means going to the tray.
+  The installer now ends the running copy itself and starts the new one. Anyone
+  on 1.0.0 gets this by pressing update: the fix is in the installer that arrives,
+  not in the copy that is running.
+
 ## 1.0.0
 
 The first public release.

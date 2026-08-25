@@ -45,10 +45,25 @@ ArchitecturesInstallIn64BitMode=x64
 ; purpose: a PyInstaller folder holds python314.dll and a hundred others open the
 ; whole time it runs, and narrowing the filter to *.exe would hide from Windows
 ; exactly the locks that block the upgrade.
-CloseApplications=yes
-; The program's own single-instance mutex, so Setup can see a running copy and
-; say so instead of failing halfway through replacing files.
-AppMutex=Local\MasterAudioSwitcherSingleInstance
+; force, not yes: "yes" is a polite request, and this program is built to refuse
+; it. Closing its window means going to the tray — that is the whole point of it —
+; so Windows asks it to close, it hides instead, and Setup concludes it could not
+; be closed. Silently that answer defaults to Abort, and Setup rolls the update
+; back and leaves. Forced, Windows ends the process instead of asking. Nothing is
+; lost by that: settings are written the moment they change, not on the way out.
+CloseApplications=force
+; No AppMutex here, on purpose, and it cost a broken update button to learn why.
+; A mutex makes Setup stop and ask the person to close the program — fine when
+; there is a person. The program updating itself starts Setup silently and then
+; quits so its files can be replaced, and a suppressed question is answered with
+; its safe default, which is Cancel. Setup gave up ten milliseconds in, before
+; the program had finished quitting, and the update ended with nothing installed
+; and the program gone from the tray. Closing a running copy is what
+; CloseApplications above is for: it asks Windows which processes hold the files
+; and closes those, silently when Setup is silent, with a page listing them when
+; it is not. Restarting them afterwards is left off because the Run entry below
+; does it, deliberately and only on the update path.
+RestartApplications=no
 SetupMutex=MasterAudioSwitcherSetup
 
 [Languages]
