@@ -12,8 +12,8 @@
     "hk_row": "Klavye kısayolu",
     "btn_row": "Fare düğmesi",
     "theme_row": "Tema",
-    "cycle_hint": "Sol tıkla değiştirilir",
-    "cycle_hint_right": "Sağ tıkla değiştirilir",
+    "cycle_hint": "Sol tıkın değiştireceklerini işaretleyin",
+    "cycle_hint_right": "Sağ tıkın değiştireceklerini işaretleyin",
     "in_cycle": "Değiştirmeye dahil",
     "microphones": "Mikrofonlar",
     "no_devices": "Çıkış aygıtı bulunamadı",
@@ -29,7 +29,7 @@
     "btn_left": "Sol",
     "btn_right": "Sağ",
     "auto": "Kulaklık",
-    "auto_device": "Öncelikli cihaz",
+    "auto_device": "Otomatik geçiş",
     "auto_device_d": "Bu cihaz açıldığında ses ona geçer. Kapandığında ses geri döner",
     "auto_none": "Seçili değil",
     "auto_here": "Şu an bağlı",
@@ -127,6 +127,7 @@
     "up_why_release": "sürüm açıklaması doğru görünmüyor",
     "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır.",
     "w_title": "İki tıklama, hepsi bu",
-    "g_left_d2": "Sesi sonraki cihaza geçirir"
+    "g_left_d2": "Sesi sonraki cihaza geçirir",
+    "w_hidden": "Simgeyi göremiyor musunuz?"
   }
 }

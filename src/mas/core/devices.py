@@ -107,8 +107,14 @@ _BY_NAME = [
     (("hyperx",), "hyperx-cloud"),
     (("earbud", "buds", "airpod", "вкладыш"), "earbuds"),
     (("headphone", "headset", "наушник", "гарнитур", "головной телефон"), "headphones"),
-    # Screens, which announce themselves by the connection or by a maker's name.
+    # Screens. Most of them never say "monitor" anywhere in the name: what gives
+    # them away is the driver in brackets, because display audio belongs to the
+    # graphics card. "LG HDR 4K (AMD High Definition Audio)" is a monitor; the
+    # vendor has to be named, since "Realtek High Definition Audio" is the
+    # ordinary sound chip and is not.
     (("hdmi",), "hdmi"),
+    (("nvidia high definition audio", "amd high definition audio",
+      "display audio", "displayport"), "monitor"),
     (("display", "монитор", "monitor"), "monitor"),
     (("tv", "телевизор"), "tv"),
     # Everything else that says what it is.

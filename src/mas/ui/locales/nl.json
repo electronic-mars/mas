@@ -12,8 +12,8 @@
     "hk_row": "Sneltoets",
     "btn_row": "Muisknop",
     "theme_row": "Thema",
-    "cycle_hint": "Schakelt met links klikken",
-    "cycle_hint_right": "Schakelt met rechts klikken",
+    "cycle_hint": "Vink aan wat de linkerklik doorloopt",
+    "cycle_hint_right": "Vink aan wat de rechterklik doorloopt",
     "in_cycle": "Opgenomen in schakelen",
     "microphones": "Microfoons",
     "no_devices": "Geen uitvoerapparaten gevonden",
@@ -29,7 +29,7 @@
     "btn_left": "Links",
     "btn_right": "Rechts",
     "auto": "Koptelefoon",
-    "auto_device": "Voorkeursapparaat",
+    "auto_device": "Automatisch schakelen",
     "auto_device_d": "Zodra dit apparaat aan gaat, gaat het geluid ernaartoe. Gaat het uit, dan gaat het geluid terug",
     "auto_none": "Niet geselecteerd",
     "auto_here": "Nu verbonden",
@@ -127,6 +127,7 @@
     "up_why_release": "de releasebeschrijving ziet er niet goed uit",
     "autostart_store": "Windows bewaart de lijst met opstartprogramma's uit de Store. De schakelaar hiervoor staat daar.",
     "w_title": "Twee klikken, dat is alles",
-    "g_left_d2": "Schakelt geluid naar het volgende apparaat"
+    "g_left_d2": "Schakelt geluid naar het volgende apparaat",
+    "w_hidden": "Zie je het pictogram niet?"
   }
 }

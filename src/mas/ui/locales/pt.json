@@ -12,8 +12,8 @@
     "hk_row": "Atalho de teclado",
     "btn_row": "Botão do mouse",
     "theme_row": "Tema",
-    "cycle_hint": "Alterna com clique esquerdo",
-    "cycle_hint_right": "Alterna com clique direito",
+    "cycle_hint": "Marque o que o clique esquerdo alterna",
+    "cycle_hint_right": "Marque o que o clique direito alterna",
     "in_cycle": "Incluído na alternância",
     "microphones": "Microfones",
     "no_devices": "Nenhum dispositivo de saída encontrado",
@@ -29,7 +29,7 @@
     "btn_left": "Esquerdo",
     "btn_right": "Direita",
     "auto": "Fones",
-    "auto_device": "Dispositivo prioritário",
+    "auto_device": "Troca automática",
     "auto_device_d": "Quando este dispositivo liga, o som vai para ele. Quando desliga, o som volta",
     "auto_none": "Não selecionado",
     "auto_here": "Conectado agora",
@@ -127,6 +127,7 @@
     "up_why_release": "a descrição da versão não parece correta",
     "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá.",
     "w_title": "Dois cliques, só isso",
-    "g_left_d2": "Alterna o som para o próximo dispositivo"
+    "g_left_d2": "Alterna o som para o próximo dispositivo",
+    "w_hidden": "Não vê o ícone?"
   }
 }

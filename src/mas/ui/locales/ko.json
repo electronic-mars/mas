@@ -12,8 +12,8 @@
     "hk_row": "단축키",
     "btn_row": "마우스 버튼",
     "theme_row": "테마",
-    "cycle_hint": "왼쪽 클릭으로 전환",
-    "cycle_hint_right": "오른쪽 클릭으로 전환",
+    "cycle_hint": "왼쪽 클릭으로 전환할 장치 선택",
+    "cycle_hint_right": "오른쪽 클릭으로 전환할 장치 선택",
     "in_cycle": "전환에 포함",
     "microphones": "마이크",
     "no_devices": "출력 장치를 찾을 수 없음",
@@ -29,7 +29,7 @@
     "btn_left": "왼쪽",
     "btn_right": "오른쪽",
     "auto": "헤드폰",
-    "auto_device": "우선 장치",
+    "auto_device": "자동 전환",
     "auto_device_d": "이 장치가 켜지면 소리가 그 장치로 이동하고, 꺼지면 다시 돌아옵니다",
     "auto_none": "선택 안 됨",
     "auto_here": "지금 연결됨",
@@ -127,6 +127,7 @@
     "up_why_release": "릴리스 설명이 올바르지 않음",
     "autostart_store": "Windows는 Store에서 가져온 프로그램의 시작 목록을 유지합니다. 이 프로그램의 스위치는 거기에 있습니다.",
     "w_title": "두 번의 클릭, 그게 전부입니다",
-    "g_left_d2": "다음 장치로 소리를 전환합니다"
+    "g_left_d2": "다음 장치로 소리를 전환합니다",
+    "w_hidden": "아이콘이 보이지 않나요?"
   }
 }

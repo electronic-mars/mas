@@ -12,8 +12,8 @@
     "hk_row": "Skrót klawiszowy",
     "btn_row": "Przycisk myszy",
     "theme_row": "Motyw",
-    "cycle_hint": "Przełączanie lewym kliknięciem",
-    "cycle_hint_right": "Przełączanie prawym kliknięciem",
+    "cycle_hint": "Zaznacz, co przełącza lewy klik",
+    "cycle_hint_right": "Zaznacz, co przełącza prawy klik",
     "in_cycle": "Uwzględnione w przełączaniu",
     "microphones": "Mikrofony",
     "no_devices": "Nie znaleziono urządzeń wyjściowych",
@@ -29,7 +29,7 @@
     "btn_left": "Lewy",
     "btn_right": "Prawo",
     "auto": "Słuchawki",
-    "auto_device": "Urządzenie priorytetowe",
+    "auto_device": "Przełączanie automatyczne",
     "auto_device_d": "Gdy to urządzenie się włączy, dźwięk na nie przechodzi. Gdy się wyłączy, dźwięk wraca",
     "auto_none": "Nie wybrano",
     "auto_here": "Podłączone teraz",
@@ -127,6 +127,7 @@
     "up_why_release": "opis wydania nie wygląda dobrze",
     "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam.",
     "w_title": "Dwa kliknięcia i tyle",
-    "g_left_d2": "Przełącza dźwięk na następne urządzenie"
+    "g_left_d2": "Przełącza dźwięk na następne urządzenie",
+    "w_hidden": "Nie widzisz ikony?"
   }
 }

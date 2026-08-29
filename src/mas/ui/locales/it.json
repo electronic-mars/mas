@@ -12,8 +12,8 @@
     "hk_row": "Scorciatoia",
     "btn_row": "Pulsante mouse",
     "theme_row": "Tema",
-    "cycle_hint": "Cambia con clic sinistro",
-    "cycle_hint_right": "Cambia con clic destro",
+    "cycle_hint": "Segna cosa ruota il clic sinistro",
+    "cycle_hint_right": "Segna cosa ruota il clic destro",
     "in_cycle": "Incluso nel cambio",
     "microphones": "Microfoni",
     "no_devices": "Nessun dispositivo di uscita trovato",
@@ -29,7 +29,7 @@
     "btn_left": "Sinistro",
     "btn_right": "Destra",
     "auto": "Cuffie",
-    "auto_device": "Dispositivo prioritario",
+    "auto_device": "Commutazione automatica",
     "auto_device_d": "Quando questo dispositivo si accende, l'audio passa ad esso. Quando si spegne, l'audio torna indietro",
     "auto_none": "Non selezionato",
     "auto_here": "Collegato ora",
@@ -127,6 +127,7 @@
     "up_why_release": "la descrizione della versione non sembra corretta",
     "autostart_store": "Windows conserva l'elenco dei programmi all'avvio per quelli dello Store. L'interruttore per questo si trova lì.",
     "w_title": "Due clic, tutto qui",
-    "g_left_d2": "Commuta l'audio al prossimo dispositivo"
+    "g_left_d2": "Commuta l'audio al prossimo dispositivo",
+    "w_hidden": "Non vedi l'icona?"
   }
 }

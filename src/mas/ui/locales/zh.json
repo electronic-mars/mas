@@ -12,8 +12,8 @@
     "hk_row": "键盘快捷键",
     "btn_row": "鼠标按钮",
     "theme_row": "主题",
-    "cycle_hint": "左键切换",
-    "cycle_hint_right": "右键切换",
+    "cycle_hint": "勾选左键要切换的设备",
+    "cycle_hint_right": "勾选右键要切换的设备",
     "in_cycle": "参与切换",
     "microphones": "麦克风",
     "no_devices": "未找到输出设备",
@@ -29,7 +29,7 @@
     "btn_left": "左",
     "btn_right": "右",
     "auto": "耳机",
-    "auto_device": "优先设备",
+    "auto_device": "自动切换",
     "auto_device_d": "此设备一开启，声音就切换到它。关闭时，声音切回",
     "auto_none": "未选择",
     "auto_here": "当前已连接",
@@ -127,6 +127,7 @@
     "up_why_release": "版本描述看起来不对劲",
     "autostart_store": "Windows 会保留来自商店的程序的启动列表。此程序的开关就在那里。",
     "w_title": "两次点击，仅此而已",
-    "g_left_d2": "将声音切换到下一个设备"
+    "g_left_d2": "将声音切换到下一个设备",
+    "w_hidden": "找不到图标？"
   }
 }

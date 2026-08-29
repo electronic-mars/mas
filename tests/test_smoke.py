@@ -1176,5 +1176,62 @@ check("every port actually bound clears that floor",
       min(_ports) > CHROMIUM_REFUSES, True)
 check("and they are not all the same one", len(set(_ports)) > 1, True)
 
+# A device with no icon chosen used to look exactly like every other one, and
+# the first thing seeded into the cycle could be a monitor with no speaker in
+# it — so the very first click a person tries produced silence. Both are guessed
+# from the name, so both are pinned here.
+print("What a device looks like, and what gets switched to")
+from mas.core.devices import guess_icon  # noqa: E402
+
+check("a monitor is recognised by the graphics driver in its name",
+      guess_icon("LG HDR 4K (AMD High Definition Audio)", True), "monitor")
+check("and so is one on an NVIDIA card",
+      guess_icon("DELL U2723QE (NVIDIA High Definition Audio)", True), "monitor")
+check("the ordinary sound chip is not a monitor",
+      guess_icon("Realtek High Definition Audio", True), "speakers")
+check("headphones are headphones in English",
+      guess_icon("Headphones (Some Brand)", True), "headphones")
+check("and in Russian", guess_icon("\u041d\u0430\u0443\u0448\u043d\u0438\u043a\u0438 (Realtek)", True),
+      "headphones")
+check("a laptop microphone is not drawn as a headset",
+      guess_icon("Microphone Array (Realtek(R) Audio)", False), "laptop")
+check("two ordinary devices no longer share one picture",
+      guess_icon("Speakers (Realtek(R) Audio)", True)
+      != guess_icon("Headphones (HyperX Cloud Flight S)", True), True)
+
+
+class SeedWorld:
+    """Just enough of the devices module for seed_if_empty."""
+
+    def __init__(self, named):
+        self.named = named
+
+    def list_devices(self, only_active=True):
+        return [devices.Device(id=n, name=n, is_output=True, active=True)
+                for n in self.named]
+
+    guess_icon = staticmethod(guess_icon)
+
+
+def seeded(names):
+    world = SeedWorld(names)
+    import mas.core.switcher as switcher_mod
+    real, switcher_mod.devices = switcher_mod.devices, world
+    try:
+        cfg = FakeConfig(cycle=[])
+        Switcher(cfg).seed_if_empty()
+        return cfg.get("cycle")
+    finally:
+        switcher_mod.devices = real
+
+
+check("the monitor is left out of the first cycle",
+      seeded(["Speakers (Realtek(R) Audio)", "Headphones (HyperX)",
+              "LG HDR 4K (AMD High Definition Audio)"]),
+      ["Speakers (Realtek(R) Audio)", "Headphones (HyperX)"])
+check("a machine with nothing but screens still gets a working cycle",
+      seeded(["LG HDR 4K (AMD High Definition Audio)"]),
+      ["LG HDR 4K (AMD High Definition Audio)"])
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

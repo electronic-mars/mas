@@ -12,8 +12,8 @@
     "hk_row": "Atajo de teclado",
     "btn_row": "Botón del ratón",
     "theme_row": "Tema",
-    "cycle_hint": "Cambia con clic izquierdo",
-    "cycle_hint_right": "Cambia con clic derecho",
+    "cycle_hint": "Marca lo que rota el clic izquierdo",
+    "cycle_hint_right": "Marca lo que rota el clic derecho",
     "in_cycle": "Incluido en el cambio",
     "microphones": "Micrófonos",
     "no_devices": "No se encontraron dispositivos de salida",
@@ -29,7 +29,7 @@
     "btn_left": "Izquierdo",
     "btn_right": "Derecha",
     "auto": "Auriculares",
-    "auto_device": "Dispositivo prioritario",
+    "auto_device": "Cambio automático",
     "auto_device_d": "En cuanto este dispositivo se enciende, el sonido pasa a él. Cuando se apaga, el sonido vuelve",
     "auto_none": "No seleccionado",
     "auto_here": "Conectado ahora",
@@ -127,6 +127,7 @@
     "up_why_release": "la descripción de la versión no parece correcta",
     "autostart_store": "Windows guarda la lista de inicio para los programas de la Tienda. El interruptor para este está ahí.",
     "w_title": "Dos clics, eso es todo",
-    "g_left_d2": "Cambia el sonido al siguiente dispositivo"
+    "g_left_d2": "Cambia el sonido al siguiente dispositivo",
+    "w_hidden": "¿No ves el icono?"
   }
 }

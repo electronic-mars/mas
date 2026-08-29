@@ -587,6 +587,20 @@ function renderSettings() {
       state.settings.dongle_name
         ? toggle('watch_dongle', t('dongle'), t('dongle_d').replace('%s', state.settings.dongle_name))
         : '',
+      // Offered only for a dongle nothing is known about: for a recognised one
+      // the switch above already does the job, and teaching it again could only
+      // replace a verified rule with a guess.
+      //
+      // It used to live under Diagnostics, at the bottom of the page. Automatic
+      // switching and teaching the dongle are two halves of one wish — the sound
+      // following the headset — and the half that makes it work when the headset
+      // is switched OFF sat under a heading that reads as logs and bug reports.
+      // People set the device above, found nothing else, and concluded the
+      // feature was broken.
+      state.settings.dongle_usb && !state.settings.dongle_name
+        ? stRow(t('teach'), t('teach_d').replace('%s', state.settings.dongle_usb),
+          `<button class="seg drop" data-act="teach">${t('teach_btn')}</button>`, { stack: true })
+        : '',
     ])}
      <h2 class="sec micro">${secIcon('ui-wave')}${t('player')}</h2>
      ${group([
@@ -619,13 +633,6 @@ function renderSettings() {
     ])}
      <h2 class="sec micro">${secIcon('sec-diag')}${t('diag')}</h2>
      ${group([
-      // Offered only for a dongle nothing is known about: for a recognised one
-      // the switch above already does the job, and teaching it again could only
-      // replace a verified rule with a guess.
-      state.settings.dongle_usb && !state.settings.dongle_name
-        ? stRow(t('teach'), t('teach_d').replace('%s', state.settings.dongle_usb),
-          `<button class="seg drop" data-act="teach">${t('teach_btn')}</button>`, { stack: true })
-        : '',
       stRow(t('learn_open'), t('learn_open_d'),
         `<button class="seg drop" data-act="folder">${t('open_btn')}</button>`),
     ])}`;
@@ -754,8 +761,8 @@ function showWelcome() {
       <div style="margin-top:12px">
         ${gestureCard(mouse('left'), t('g_left'), t('g_left_d2'))}
         ${gestureCard(mouse('right'), t('g_right'), t('g_right_d'))}
+        ${gestureCard('<path d="M7 14l5-5 5 5" fill="none"/>', t('w_hidden'), t('welcome_note'))}
       </div>
-      <div class="note">${t('welcome_note')}</div>
       <button class="btn" id="welcome-ok" style="margin-top:12px">${t('welcome_ok')}</button>
     </div>`;
   $('welcome-ok').addEventListener('click', async () => {

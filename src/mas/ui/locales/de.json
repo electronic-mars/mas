@@ -12,8 +12,8 @@
     "hk_row": "Tastenkürzel",
     "btn_row": "Maustaste",
     "theme_row": "Design",
-    "cycle_hint": "Wechsel per Linksklick",
-    "cycle_hint_right": "Wechsel per Rechtsklick",
+    "cycle_hint": "Ankreuzen, was der Linksklick durchschaltet",
+    "cycle_hint_right": "Ankreuzen, was der Rechtsklick durchschaltet",
     "in_cycle": "Im Wechsel enthalten",
     "microphones": "Mikrofone",
     "no_devices": "Keine Ausgabegeräte gefunden",
@@ -29,7 +29,7 @@
     "btn_left": "Links",
     "btn_right": "Rechts",
     "auto": "Kopfhörer",
-    "auto_device": "Prioritätsgerät",
+    "auto_device": "Automatisches Umschalten",
     "auto_device_d": "Sobald dieses Gerät eingeschaltet wird, wechselt der Ton dorthin. Wenn es ausgeschaltet wird, wechselt der Ton zurück.",
     "auto_none": "Nicht ausgewählt",
     "auto_here": "Jetzt verbunden",
@@ -127,6 +127,7 @@
     "up_why_release": "die Versionsbeschreibung sieht nicht richtig aus",
     "autostart_store": "Windows speichert die Startliste für Programme aus dem Store. Der Schalter dafür befindet sich dort.",
     "w_title": "Zwei Klicks, das ist alles",
-    "g_left_d2": "Schaltet den Ton auf das nächste Gerät um"
+    "g_left_d2": "Schaltet den Ton auf das nächste Gerät um",
+    "w_hidden": "Symbol nicht zu sehen?"
   }
 }

@@ -12,8 +12,8 @@
     "hk_row": "Raccourci clavier",
     "btn_row": "Bouton souris",
     "theme_row": "Thème",
-    "cycle_hint": "Bascule par clic gauche",
-    "cycle_hint_right": "Bascule par clic droit",
+    "cycle_hint": "Cochez ce que le clic gauche fait défiler",
+    "cycle_hint_right": "Cochez ce que le clic droit fait défiler",
     "in_cycle": "Inclus dans la bascule",
     "microphones": "Microphones",
     "no_devices": "Aucun périphérique de sortie trouvé",
@@ -29,7 +29,7 @@
     "btn_left": "Gauche",
     "btn_right": "Droite",
     "auto": "Casque",
-    "auto_device": "Périph. prioritaire",
+    "auto_device": "Basculement automatique",
     "auto_device_d": "Dès que ce périphérique s'allume, le son y va. Quand il s'éteint, le son revient",
     "auto_none": "Non sélectionné",
     "auto_here": "Connecté",
@@ -127,6 +127,7 @@
     "up_why_release": "la description de la version ne semble pas correcte",
     "autostart_store": "Windows conserve la liste de démarrage pour les programmes du Store. L'interrupteur pour celui-ci s'y trouve.",
     "w_title": "Deux clics, c'est tout",
-    "g_left_d2": "Bascule le son vers le prochain périphérique"
+    "g_left_d2": "Bascule le son vers le prochain périphérique",
+    "w_hidden": "Vous ne voyez pas l'icône ?"
   }
 }

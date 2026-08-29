@@ -12,8 +12,8 @@
     "hk_row": "キーボードショートカット",
     "btn_row": "マウスボタン",
     "theme_row": "テーマ",
-    "cycle_hint": "左クリックで切り替え",
-    "cycle_hint_right": "右クリックで切り替え",
+    "cycle_hint": "左クリックで切り替える機器を選択",
+    "cycle_hint_right": "右クリックで切り替える機器を選択",
     "in_cycle": "切り替え対象",
     "microphones": "マイク",
     "no_devices": "出力デバイスが見つかりません",
@@ -29,7 +29,7 @@
     "btn_left": "左",
     "btn_right": "右",
     "auto": "ヘッドホン",
-    "auto_device": "優先デバイス",
+    "auto_device": "自動切り替え",
     "auto_device_d": "このデバイスがオンになると音が移動し、オフになると元に戻ります",
     "auto_none": "未選択",
     "auto_here": "接続中",
@@ -127,6 +127,7 @@
     "up_why_release": "リリースの説明が正しくないようです",
     "autostart_store": "Windows はストアのアプリのスタートアップ一覧を保持します。このアプリのスイッチはそこにあります。",
     "w_title": "2回のクリックだけです",
-    "g_left_d2": "次のデバイスに音声を切り替えます"
+    "g_left_d2": "次のデバイスに音声を切り替えます",
+    "w_hidden": "アイコンが見当たりませんか？"
   }
 }

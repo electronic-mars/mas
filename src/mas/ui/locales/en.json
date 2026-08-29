@@ -12,8 +12,8 @@
     "hk_row": "Keyboard shortcut",
     "btn_row": "Mouse button",
     "theme_row": "Theme",
-    "cycle_hint": "Switched by left click",
-    "cycle_hint_right": "Switched by right click",
+    "cycle_hint": "Tick what the left click rotates",
+    "cycle_hint_right": "Tick what the right click rotates",
     "in_cycle": "Included in switching",
     "microphones": "Microphones",
     "no_devices": "No output devices found",
@@ -29,7 +29,7 @@
     "btn_left": "Left",
     "btn_right": "Right",
     "auto": "Headphones",
-    "auto_device": "Priority device",
+    "auto_device": "Automatic switching",
     "auto_device_d": "The moment this device turns on, sound moves to it. When it turns off, sound goes back",
     "auto_none": "Not selected",
     "auto_here": "Connected now",
@@ -127,6 +127,7 @@
     "up_why_release": "the release description does not look right",
     "autostart_store": "Windows keeps the startup list for programs from the Store. The switch for this one is there.",
     "w_title": "Two clicks, that is all",
-    "g_left_d2": "Moves the sound to the next device"
+    "g_left_d2": "Moves the sound to the next device",
+    "w_hidden": "Can't see the icon?"
   }
 }

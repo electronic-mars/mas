@@ -20,16 +20,31 @@ class Switcher:
     def ordered_ids(self) -> list[str]:
         return list(self.cfg.get("cycle"))
 
+    # Screens are left out below. A monitor is an audio device to Windows whether
+    # or not it has a speaker in it, and most do not: the sound arrives and is
+    # never heard. The very first click a person tries would then produce
+    # silence, which reads as "this program broke my audio" — worse than the
+    # program appearing to do nothing. Anyone whose speakers really are in the
+    # monitor ticks one box and is done.
+    SCREENS = ("monitor", "hdmi", "tv")
+
     def seed_if_empty(self) -> None:
         """On a clean install the cycle is empty and a left click does nothing. We
-        put every output device in it — the program works right away, and the user
+        put the output devices in it — the program works right away, and the user
         removes what they do not need."""
         if self.ordered_ids():
             return
-        ids = [d.id for d in devices.list_devices(only_active=True) if d.is_output]
+        outs = [d for d in devices.list_devices(only_active=True) if d.is_output]
+        ids = [d.id for d in outs
+               if devices.guess_icon(d.name, True) not in self.SCREENS]
+        if not ids:
+            # Nothing but screens: better a cycle that might be silent than a
+            # left click that does nothing at all and cannot be explained.
+            ids = [d.id for d in outs]
         if ids:
             self.cfg.set("cycle", ids)
-            _log.info("cycle filled in on first run: %d devices", len(ids))
+            _log.info("cycle filled in on first run: %d of %d devices",
+                      len(ids), len(outs))
 
     def available(self) -> list[str]:
         """Devices from the cycle that are present right now, in the given order."""
