@@ -10,7 +10,7 @@ import time
 import logging
 
 from . import __version__, log
-from .bridge import Bridge
+from .bridge import PROTOCOL, Bridge
 from .core import devices, mixer, startup
 from .core.config import Config
 from .core.dongle import KNOWN as KNOWN_DONGLES
@@ -109,6 +109,27 @@ class Api:
         return self.app.state()
 
     # --- updating ------------------------------------------------------
+    def dock_hello(self):
+        """The dock saying it is there, and asking what to draw.
+
+        Also the heartbeat: stop calling this and the tray icon comes back,
+        because a dock that has crashed leaves a program with no face at all.
+        """
+        app = self.app
+        app.dock_seen()
+        return {"protocol": PROTOCOL, "version": __version__,
+                "hosting": bool(app.cfg.get("dock_hosts_us")),
+                "state": app.state()}
+
+    def dock_take_over(self, hosting: bool):
+        """The dock offering to draw us instead of the tray, or handing it back."""
+        app = self.app
+        app.dock_seen()
+        app.cfg.set("dock_hosts_us", bool(hosting))
+        _log.info("the dock %s drawing us", "takes over" if hosting else "hands back")
+        app.dock_apply()
+        return {"hosting": bool(hosting)}
+
     def update_action(self, action: str):
         """One entry point: check, install, poll, forget."""
         app = self.app
@@ -246,6 +267,10 @@ class App:
         self._engine: str | None = None
         self._engine_asking = False
         self._stopped = threading.Event()
+        # When the dock last said it was there, and what the tray currently
+        # shows. None means nobody has decided yet.
+        self._dock_seen = 0.0
+        self._tray_shown: bool | None = None
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
         self._pending_tab: str | None = None
@@ -1218,10 +1243,15 @@ class App:
             on_right=lambda: self._button("right"),
             on_middle=lambda: self.show("mixer"),
             on_quit=self.quit,
+            # Last time we ran, the dock was drawing us. Hold the icon back
+            # rather than flash it for three seconds at every start — the watch
+            # above shows it within DOCK_WATCH if the dock does not appear.
+            hold=bool(self.cfg.get("dock_hosts_us")),
         )
         self.overlay.start()
         threading.Thread(target=self.tray.run, daemon=True, name="mas-tray").start()
         threading.Thread(target=self._boot_watchdog, daemon=True, name="mas-boot").start()
+        threading.Thread(target=self._dock_watch, daemon=True, name="mas-dock").start()
 
         # Our own title bar instead of the native frame. easy_drag is off: with
         # it the window is dragged by any point of the page, and the sliders and
@@ -1266,6 +1296,44 @@ class App:
             # memory is given back by the system.
             os._exit(0)
         return 0
+
+    # --- living inside the dock ------------------------------------------
+    # The dock draws us as one of its widgets, and then the tray icon is a
+    # duplicate. It may have it — on one condition, which is that we can always
+    # take it back. A dock that has been closed, has crashed, or was uninstalled
+    # would otherwise leave a running program with no icon, no window anybody
+    # can reach and no way to quit it short of the task manager.
+    DOCK_SILENCE = 15.0     # longer than any hiccup, shorter than any patience
+    DOCK_WATCH = 3.0
+
+    def dock_seen(self) -> None:
+        """The dock has just spoken to us."""
+        self._dock_seen = time.monotonic()
+
+    def dock_has_us(self) -> bool:
+        return (bool(self.cfg.get("dock_hosts_us"))
+                and time.monotonic() - self._dock_seen < self.DOCK_SILENCE)
+
+    def dock_apply(self) -> None:
+        """Put the tray icon wherever the answer currently is."""
+        if not self.tray:
+            return
+        want = not self.dock_has_us()
+        if want != self._tray_shown:
+            self._tray_shown = want
+            self.tray.set_visible(want)
+            _log.info("the tray icon is %s (the dock %s us)",
+                      "ours" if want else "the dock's",
+                      "has" if not want else "does not have")
+
+    def _dock_watch(self) -> None:
+        while not self._stopped.wait(self.DOCK_WATCH):
+            try:
+                self.dock_apply()
+            except Exception:
+                # Whatever went wrong here, the icon is the way out of the
+                # program: never let this thread die quietly.
+                _log.exception("the dock watch stumbled")
 
     def _boot_watchdog(self) -> None:
         # Devices are enumerated here and not in the main thread: the main one

@@ -65,6 +65,12 @@ DEFAULTS: dict[str, Any] = {
     # switched on and off and writes down what changed, and the headset works
     # here from that moment on, release or no release.
     "dongle_rules": {},
+    # The dock draws us instead of the tray. Set by the dock itself through the
+    # bridge, not by anything in our own window: it is the dock that knows
+    # whether it is there. The tray icon comes back by itself the moment the
+    # dock stops asking — a program with no icon and no dock has no way out at
+    # all, and that is not a state we are willing to leave anybody in.
+    "dock_hosts_us": False,
     "mics_expanded": False,   # the microphone section is collapsed by default
     "onboarded": False,
 }

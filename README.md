@@ -49,6 +49,14 @@ reporting to them; an unsigned program that synthesises keystrokes and reads HID
 looks alarming to a heuristic, and there is nothing to be done about that short
 of a paid certificate.
 
+## Living in another program's panel
+
+The program can be drawn by a companion program instead of sitting in the tray —
+its own window already talks to it over a local interface, and that interface is
+open to anyone on the machine who can find it. What to read, what to call, and
+the one rule that comes with taking the tray icon away, are in
+[docs/DOCK.md](docs/DOCK.md).
+
 ## Updating
 
 **About → Check for updates.** It fetches the new installer, checks it and

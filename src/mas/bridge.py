@@ -6,17 +6,30 @@ unreliable in a built exe — the window came up empty. The server listens on
 """
 import json
 import mimetypes
+import os
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import log
-from .paths import ui_dir
+from .paths import data_dir, ui_dir
 
 _log = log.get("bridge")
 
 TOKEN_HEADER = "X-MAS-Token"
+# What another program on this machine has to read to talk to us. The port is
+# picked at random every run and so is the token, which is exactly right for
+# keeping strangers out and exactly wrong for a friend trying to find us — so we
+# leave a note. Deleted on the way out, and the reader is expected to check by
+# calling rather than to trust a file that a crash may have left behind.
+#
+# The token in a file means any program running as this person can ask us to
+# switch the sound. That is the same boundary they already have: they can send
+# us keystrokes, kill us, or replace our exe. It is not the same as letting a web
+# page do it, which is what the token is actually there to prevent.
+NOTE = "bridge.json"
+PROTOCOL = 1
 _TOKEN_MARK = "%%MAS_TOKEN%%"  # must not match a JS var name, or substitution breaks it
 
 # The window is drawn by WebView2, which is Chromium, and Chromium refuses to
@@ -66,9 +79,31 @@ class Bridge:
         self.port = self._srv.server_address[1]
         threading.Thread(target=self._srv.serve_forever, daemon=True, name="mas-bridge").start()
         _log.info("bridge is up on %s, interface from %s", self.url, self.ui_dir)
+        self._announce()
         return self.url
 
+    def _announce(self) -> None:
+        """Leave the address and the key where a companion program can find them."""
+        from . import __version__
+        note = {"protocol": PROTOCOL, "url": self.url, "token": self.token,
+                "pid": os.getpid(), "version": __version__}
+        path = data_dir() / NOTE
+        try:
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(note, indent=2), encoding="utf-8")
+            tmp.replace(path)   # never half a file: the reader may arrive mid-write
+        except OSError:
+            _log.warning("could not write %s — the dock will not find us", NOTE,
+                         exc_info=True)
+
+    def _withdraw(self) -> None:
+        try:
+            (data_dir() / NOTE).unlink(missing_ok=True)
+        except OSError:
+            _log.warning("could not remove %s", NOTE, exc_info=True)
+
     def stop(self) -> None:
+        self._withdraw()
         if self._srv:
             self._srv.shutdown()
             self._srv = None

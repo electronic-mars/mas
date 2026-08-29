@@ -90,7 +90,7 @@ def icon_handle(img: Image.Image) -> int:
 
 
 class Tray:
-    def __init__(self, on_left, on_right, on_middle, on_quit):
+    def __init__(self, on_left, on_right, on_middle, on_quit, hold=False):
         self.on_left = on_left
         self.on_right = on_right
         self.on_middle = on_middle
@@ -109,6 +109,11 @@ class Tray:
         # appear as the default speakers and change to the real device a moment
         # later, and that blink is the first thing a person sees of the program.
         self._shown = False
+        # Held back because the dock said it would draw us instead. Then nothing
+        # here decides anything: the owner watches for the dock and says. The
+        # icon must not flash on for a second at every boot only to be taken
+        # away again.
+        self._hold = hold
 
     # --- appearance --------------------------------------------------
     # The tray icon is a shared Windows resource. Changing it from arbitrary
@@ -135,12 +140,24 @@ class Tray:
             self._show()
         elif kind == "tip":
             self.icon.title = job[1]
+        elif kind == "visible":
+            self._hold = False          # somebody has decided; stop waiting
+            if bool(job[1]) != self._shown:
+                self._shown = bool(job[1])
+                self.icon.visible = self._shown
+                _log.info("icon %s the tray", "into" if self._shown else "out of")
         elif kind == "notify":
             _, message, title = job
             self.icon.notify(message, title)
 
+    def set_visible(self, on: bool) -> None:
+        """Shown or not — the answer coming from outside, and the last word."""
+        self._queue.put(("visible", bool(on), None))
+
     def _show(self) -> None:
         """Into the tray, once, whichever of the two reasons arrives first."""
+        if self._hold:
+            return
         if not self._shown:
             self._shown = True
             self.icon.visible = True
@@ -150,6 +167,8 @@ class Tray:
         """A safety net. Waiting for the right icon must never end with no icon
         at all: if the device cannot be read, the program still has to be in the
         tray, because that is where its only certain way out lives."""
+        if self._hold:
+            return      # the dock's watch decides this one, not a timer here
         if not self._stop.wait(3.0):
             if not self._shown:
                 _log.warning("no device came within 3 s — showing the default icon")

@@ -1256,5 +1256,43 @@ check("a machine with nothing but screens still gets a working cycle",
       seeded(["LG HDR 4K (AMD High Definition Audio)"]),
       ["LG HDR 4K (AMD High Definition Audio)"])
 
+# The dock may draw us instead of the tray, on one condition: that we can always
+# take the icon back. A dock that was closed, crashed or uninstalled must not
+# leave a running program with no icon, no reachable window and no way to quit.
+print("\nWho holds the tray icon")
+
+
+class FakeTray:
+    def __init__(self):
+        self.shown = None
+
+    def set_visible(self, on):
+        self.shown = on
+
+
+def tray_after(hosting, silent_for):
+    """What the icon does, given the setting and how long the dock has been quiet."""
+    import time as _time
+
+    app = App.__new__(App)
+    app.cfg = FakeConfig(dock_hosts_us=hosting)
+    app.tray = FakeTray()
+    app._tray_shown = None
+    app._dock_seen = _time.monotonic() - silent_for
+    app.dock_apply()
+    return app.tray.shown
+
+
+check("with no dock, the icon is ours", tray_after(False, 0.0), True)
+check("the dock that is talking to us gets it", tray_after(True, 1.0), False)
+check("and keeps it while it goes on talking",
+      tray_after(True, App.DOCK_SILENCE - 1), False)
+check("a dock that has gone quiet loses it",
+      tray_after(True, App.DOCK_SILENCE + 1), True)
+# The setting alone is not enough to take the icon away: a machine where the
+# dock has been uninstalled would come up with no icon at all and stay that way.
+check("the setting without a living dock does not hide anything",
+      tray_after(True, 3600.0), True)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
