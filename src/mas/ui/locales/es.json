@@ -125,6 +125,8 @@
     "up_why_network": "no se pudo acceder a internet",
     "up_why_signature": "el archivo descargado no está firmado por el desarrollador",
     "up_why_release": "la descripción de la versión no parece correcta",
-    "autostart_store": "Windows guarda la lista de inicio para los programas de la Tienda. El interruptor para este está ahí."
+    "autostart_store": "Windows guarda la lista de inicio para los programas de la Tienda. El interruptor para este está ahí.",
+    "w_title": "Dos clics, eso es todo",
+    "g_left_d2": "Cambia el sonido al siguiente dispositivo"
   }
 }

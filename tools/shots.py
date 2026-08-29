@@ -32,7 +32,14 @@ SCALE = 2                              # double-resolution shots — more readab
 # at the size of the real window (440×772 at SCALE=1).
 ZOOM = 1.1
 WIN_W, WIN_H = 400, 702                # 440×772 of the real window, divided by the zoom
+# Chrome first, Edge second, and it used to be the other way round. Edge 147 in
+# headless mode still screenshots about:blank and writes nothing at all for an
+# http:// address — exit code 0, empty stderr, no file. Both are the same
+# Chromium and the page comes out identical; this is about which one still
+# works. Checked by asking each of them for a picture of the same local page.
 EDGE_CANDIDATES = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
 ]
@@ -254,8 +261,11 @@ def shoot(browser: str, base: str, out: Path, height: int, act: str) -> None:
 
     profile = Path(tempfile.mkdtemp(prefix="mas-edge-"))
     url = f"{base}?w={WIN_W}&h={height}" + (f"&act={act}" if act else "")
-    subprocess.run(
-        [browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+    done = subprocess.run(
+        # Plain --headless, not --headless=new. Edge 147 accepts the new mode,
+        # runs, exits 0 and writes no file at all; the old mode still works.
+        # Checked by asking both of them for a picture of about:blank.
+        [browser, "--headless", "--disable-gpu", "--hide-scrollbars",
          f"--force-device-scale-factor={SCALE * ZOOM}",
          f"--window-size={WIN_W + 160},{height + 160}",
          f"--screenshot={out}", f"--user-data-dir={profile}",
@@ -264,7 +274,12 @@ def shoot(browser: str, base: str, out: Path, height: int, act: str) -> None:
         capture_output=True, timeout=90)
     shutil.rmtree(profile, ignore_errors=True)
     if not out.is_file():
-        raise SystemExit(f"screenshot failed: {out.name}")
+        # What the browser said, rather than the fact that it said nothing —
+        # this failure took twenty minutes to place because the message was
+        # thrown away here.
+        raise SystemExit(f"screenshot failed: {out.name}\n"
+                         f"  exit {done.returncode}\n"
+                         f"  {done.stderr.decode('utf-8', 'replace').strip()[:2000]}")
 
     box = (round(WIN_W * ZOOM * SCALE), round(height * ZOOM * SCALE))
     with Image.open(out) as img:

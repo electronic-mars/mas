@@ -125,6 +125,8 @@
     "up_why_network": "não foi possível acessar a internet",
     "up_why_signature": "o arquivo baixado não está assinado pelo desenvolvedor",
     "up_why_release": "a descrição da versão não parece correta",
-    "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá."
+    "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá.",
+    "w_title": "Dois cliques, só isso",
+    "g_left_d2": "Alterna o som para o próximo dispositivo"
   }
 }

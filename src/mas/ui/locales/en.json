@@ -125,6 +125,8 @@
     "up_why_network": "could not reach the internet",
     "up_why_signature": "the downloaded file is not signed by the developer",
     "up_why_release": "the release description does not look right",
-    "autostart_store": "Windows keeps the startup list for programs from the Store. The switch for this one is there."
+    "autostart_store": "Windows keeps the startup list for programs from the Store. The switch for this one is there.",
+    "w_title": "Two clicks, that is all",
+    "g_left_d2": "Moves the sound to the next device"
   }
 }

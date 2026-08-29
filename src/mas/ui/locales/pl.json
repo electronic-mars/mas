@@ -125,6 +125,8 @@
     "up_why_network": "nie można było połączyć się z internetem",
     "up_why_signature": "pobrany plik nie jest podpisany przez dewelopera",
     "up_why_release": "opis wydania nie wygląda dobrze",
-    "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam."
+    "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam.",
+    "w_title": "Dwa kliknięcia i tyle",
+    "g_left_d2": "Przełącza dźwięk na następne urządzenie"
   }
 }

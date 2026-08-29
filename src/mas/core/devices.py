@@ -91,6 +91,45 @@ _default_cache: dict = {True: (None, 0.0), False: (None, 0.0)}
 _quiet: dict = {True: False, False: False}
 
 
+# Names taken from the icon palette in ui/app.js. A device nobody has chosen an
+# icon for used to fall back to "speakers" — every one of them, so a laptop and
+# a headset wore the same picture, and the tray icon did not change when the
+# sound moved between them. With notifications off, that left no feedback at
+# all, and the program looked broken while working perfectly.
+#
+# Windows names its endpoints in the language of the system, so the words are
+# matched in English and in Russian. What cannot be told apart from a name is
+# left alone: the point is that two different devices look different, not that
+# the guess is clever.
+_BY_NAME = [
+    # Worn on the head — checked first: "Headset Microphone" is a headset before
+    # it is a microphone.
+    (("hyperx",), "hyperx-cloud"),
+    (("earbud", "buds", "airpod", "вкладыш"), "earbuds"),
+    (("headphone", "headset", "наушник", "гарнитур", "головной телефон"), "headphones"),
+    # Screens, which announce themselves by the connection or by a maker's name.
+    (("hdmi",), "hdmi"),
+    (("display", "монитор", "monitor"), "monitor"),
+    (("tv", "телевизор"), "tv"),
+    # Everything else that says what it is.
+    (("soundbar", "саундбар"), "soundbar"),
+    (("microphone array", "массив микрофонов", "микрофонный массив"), "laptop"),
+    (("bluetooth",), "bluetooth"),
+]
+
+
+def guess_icon(name: str, is_output: bool) -> str:
+    """The icon a device gets until somebody picks one for it."""
+    low = (name or "").lower()
+    for words, glyph in _BY_NAME:
+        if any(w in low for w in words):
+            # A headset's microphone is drawn as a headset, and so is the headset
+            # itself: they belong together, and the list they appear in already
+            # says which is which.
+            return glyph
+    return "speakers" if is_output else "microphone"
+
+
 def _enumerate():
     """pycaw is noisy with warnings on disabled devices — we silence them here."""
     from pycaw.pycaw import AudioUtilities

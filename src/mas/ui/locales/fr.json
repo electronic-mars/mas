@@ -125,6 +125,8 @@
     "up_why_network": "impossible de joindre Internet",
     "up_why_signature": "le fichier téléchargé n'est pas signé par le développeur",
     "up_why_release": "la description de la version ne semble pas correcte",
-    "autostart_store": "Windows conserve la liste de démarrage pour les programmes du Store. L'interrupteur pour celui-ci s'y trouve."
+    "autostart_store": "Windows conserve la liste de démarrage pour les programmes du Store. L'interrupteur pour celui-ci s'y trouve.",
+    "w_title": "Deux clics, c'est tout",
+    "g_left_d2": "Bascule le son vers le prochain périphérique"
   }
 }

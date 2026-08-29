@@ -23,7 +23,12 @@ DEFAULTS: dict[str, Any] = {
     "autostart": False,
     "switch_communications": True,
     "sound_on_switch": False,
-    "notify_on_switch": False,
+    # On by default, and it has to be. Switching sound is invisible: nothing on
+    # screen moves, and the only other sign is the tray icon, which a person is
+    # not looking at when they click it. Installed on a second machine with this
+    # off, the program switched devices perfectly and read as broken — the click
+    # did something, and nothing said so. The notification is the receipt.
+    "notify_on_switch": True,
     "theme": "system",        # system | dark | light
     # Which button switches the sound. The other one opens the window — they swap
     # together, there is no separate setting for the window.

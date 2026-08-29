@@ -416,7 +416,7 @@ class App:
         def pack(d: devices.Device) -> dict:
             return {
                 "id": d.id, "name": d.name, "kind": d.kind,
-                "icon": icons.get(d.id, "microphone" if not d.is_output else "speakers"),
+                "icon": icons.get(d.id) or devices.guess_icon(d.name, d.is_output),
                 "in_cycle": d.id in cycle,
                 "is_default": d.id == (cur_out if d.is_output else cur_in),
             }
@@ -903,7 +903,8 @@ class App:
                          "not found" if dev is None else "there",
                          "there" if self.tray else "missing")
             return
-        glyph = self.cfg.get("icons").get(dev.id)
+        glyph = self.cfg.get("icons").get(dev.id) or devices.guess_icon(
+            dev.name, dev.is_output)
         # Written to the log: the complaint "the tray icon never changed" is
         # otherwise impossible to settle.
         _log.info("tray icon: %s (%s)", glyph or "default", dev.name)
@@ -978,7 +979,9 @@ class App:
         if not tray_done:
             self.refresh_tray()
         if self.cfg.get("notify_on_switch"):
-            self.overlay.show(self.cfg.get("icons").get(dev.id), dev.name, self._light_theme())
+            self.overlay.show(
+                self.cfg.get("icons").get(dev.id) or devices.guess_icon(dev.name, dev.is_output),
+                dev.name, self._light_theme())
         if self.cfg.get("sound_on_switch"):
             self._beep()
         self.push_state()

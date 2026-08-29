@@ -735,14 +735,25 @@ function gestureCard(inner, title, desc) {
 }
 
 function showWelcome() {
-  const mouse = (fill) => `<rect x="6" y="2.5" width="12" height="19" rx="6"/>${fill}`;
+  // The two buttons used to be drawn with a hairline stroke on one side, and at
+  // seventeen pixels the three cards read as the same picture repeated three
+  // times. The pressed button is filled instead: the mouse body is a rounded
+  // rectangle whose top corners have radius 6, so each button is exactly one
+  // quadrant of that corner and can be drawn as an arc, not approximated.
+  const mouse = (side) => `<rect x="6" y="2.5" width="12" height="19" rx="6"/>
+    <path d="${side === 'left' ? 'M6 8.5A6 6 0 0 1 12 2.5L12 8.5Z'
+                               : 'M12 2.5A6 6 0 0 1 18 8.5L12 8.5Z'}"
+      style="fill:var(--acc);stroke:none"/>`;
+  // Two cards, not three. The middle button opens the mixer, which is also the
+  // second tab of this window — teaching it here cost a third of the screen to
+  // say something nobody needs in their first minute, and made the two clicks
+  // that matter look like one item in a list of three.
   $('overlays').innerHTML = `<div class="welcome" id="welcome">
       <div class="big"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z"/></svg></div>
-      <h2>${t('welcome_title')}</h2>
+      <h2>${t('w_title')}</h2>
       <div style="margin-top:12px">
-        ${gestureCard(mouse('<path d="M6 8.5h6V2.6" fill="none"/>'), t('g_left'), t('g_left_d'))}
-        ${gestureCard(mouse('<path d="M18 8.5h-6V2.6" fill="none"/>'), t('g_right'), t('g_right_d'))}
-        ${gestureCard(mouse('<path d="M12 6.5v3.5" fill="none"/>'), t('g_middle'), t('g_middle_d'))}
+        ${gestureCard(mouse('left'), t('g_left'), t('g_left_d2'))}
+        ${gestureCard(mouse('right'), t('g_right'), t('g_right_d'))}
       </div>
       <div class="note">${t('welcome_note')}</div>
       <button class="btn" id="welcome-ok" style="margin-top:12px">${t('welcome_ok')}</button>

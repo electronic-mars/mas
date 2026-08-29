@@ -125,6 +125,8 @@
     "up_why_network": "无法访问互联网",
     "up_why_signature": "下载的文件没有开发者的签名",
     "up_why_release": "版本描述看起来不对劲",
-    "autostart_store": "Windows 会保留来自商店的程序的启动列表。此程序的开关就在那里。"
+    "autostart_store": "Windows 会保留来自商店的程序的启动列表。此程序的开关就在那里。",
+    "w_title": "两次点击，仅此而已",
+    "g_left_d2": "将声音切换到下一个设备"
   }
 }

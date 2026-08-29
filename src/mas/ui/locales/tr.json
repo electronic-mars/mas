@@ -125,6 +125,8 @@
     "up_why_network": "internete ulaşılamadı",
     "up_why_signature": "indirilen dosya geliştirici tarafından imzalanmamış",
     "up_why_release": "sürüm açıklaması doğru görünmüyor",
-    "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır."
+    "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır.",
+    "w_title": "İki tıklama, hepsi bu",
+    "g_left_d2": "Sesi sonraki cihaza geçirir"
   }
 }
