@@ -932,16 +932,30 @@ check("paused, it is the program again", titled(False, "Mannymore", "Shiver"),
 check("a nameless track is not shown", titled(True), "Master Audio Switcher")
 
 
-def pressed(button, visible, switch_button="left"):
-    """Which of the two things a tray click did."""
+def pressed(button, visible, switch_button="left", front=True):
+    """Which of the three things a tray click did.
+
+    `front` is whether our window, when it is open, is the one the person is
+    actually looking at — a window buried under a browser is open as far as the
+    program is concerned and invisible as far as the person is concerned.
+    """
+    import mas.app as app_mod
+
     app = App.__new__(App)
     app.cfg = FakeConfig(switch_button=switch_button)
     app._visible = visible
+    app._hwnd = 42
     done = []
     app.cycle = lambda: done.append("switched")
     app.show = lambda tab="devices": done.append("shown")
     app.hide = lambda: done.append("hidden")
-    app._button(button)
+    was = app_mod.screen.is_front, app_mod.screen.to_front
+    app_mod.screen.is_front = lambda hwnd: front
+    app_mod.screen.to_front = lambda hwnd: done.append("raised")
+    try:
+        app._button(button)
+    finally:
+        app_mod.screen.is_front, app_mod.screen.to_front = was
     return done
 
 
@@ -952,6 +966,15 @@ check("the other button opens the window", pressed("right", False), ["shown"])
 # to try, and it used to do nothing — the cross in the corner was the only exit.
 check("and closes it when it is already open", pressed("right", True), ["hidden"])
 check("swapped buttons swap both jobs", pressed("left", True, "right"), ["hidden"])
+# Open and buried under another program is not open to the person sitting there.
+# Hiding it then spent their click on putting away something they could not see,
+# and only the second press brought it back.
+check("a buried window is brought forward, not hidden",
+      pressed("right", True, front=False), ["raised"])
+check("and the press after that, with it in front, still closes it",
+      pressed("right", True, front=True), ["hidden"])
+check("burying does not change what the switching button does",
+      pressed("left", True, front=False), ["switched"])
 
 
 # --------------------------------------------------------------------------

@@ -101,6 +101,12 @@ _quiet: dict = {True: False, False: False}
 # matched in English and in Russian. What cannot be told apart from a name is
 # left alone: the point is that two different devices look different, not that
 # the guess is clever.
+# Anything worn on the head, in both languages. Kept as one list because it
+# answers two questions: which outputs are headphones, and which microphone
+# belongs to a headset rather than to the machine.
+_HEAD_WORN = ("hyperx", "earbud", "buds", "airpod", "вкладыш", "headphone",
+              "headset", "наушник", "гарнитур", "головной телефон")
+
 _BY_NAME = [
     # Worn on the head — checked first: "Headset Microphone" is a headset before
     # it is a microphone.
@@ -127,6 +133,13 @@ _BY_NAME = [
 def guess_icon(name: str, is_output: bool) -> str:
     """The icon a device gets until somebody picks one for it."""
     low = (name or "").lower()
+    if not is_output and any(w in low for w in _HEAD_WORN):
+        # The headset drawing — headphones with a boom — is the only one in the
+        # palette that says "a microphone on a head". It tells the headset's
+        # microphone apart from the machine's own at a glance, which is the
+        # whole point, and it does not repeat the picture the headset already
+        # wears in the list of outputs above.
+        return "headset"
     for words, glyph in _BY_NAME:
         if any(w in low for w in words):
             # A headset's microphone is drawn as a headset, and so is the headset

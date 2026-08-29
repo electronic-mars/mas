@@ -887,7 +887,16 @@ class App:
 
     def _button(self, pressed: str) -> None:
         if pressed == self.cfg.get("switch_button"):
-            self.cycle()
+            return self.cycle()
+        hwnd = self.own_hwnd()
+        if self._visible and hwnd and not screen.is_front(hwnd):
+            # Open, but behind the browser — so from where the person is sitting
+            # it is not open at all. Hiding it here is what the program used to
+            # do, and it looked like the click did nothing: the first press put
+            # away a window they could not see, and only the second brought it
+            # back. A window that is not in front is asking to be brought
+            # forward, not put away.
+            screen.to_front(hwnd)
         elif self._visible:
             # The button that opened the window closes it. Until now the only
             # way back was the cross in the corner, and pressing the icon again

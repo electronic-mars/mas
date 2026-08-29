@@ -94,6 +94,11 @@ def own_window(title: str) -> int | None:
     return hwnd if pid.value == os.getpid() else None
 
 
+def is_front(hwnd: int) -> bool:
+    """Is this window the one the person is actually looking at?"""
+    return bool(hwnd) and int(user32.GetForegroundWindow() or 0) == int(hwnd)
+
+
 def to_front(hwnd: int) -> bool:
     """Put our window in front of everything, including of whatever is there now.
 

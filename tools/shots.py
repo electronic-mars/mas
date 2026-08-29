@@ -59,10 +59,14 @@ OUTPUTS = [
      "icon": "monitor", "in_cycle": False, "is_default": False},
 ]
 INPUTS = [
+    # The icons a person actually sees without choosing any: a headset for the
+    # microphone that comes with the headset, the machine for the one built into
+    # it. Both used to be the same picture here, which is exactly the complaint
+    # these screenshots are supposed to document being over.
     {"id": MIC_HP, "name": "Microphone (HyperX Cloud Flight S)", "kind": "Microphone",
-     "icon": "microphone", "in_cycle": False, "is_default": True},
+     "icon": "headset", "in_cycle": False, "is_default": True},
     {"id": MIC_ARR, "name": "Microphone Array (Realtek(R) Audio)", "kind": "Microphone",
-     "icon": "microphone", "in_cycle": False, "is_default": False},
+     "icon": "laptop", "in_cycle": False, "is_default": False},
 ]
 KNOWN = [
     {"id": HP, "name": "Headphones (HyperX Cloud Flight S)", "active": True},
