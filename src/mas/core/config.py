@@ -49,7 +49,14 @@ DEFAULTS: dict[str, Any] = {
     # Switch the microphone together with the headphones: recording moves to the
     # microphone of the same headset, and going back to the speakers restores the
     # previous microphone.
-    "switch_microphone": False,
+    #
+    # On by default. Off, the program's own promise — that putting the headset on
+    # moves everything, not half of it — was invisible until somebody found the
+    # setting, and the microphones sat in the window looking like decoration.
+    # This is the one default that can interrupt a person mid-call, so it only
+    # ever acts on a headset that has a microphone of its own, and it puts the
+    # previous one back on the way out.
+    "switch_microphone": True,
     # Watch the headset through its USB dongle. Needed only where the dongle is
     # always plugged in and Windows does not see the headset being switched on.
     "watch_dongle": False,
