@@ -201,6 +201,13 @@ def auto_app(auto_id, cycle=(A, B, C)):
     app._ui_lock, app._state_rev, app._pending_tab = threading.Lock(), 0, None
     app.moved = []
     app._go = lambda i: app.moved.append(i)
+    # No dongle on this imaginary machine: these tests are about the decision to
+    # switch, not about the headset's radio. The ones that are about it are
+    # further down and hand the app a stand-in.
+    app.dongle = None
+    app._dongle_on = None
+    app.synced = 0
+    app.sync_dongle = lambda: setattr(app, "synced", app.synced + 1)
     # In production the work goes off to a separate thread with its own COM
     # apartment; in the test we run it in place, to check the decision, not races.
     app._dispatch = lambda job, auto: job(auto)
@@ -1293,6 +1300,45 @@ check("a dock that has gone quiet loses it",
 # dock has been uninstalled would come up with no icon at all and stay that way.
 check("the setting without a living dock does not hide anything",
       tray_after(True, 3600.0), True)
+
+# A laptop that spent a week unplugged with the dongle pulled out. The program
+# started without it, the listener gave up once and never looked again, and when
+# the dongle went back in the endpoint appeared — so the sound went to a headset
+# nobody had switched on. From where the person sat, the program had not
+# switched at all: it had switched to silence.
+print("\nA dongle that arrives after we do")
+
+
+class FakeDongle:
+    def stop(self):
+        pass
+
+
+def appearing(dongle_says):
+    """What happens when the priority device turns up, given what the dongle says."""
+    app = auto_app(HP)
+    app.DONGLE_FIRST_WORD = 0.1     # no test should wait two seconds for this
+    app.dongle = None if dongle_says == "no dongle" else FakeDongle()
+    app._dongle_on = {"on": True, "off": False, "silent": None}.get(dongle_says)
+    fake_world([A, B], A)
+    app._devices_changed({HP}, set())
+    return app
+
+
+check("the dongle is opened again before anything is decided",
+      appearing("no dongle").synced, 1)
+check("with no dongle to ask, the sound moves as it always did",
+      appearing("no dongle").moved, [HP])
+check("a headset the dongle says is off does not get the sound",
+      appearing("off").moved, [])
+check("and we do not pretend to be holding it",
+      appearing("off")._auto_held, False)
+check("a headset the dongle says is on does", appearing("on").moved, [HP])
+# A dongle that has not said anything within the wait is treated as no dongle at
+# all: better to switch to a headset that might be off than to stop switching
+# for everybody whose dongle keeps quiet.
+check("a silent dongle does not block switching for ever",
+      appearing("silent").moved, [HP])
 
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

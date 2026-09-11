@@ -655,6 +655,10 @@ class App:
         if self.dongle is not None:
             self.dongle.stop()
             self.dongle = None
+        # Whatever the old listener knew is about to be out of date, and a new
+        # one has not heard anything yet. Saying "not heard yet" is the honest
+        # answer and the one everything below is written to handle.
+        self._dongle_on = None
         self._dongle_name = self._dongle_usb = None
         ids = self.dongle_ids()
         if ids is None:
@@ -845,7 +849,7 @@ class App:
         if not auto:
             return
         if auto in added:
-            job = self._grab_auto
+            job = self._auto_appeared
         elif auto in removed and self._auto_held:
             job = self._release_auto
         else:
@@ -881,7 +885,49 @@ class App:
             except Exception:
                 _log.exception("automatic switching failed")
 
+    # How long a freshly opened dongle is given to say what the headset is
+    # doing, before we give up and behave as though there were none.
+    #
+    # Measured: an already-open dongle says nothing at all while nothing is
+    # changing — eight seconds of silence with the handle open. It speaks on
+    # transitions. So this wait is for the one case it might help, a dongle
+    # that has just been plugged in and announces itself; when it does not, the
+    # wait expires and we switch exactly as before. Two seconds after somebody
+    # has physically pushed a plug into a socket is not a delay anybody feels.
+    DONGLE_FIRST_WORD = 2.0
+
+    def _headset_asleep(self) -> bool:
+        """Does the dongle say the headset is not switched on?
+
+        Only meaningful while we are listening to one — with no dongle, or an
+        unknown one, there is nobody to ask and the answer is no.
+        """
+        if self.dongle is None:
+            return False
+        end = time.monotonic() + self.DONGLE_FIRST_WORD
+        while self._dongle_on is None and time.monotonic() < end:
+            time.sleep(0.05)
+        return self._dongle_on is False
+
+    def _auto_appeared(self, auto: str) -> None:
+        """The priority device is back in the system.
+
+        For a wireless headset that means its dongle has just been plugged in,
+        which says nothing about whether the headset itself is switched on. And
+        the listener that would know died at startup if the dongle was not in
+        the machine then — it never looked again for the rest of the session.
+        So: open the dongle first, ask it, and only then decide.
+        """
+        self.sync_dongle()
+        self._grab_auto(auto)
+
     def _grab_auto(self, auto: str) -> None:
+        if self._headset_asleep():
+            # Handing the sound to a headset nobody has switched on is worse
+            # than doing nothing: it goes somewhere silent, and the person is
+            # left wondering what broke.
+            _log.info("the priority device is here, but its headset is off")
+            return
         current = devices.default_id(is_output=True, max_age=0.0)
         self._auto_held = True
         if current == auto:
