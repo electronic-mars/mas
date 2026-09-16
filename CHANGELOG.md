@@ -3,6 +3,41 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.4
+
+The first minute of the program, taken apart after it was installed on a second
+machine and looked broken while working perfectly.
+
+- every device gets its own icon before anybody picks one, guessed from its
+  name in English and Russian. They all used to wear the same picture, so the
+  laptop and the headset looked identical and the tray icon did not change when
+  the sound moved between them. A headset's microphone is drawn as a headset;
+  the one built into the laptop, as the laptop;
+- notifications are on out of the box. Switching sound is invisible, and without
+  them a click that worked said nothing at all;
+- the microphone follows the headset out of the box, and goes back when the
+  sound does;
+- a monitor is no longer put into the switching list on first run: most have no
+  speaker, and the very first click would have sent the sound into silence.
+  Screens are recognised by the graphics driver in their name;
+- the welcome screen teaches the two clicks that matter, draws which mouse
+  button is meant, and makes the one sentence people miss — that Windows hides
+  new tray icons — a card of its own instead of grey small print;
+- teaching an unknown headset dongle moved from Diagnostics into the headphones
+  section, next to automatic switching, which it is the other half of. That
+  setting is called "Automatic switching" now, which is what people search for;
+- clicking the tray icon brings the window forward when it is open but buried
+  under another program. It used to hide it — a click spent on putting away
+  something nobody could see;
+- a headset dongle plugged in after the program started is noticed. The
+  listener looked for it once, at startup, and gave up for the whole session if
+  it was not there — a week with the dongle out of the laptop, and the headset
+  could no longer switch the sound on or off. And the sound is no longer handed
+  to a headset the dongle says is switched off;
+- Master Control Dock can draw this program as one of its widgets instead of a
+  tray icon. The icon always comes back on its own if the dock stops answering.
+  How a companion program finds and talks to this one is in docs/DOCK.md.
+
 ## 1.0.3
 
 - the window opens on machines whose port range starts low. The interface is
