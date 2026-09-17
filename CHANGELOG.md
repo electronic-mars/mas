@@ -3,6 +3,26 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.5
+
+- the tray icon beside the dock widget is the person's choice. Master Control
+  Dock can draw this program as a widget; whether the tray icon stays as well is
+  a switch in Controls, shown only while a dock is actually drawing us, and on
+  by default. The dock must now say it is showing the widget, not merely that
+  it is alive — a dock that answered for an hour without drawing anything used
+  to keep the icon the whole time (docs/DOCK.md, protocol 2);
+- starting the program while it is already running opens its window instead of
+  leaving in silence, which with no icon anywhere looked like a program that
+  would not start;
+- a tray icon held back from a start at sign-in and shown later did not always
+  appear; every show now clears its place first;
+- a settings file that parses but holds the wrong shapes no longer leaves the
+  program alive and useless — each key goes back to its default when wrong;
+- the notification after a switch cost a quarter of a second of processor to
+  draw; it costs nothing now;
+- a content-security policy on the window, for the day a device name is not
+  escaped somewhere: the page holds the key to the program.
+
 ## 1.0.4
 
 The first minute of the program, taken apart after it was installed on a second
