@@ -1307,7 +1307,7 @@ class App:
             # Last time we ran, the dock was drawing us. Hold the icon back
             # rather than flash it for three seconds at every start — the watch
             # above shows it within DOCK_WATCH if the dock does not appear.
-            hold=bool(self.cfg.get("dock_hosts_us"))
+            outside_decides=bool(self.cfg.get("dock_hosts_us"))
             and not self.cfg.get("tray_with_dock"),
         )
         self.overlay.start()

@@ -12,6 +12,7 @@ terms.
 | [pystray](https://github.com/moses-palmer/pystray) 0.19.5 | LGPL-3.0 | the tray icon |
 | [pycaw](https://github.com/AndreMiras/pycaw) | MIT | volume and mixer through Core Audio |
 | [comtypes](https://github.com/enthought/comtypes) 1.4.16 | MIT | talking to Windows COM interfaces |
+| [psutil](https://github.com/giampaolo/psutil) 7.2.2 | BSD-3-Clause | the names of the programs behind audio sessions, for the mixer |
 | [Pillow](https://python-pillow.org/) 12.3.0 | MIT-CMU | preparing raster icons |
 | [winrt-runtime](https://github.com/pywinrt/pywinrt) with `Windows.Media.Control` and `Windows.Foundation` 3.2.1 | MIT | player state through WinRT |
 | [bottle](https://bottlepy.org/) 0.13.4 | MIT | comes with pywebview, serves the page locally |

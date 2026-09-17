@@ -4,6 +4,16 @@
      said "ru" while the markup said English, which was wrong twice over. -->
 <html lang="en" data-theme="dark">
 <meta charset="utf-8">
+<!-- Scripts, styles, images and calls come from this page's own origin and
+     nowhere else. Device names arrive from drivers and from USB devices' own
+     product strings, and every one of them is escaped before it reaches the
+     markup — this is the second lock for the day one is forgotten, because the
+     page holds the token and a script that got in could do anything the
+     program can. Inline style attributes are allowed: the icon masks are set
+     that way. Inline scripts are not, which is why the token is a meta tag. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'">
+<meta name="mas-token" content="%%MAS_TOKEN%%">
 <title>Master Audio Switcher</title>
 <link rel="stylesheet" href="app.css">
 
@@ -106,8 +116,5 @@
 
 <div id="overlays"></div>
 
-<script type="module">
-  window.__MAS_TOKEN__ = '%%MAS_TOKEN%%';
-</script>
 <script type="module" src="app.js"></script>
 </html>

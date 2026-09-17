@@ -90,7 +90,7 @@ def icon_handle(img: Image.Image) -> int:
 
 
 class Tray:
-    def __init__(self, on_left, on_right, on_middle, on_quit, hold=False):
+    def __init__(self, on_left, on_right, on_middle, on_quit, outside_decides=False):
         self.on_left = on_left
         self.on_right = on_right
         self.on_middle = on_middle
@@ -109,11 +109,15 @@ class Tray:
         # appear as the default speakers and change to the real device a moment
         # later, and that blink is the first thing a person sees of the program.
         self._shown = False
-        # Held back because the dock said it would draw us instead. Then nothing
-        # here decides anything: the owner watches for the dock and says. The
-        # icon must not flash on for a second at every boot only to be taken
-        # away again.
-        self._hold = hold
+        # Who decides whether the icon is in the tray. False: this object does,
+        # on the first device it hears of, with a timer as a safety net. True:
+        # somebody outside does, through set_visible, and nothing here shows or
+        # hides on its own. It starts True when the dock was drawing us last
+        # time — the icon must not flash on at every boot only to be taken away
+        # — and becomes True for good at the first set_visible. One meaning; it
+        # used to be cleared there instead, and a device change put back an icon
+        # the dock was holding.
+        self._outside_decides = outside_decides
 
     # --- appearance --------------------------------------------------
     # The tray icon is a shared Windows resource. Changing it from arbitrary
@@ -141,10 +145,7 @@ class Tray:
         elif kind == "tip":
             self.icon.title = job[1]
         elif kind == "visible":
-            # From here on visibility is somebody else's to decide. A device
-            # change must not put back an icon the dock is holding — it used to,
-            # because this flag was cleared instead of set.
-            self._hold = True
+            self._outside_decides = True
             if bool(job[1]) != self._shown:
                 self._shown = bool(job[1])
                 if self._shown:
@@ -176,7 +177,7 @@ class Tray:
 
     def _show(self) -> None:
         """Into the tray, once, whichever of the two reasons arrives first."""
-        if self._hold:
+        if self._outside_decides:
             return
         if not self._shown:
             self._shown = True
@@ -187,7 +188,7 @@ class Tray:
         """A safety net. Waiting for the right icon must never end with no icon
         at all: if the device cannot be read, the program still has to be in the
         tray, because that is where its only certain way out lives."""
-        if self._hold:
+        if self._outside_decides:
             return      # the dock's watch decides this one, not a timer here
         if not self._stop.wait(3.0):
             if not self._shown:

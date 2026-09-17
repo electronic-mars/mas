@@ -1382,5 +1382,33 @@ _running.stop()
 check("with nothing running, the answer is no rather than an error",
       wake_running_copy(timeout=1.0), False)
 
+# A settings file that parses but holds the wrong shapes used to be taken at its
+# word: "icons": [1, 2] left the program alive with no tray icon, an empty window
+# and a log filling five times a second. Each key is now checked against the
+# shape of its default and sent back to it when wrong.
+print("\nSettings of the wrong shape")
+import json as _json  # noqa: E402
+from mas.core.config import Config, DEFAULTS as _DEF  # noqa: E402
+from mas.paths import config_path as _config_path  # noqa: E402
+
+_config_path().write_text(_json.dumps({
+    "icons": [1, 2],                    # list where a dict is expected
+    "cycle": "not-a-list",              # string where a list is expected
+    "dongle_rules": 5,                  # int where a dict is expected
+    "notify_on_switch": False,          # right shape — must survive
+    "theme": "light",                   # right shape — must survive
+    "made_up_key": True,                # unknown — must be ignored
+}), encoding="utf-8")
+_cfg = Config()
+check("a wrong-shaped dict goes back to its default", _cfg.get("icons"), {})
+check("a wrong-shaped list goes back to its default", _cfg.get("cycle"), [])
+check("a wrong-shaped int goes back to its default", _cfg.get("dongle_rules"), {})
+check("a right-shaped value survives", _cfg.get("notify_on_switch"), False)
+check("and so does a string", _cfg.get("theme"), "light")
+check("an unknown key is not kept", "made_up_key" in _cfg.all(), False)
+check("every default is one of the four shapes checked",
+      all(type(v) in (bool, str, list, dict) for v in _DEF.values()), True)
+_config_path().unlink()
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

@@ -209,8 +209,12 @@ INJECT = """
   #overlays{position:absolute;inset:0}
   .sheet,.welcome{position:absolute !important}
 </style>
-<script>
-(() => {
+<script src="shot.js"></script>
+
+"""
+
+
+CLICKER = """(() => {
   const q = new URLSearchParams(location.search);
   const root = document.documentElement.style;
   root.setProperty('--shot-w', (q.get('w') || 400) + 'px');
@@ -237,7 +241,6 @@ INJECT = """
     }, 60);
   }, 50);
 })();
-</script>
 """
 
 
@@ -246,6 +249,11 @@ def ui_copy() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="mas-shots-"))
     dst = tmp / "ui"
     shutil.copytree(ROOT / "src" / "mas" / "ui", dst)
+    # The clicker is a file, not an inline block: the page's content-security
+    # policy allows scripts from its own origin only, and an inline script
+    # would simply not run — which is how the screenshots came out with the
+    # body unbounded and the right edge cut off.
+    (dst / "shot.js").write_text(CLICKER, encoding="utf-8")
     index = dst / "index.html"
     index.write_text(index.read_text(encoding="utf-8").replace("</html>", INJECT + "</html>"),
                      encoding="utf-8")

@@ -3,6 +3,9 @@
 # build from an old tag unreproducible, which is the whole point of building in
 # public.
 pycaw==20251023
+# pycaw pulls this in for session process names. Named here so that its version
+# is chosen on purpose and THIRD-PARTY.md can tell the truth about it.
+psutil==7.2.2
 comtypes==1.4.16
 pywebview==6.2.1
 pystray==0.19.5

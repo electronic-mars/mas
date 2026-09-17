@@ -29,7 +29,9 @@ jobs:
         with:
           python-version: '3.14'
 
-      - run: pip install -r requirements.txt pyinstaller
+      # The packer pinned like everything else: a build from an old tag has to
+      # come out the same, and "whatever PyInstaller is newest today" does not.
+      - run: pip install -r requirements.txt pyinstaller==6.22.3
 
       # One number, in one place. The executable's properties and the About tab
       # read it from the package; the file names read it from the tag. If those
@@ -113,6 +115,10 @@ jobs:
           if (-not (Test-Path $iscc)) {
             choco install innosetup --no-progress -y
           }
+          # Which Inno actually packed this — in the log, every time. The one on
+          # the runner image is whatever the image ships; if that ever changes
+          # under us, the record of which version built which release is here.
+          & $iscc 2>&1 | Select-Object -First 1
           & $iscc "/DAppVersion=$env:VERSION" `
             "/DSourceDir=$PWD\build\mas\MasterAudioSwitcher" `
             "/O$PWD" build\installer.iss
@@ -163,7 +169,7 @@ jobs:
           # release published without it is a release nobody can update to.
           # Better to stop here than to find that out from the first complaint.
           if (-not $env:UPDATE_SIGNING_KEY) { throw "UPDATE_SIGNING_KEY is not set" }
-          python -m pip install --quiet cryptography
+          python -m pip install --quiet cryptography==50.0.1
           $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$env:SETUP"
           python tools/sign_release.py "$env:SETUP" "${{ github.ref_name }}" "$url"
           if ($LASTEXITCODE -ne 0) { throw "the release was not signed" }

@@ -98,8 +98,24 @@ class Config:
         except (OSError, json.JSONDecodeError):
             _log.exception("settings cannot be read, using the defaults")
             return
+        # Key by key, and each one has to be the shape the program expects. A
+        # file that parses but says `"icons": [1, 2]` used to be taken at its
+        # word, and the program then ran with no tray icon, an empty window and
+        # a log filling five times a second — alive and useless, with nothing
+        # to say why. Unknown keys and wrong shapes go back to the default, and
+        # the log says which.
+        kept, dropped = {}, []
+        for k, v in raw.items():
+            if k not in DEFAULTS:
+                continue
+            if type(v) is not type(DEFAULTS[k]):
+                dropped.append(f"{k} ({type(v).__name__} where {type(DEFAULTS[k]).__name__} was expected)")
+                continue
+            kept[k] = v
         with self._lock:
-            self._data = {**DEFAULTS, **{k: v for k, v in raw.items() if k in DEFAULTS}}
+            self._data = {**DEFAULTS, **kept}
+        if dropped:
+            _log.warning("settings ignored, back to their defaults: %s", "; ".join(dropped))
         _log.info("settings loaded")
 
     def save(self) -> None:

@@ -1,5 +1,6 @@
-// Bridge client. The token is injected by the server when it serves index.html.
-const MAS_TOKEN = window.__MAS_TOKEN__;
+// Bridge client. The token is injected by the server when it serves index.html,
+// into a meta tag: the content-security policy allows no inline script.
+const MAS_TOKEN = document.querySelector('meta[name="mas-token"]').content;
 
 export async function call(method, payload = null) {
   const res = await fetch(`/api/${method}`, {
