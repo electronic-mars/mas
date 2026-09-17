@@ -128,6 +128,8 @@
     "autostart_store": "Windows conserve la liste de démarrage pour les programmes du Store. L'interrupteur pour celui-ci s'y trouve.",
     "w_title": "Deux clics, c'est tout",
     "g_left_d2": "Bascule le son vers le prochain périphérique",
-    "w_hidden": "Vous ne voyez pas l'icône ?"
+    "w_hidden": "Vous ne voyez pas l'icône ?",
+    "tray_dock": "Icône aussi dans la barre d'état",
+    "tray_dock_d": "Le programme est affiché dans Master Control Dock. L'icône de la barre d'état bascule de la même façon"
   }
 }

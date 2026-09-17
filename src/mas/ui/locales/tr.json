@@ -128,6 +128,8 @@
     "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır.",
     "w_title": "İki tıklama, hepsi bu",
     "g_left_d2": "Sesi sonraki cihaza geçirir",
-    "w_hidden": "Simgeyi göremiyor musunuz?"
+    "w_hidden": "Simgeyi göremiyor musunuz?",
+    "tray_dock": "Simge tepside de",
+    "tray_dock_d": "Program Master Control Dock'ta gösteriliyor. Tepsideki simge de aynı şekilde geçiş yapar"
   }
 }

@@ -128,6 +128,8 @@
     "autostart_store": "Windows guarda la lista de inicio para los programas de la Tienda. El interruptor para este está ahí.",
     "w_title": "Dos clics, eso es todo",
     "g_left_d2": "Cambia el sonido al siguiente dispositivo",
-    "w_hidden": "¿No ves el icono?"
+    "w_hidden": "¿No ves el icono?",
+    "tray_dock": "Icono también en la bandeja",
+    "tray_dock_d": "El programa se muestra en Master Control Dock. El icono de la bandeja cambia igual"
   }
 }

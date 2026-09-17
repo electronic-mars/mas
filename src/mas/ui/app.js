@@ -615,6 +615,11 @@ function renderSettings() {
       hkWarn,
       stRow(t('btn_row'), btn === 'left' ? t('buttons_d_left') : t('buttons_d_right'),
         `<div class="segs">${btnSeg('left', t('btn_left'))}${btnSeg('right', t('btn_right'))}</div>`),
+      // Only while a dock is showing us: without one, the tray icon is the only
+      // way in and must not be switchable off.
+      state.settings.dock_showing
+        ? toggle('tray_with_dock', t('tray_dock'), t('tray_dock_d'))
+        : '',
     ])}
      <h2 class="sec micro">${secIcon('sec-switching')}${t('switching')}</h2>
      ${group([

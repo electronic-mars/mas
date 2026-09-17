@@ -71,6 +71,12 @@ DEFAULTS: dict[str, Any] = {
     # dock stops asking — a program with no icon and no dock has no way out at
     # all, and that is not a state we are willing to leave anybody in.
     "dock_hosts_us": False,
+    # Whether the tray icon stays while the dock is showing us. The dock used to
+    # decide that on its own, and the icon simply vanished the moment a widget
+    # appeared — the person had not chosen anything. It is theirs to choose, and
+    # the tray icon stays unless they say otherwise: it is the one way in that
+    # depends on nothing else running.
+    "tray_with_dock": True,
     "mics_expanded": False,   # the microphone section is collapsed by default
     "onboarded": False,
 }

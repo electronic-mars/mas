@@ -128,6 +128,8 @@
     "autostart_store": "Windows conserva l'elenco dei programmi all'avvio per quelli dello Store. L'interruttore per questo si trova lì.",
     "w_title": "Due clic, tutto qui",
     "g_left_d2": "Commuta l'audio al prossimo dispositivo",
-    "w_hidden": "Non vedi l'icona?"
+    "w_hidden": "Non vedi l'icona?",
+    "tray_dock": "Icona anche nell'area di notifica",
+    "tray_dock_d": "Il programma è mostrato in Master Control Dock. L'icona nell'area di notifica commuta allo stesso modo"
   }
 }

@@ -1277,17 +1277,20 @@ class FakeTray:
         self.shown = on
 
 
-def tray_after(hosting, silent_for, showing=True):
+def tray_after(hosting, silent_for, showing=True, keep_tray=False):
     """What the icon does, given the setting, how long the dock has been quiet,
-    and whether its last word was that it is drawing us."""
+    whether its last word was that it is drawing us, and whether the person
+    wants the tray icon as well."""
     import time as _time
 
     app = App.__new__(App)
-    app.cfg = FakeConfig(dock_hosts_us=hosting)
+    app.cfg = FakeConfig(dock_hosts_us=hosting, tray_with_dock=keep_tray)
     app.tray = FakeTray()
     app._tray_shown = None
     app._dock_seen = _time.monotonic() - silent_for
     app._dock_showing = showing
+    app._dock_was_showing = False
+    app.push_state = lambda: None
     app.dock_apply()
     return app.tray.shown
 
@@ -1306,6 +1309,12 @@ check("the setting without a living dock does not hide anything",
 # ours — and held the tray icon the whole time, so the program had no way in.
 check("a living dock that is not drawing us does not get the icon",
       tray_after(True, 1.0, showing=False), True)
+# The person decides. The dock used to take the icon the moment a widget
+# appeared, and the tray simply went empty without anybody having chosen that.
+check("with the tray switch on, the icon stays beside the widget",
+      tray_after(True, 1.0, keep_tray=True), True)
+check("and it is on out of the box",
+      __import__("mas.core.config", fromlist=["DEFAULTS"]).DEFAULTS["tray_with_dock"], True)
 
 # A laptop that spent a week unplugged with the dongle pulled out. The program
 # started without it, the listener gave up once and never looked again, and when

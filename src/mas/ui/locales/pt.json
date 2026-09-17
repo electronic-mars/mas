@@ -128,6 +128,8 @@
     "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá.",
     "w_title": "Dois cliques, só isso",
     "g_left_d2": "Alterna o som para o próximo dispositivo",
-    "w_hidden": "Não vê o ícone?"
+    "w_hidden": "Não vê o ícone?",
+    "tray_dock": "Ícone também na bandeja",
+    "tray_dock_d": "O programa é mostrado no Master Control Dock. O ícone da bandeja alterna da mesma forma"
   }
 }

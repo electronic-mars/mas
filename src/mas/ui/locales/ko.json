@@ -128,6 +128,8 @@
     "autostart_store": "Windows는 Store에서 가져온 프로그램의 시작 목록을 유지합니다. 이 프로그램의 스위치는 거기에 있습니다.",
     "w_title": "두 번의 클릭, 그게 전부입니다",
     "g_left_d2": "다음 장치로 소리를 전환합니다",
-    "w_hidden": "아이콘이 보이지 않나요?"
+    "w_hidden": "아이콘이 보이지 않나요?",
+    "tray_dock": "트레이에도 아이콘 표시",
+    "tray_dock_d": "프로그램이 Master Control Dock에 표시됩니다. 트레이 아이콘도 똑같이 전환합니다"
   }
 }

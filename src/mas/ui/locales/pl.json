@@ -128,6 +128,8 @@
     "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam.",
     "w_title": "Dwa kliknięcia i tyle",
     "g_left_d2": "Przełącza dźwięk na następne urządzenie",
-    "w_hidden": "Nie widzisz ikony?"
+    "w_hidden": "Nie widzisz ikony?",
+    "tray_dock": "Ikona również na pasku",
+    "tray_dock_d": "Program jest widoczny w Master Control Dock. Ikona na pasku przełącza tak samo"
   }
 }

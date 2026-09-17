@@ -128,6 +128,8 @@
     "autostart_store": "Windows keeps the startup list for programs from the Store. The switch for this one is there.",
     "w_title": "Two clicks, that is all",
     "g_left_d2": "Moves the sound to the next device",
-    "w_hidden": "Can't see the icon?"
+    "w_hidden": "Can't see the icon?",
+    "tray_dock": "Tray icon as well",
+    "tray_dock_d": "The program is shown in Master Control Dock. The tray icon switches the same way"
   }
 }

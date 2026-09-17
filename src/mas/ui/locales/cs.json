@@ -128,6 +128,8 @@
     "autostart_store": "Windows uchovává seznam spouštěných programů z obchodu Store. Přepínač pro tento program najdete tam.",
     "w_title": "Dvě kliknutí, to je vše",
     "g_left_d2": "Přepne zvuk na další zařízení",
-    "w_hidden": "Nevidíte ikonu?"
+    "w_hidden": "Nevidíte ikonu?",
+    "tray_dock": "Ikona i v oznamovací oblasti",
+    "tray_dock_d": "Program je zobrazen v Master Control Dock. Ikona v oznamovací oblasti přepíná stejně"
   }
 }

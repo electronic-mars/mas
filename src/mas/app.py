@@ -106,6 +106,8 @@ class Api:
             self.app.players.set_priority(value)
         elif key in ("auto_device", "watch_dongle"):
             self.app.sync_auto_device()
+        elif key == "tray_with_dock":
+            self.app.dock_apply()
         return self.app.state()
 
     # --- updating ------------------------------------------------------
@@ -279,6 +281,7 @@ class App:
         # shows. None means nobody has decided yet.
         self._dock_seen = 0.0
         self._dock_showing = False
+        self._dock_was_showing = False
         self._tray_shown: bool | None = None
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
@@ -469,6 +472,9 @@ class App:
         # Installed from the Store, updating is the Store's job: the button
         # would be against its rules and would duplicate work already done.
         settings["from_store"] = update.from_store()
+        # The tray switch is only worth offering while there is a dock that
+        # actually shows us; otherwise the tray icon is the only one there is.
+        settings["dock_showing"] = self.dock_showing()
         # The update button's whole state travels with everything else, so the
         # page needs no poller of its own: the counter it already watches is
         # bumped on every step, including each slice of the download.
@@ -1301,7 +1307,8 @@ class App:
             # Last time we ran, the dock was drawing us. Hold the icon back
             # rather than flash it for three seconds at every start — the watch
             # above shows it within DOCK_WATCH if the dock does not appear.
-            hold=bool(self.cfg.get("dock_hosts_us")),
+            hold=bool(self.cfg.get("dock_hosts_us"))
+            and not self.cfg.get("tray_with_dock"),
         )
         self.overlay.start()
         threading.Thread(target=self.tray.run, daemon=True, name="mas-tray").start()
@@ -1366,15 +1373,27 @@ class App:
         self._dock_seen = time.monotonic()
         self._dock_showing = showing
 
-    def dock_has_us(self) -> bool:
+    def dock_showing(self) -> bool:
+        """Is a living dock drawing us right now?"""
         return (bool(self.cfg.get("dock_hosts_us"))
                 and self._dock_showing
                 and time.monotonic() - self._dock_seen < self.DOCK_SILENCE)
+
+    def dock_has_us(self) -> bool:
+        """Does the dock stand in for the tray icon? Only if it is drawing us
+        and the person has said they do not want the icon as well."""
+        return self.dock_showing() and not self.cfg.get("tray_with_dock")
 
     def dock_apply(self) -> None:
         """Put the tray icon wherever the answer currently is."""
         if not self.tray:
             return
+        showing = self.dock_showing()
+        if showing != self._dock_was_showing:
+            # The settings page offers the tray switch only while a dock shows
+            # us, so it has to hear when that starts and stops.
+            self._dock_was_showing = showing
+            self.push_state()
         want = not self.dock_has_us()
         if want != self._tray_shown:
             self._tray_shown = want

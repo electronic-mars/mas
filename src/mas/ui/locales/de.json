@@ -128,6 +128,8 @@
     "autostart_store": "Windows speichert die Startliste für Programme aus dem Store. Der Schalter dafür befindet sich dort.",
     "w_title": "Zwei Klicks, das ist alles",
     "g_left_d2": "Schaltet den Ton auf das nächste Gerät um",
-    "w_hidden": "Symbol nicht zu sehen?"
+    "w_hidden": "Symbol nicht zu sehen?",
+    "tray_dock": "Symbol auch im Infobereich",
+    "tray_dock_d": "Das Programm wird in Master Control Dock angezeigt. Das Symbol im Infobereich schaltet genauso um"
   }
 }

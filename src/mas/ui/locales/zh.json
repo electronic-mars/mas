@@ -128,6 +128,8 @@
     "autostart_store": "Windows 会保留来自商店的程序的启动列表。此程序的开关就在那里。",
     "w_title": "两次点击，仅此而已",
     "g_left_d2": "将声音切换到下一个设备",
-    "w_hidden": "找不到图标？"
+    "w_hidden": "找不到图标？",
+    "tray_dock": "托盘中也显示图标",
+    "tray_dock_d": "程序已显示在 Master Control Dock 中。托盘图标的切换方式相同"
   }
 }
