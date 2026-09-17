@@ -1277,8 +1277,9 @@ class FakeTray:
         self.shown = on
 
 
-def tray_after(hosting, silent_for):
-    """What the icon does, given the setting and how long the dock has been quiet."""
+def tray_after(hosting, silent_for, showing=True):
+    """What the icon does, given the setting, how long the dock has been quiet,
+    and whether its last word was that it is drawing us."""
     import time as _time
 
     app = App.__new__(App)
@@ -1286,13 +1287,14 @@ def tray_after(hosting, silent_for):
     app.tray = FakeTray()
     app._tray_shown = None
     app._dock_seen = _time.monotonic() - silent_for
+    app._dock_showing = showing
     app.dock_apply()
     return app.tray.shown
 
 
 check("with no dock, the icon is ours", tray_after(False, 0.0), True)
-check("the dock that is talking to us gets it", tray_after(True, 1.0), False)
-check("and keeps it while it goes on talking",
+check("the dock that is drawing us gets it", tray_after(True, 1.0), False)
+check("and keeps it while it goes on saying so",
       tray_after(True, App.DOCK_SILENCE - 1), False)
 check("a dock that has gone quiet loses it",
       tray_after(True, App.DOCK_SILENCE + 1), True)
@@ -1300,6 +1302,10 @@ check("a dock that has gone quiet loses it",
 # dock has been uninstalled would come up with no icon at all and stay that way.
 check("the setting without a living dock does not hide anything",
       tray_after(True, 3600.0), True)
+# Protocol 2. A dock ran for an hour, alive and answering, and drew nothing of
+# ours — and held the tray icon the whole time, so the program had no way in.
+check("a living dock that is not drawing us does not get the icon",
+      tray_after(True, 1.0, showing=False), True)
 
 # A laptop that spent a week unplugged with the dongle pulled out. The program
 # started without it, the listener gave up once and never looked again, and when
@@ -1339,6 +1345,33 @@ check("a headset the dongle says is on does", appearing("on").moved, [HP])
 # for everybody whose dongle keeps quiet.
 check("a silent dongle does not block switching for ever",
       appearing("silent").moved, [HP])
+
+# Starting the program while it already runs used to end in silence: the second
+# copy saw the first and left. Without a tray icon that is indistinguishable from
+# a program that will not start. The second copy now asks the first, through the
+# same note and interface a dock uses, to show its window.
+print("\nA second launch")
+
+
+class Summoned:
+    def __init__(self):
+        self.times = 0
+
+    def bring_forward(self):
+        self.times += 1
+        return True
+
+
+from mas.app import wake_running_copy  # noqa: E402
+
+_first = Summoned()
+_running = Bridge(_first)
+_running.start()
+check("the running copy is asked to come forward", wake_running_copy(), True)
+check("and it is asked exactly once", _first.times, 1)
+_running.stop()
+check("with nothing running, the answer is no rather than an error",
+      wake_running_copy(timeout=1.0), False)
 
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)

@@ -109,14 +109,17 @@ class Api:
         return self.app.state()
 
     # --- updating ------------------------------------------------------
-    def dock_hello(self):
+    def dock_hello(self, showing: bool = False):
         """The dock saying it is there, and asking what to draw.
 
-        Also the heartbeat: stop calling this and the tray icon comes back,
-        because a dock that has crashed leaves a program with no face at all.
+        Also the heartbeat, and since protocol 2 a promise: `showing` is the
+        dock saying our widget is on the screen right now. Without it the tray
+        icon comes back. Being alive is not enough — a dock that ran for an hour
+        without drawing us had the icon all that time, and the person had no way
+        in to the program at all.
         """
         app = self.app
-        app.dock_seen()
+        app.dock_seen(bool(showing))
         return {"protocol": PROTOCOL, "version": __version__,
                 "hosting": bool(app.cfg.get("dock_hosts_us")),
                 "state": app.state()}
@@ -124,11 +127,16 @@ class Api:
     def dock_take_over(self, hosting: bool):
         """The dock offering to draw us instead of the tray, or handing it back."""
         app = self.app
-        app.dock_seen()
+        app.dock_seen(bool(hosting))
         app.cfg.set("dock_hosts_us", bool(hosting))
         _log.info("the dock %s drawing us", "takes over" if hosting else "hands back")
         app.dock_apply()
         return {"hosting": bool(hosting)}
+
+    def bring_forward(self):
+        """Another launch of the program, asking this one to show itself."""
+        self.app.show("devices")
+        return True
 
     def update_action(self, action: str):
         """One entry point: check, install, poll, forget."""
@@ -270,6 +278,7 @@ class App:
         # When the dock last said it was there, and what the tray currently
         # shows. None means nobody has decided yet.
         self._dock_seen = 0.0
+        self._dock_showing = False
         self._tray_shown: bool | None = None
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
@@ -1352,12 +1361,14 @@ class App:
     DOCK_SILENCE = 15.0     # longer than any hiccup, shorter than any patience
     DOCK_WATCH = 3.0
 
-    def dock_seen(self) -> None:
-        """The dock has just spoken to us."""
+    def dock_seen(self, showing: bool) -> None:
+        """The dock has just spoken to us, and said whether it draws us."""
         self._dock_seen = time.monotonic()
+        self._dock_showing = showing
 
     def dock_has_us(self) -> bool:
         return (bool(self.cfg.get("dock_hosts_us"))
+                and self._dock_showing
                 and time.monotonic() - self._dock_seen < self.DOCK_SILENCE)
 
     def dock_apply(self) -> None:
@@ -1450,9 +1461,40 @@ def main() -> int:
     _log.info("=== start, frozen=%s, from=%s ===", is_frozen(),
               "the Microsoft Store" if update.from_store() else "the releases page")
     if already_running():
-        _log.warning("an instance is already running, exiting")
+        # Somebody started the program by hand while it is already running —
+        # most likely because they cannot see it. Quietly leaving did nothing
+        # visible at all, which reads as a program that will not start. So we
+        # ask the running copy to open its window. Not when Windows starts us:
+        # a second copy at sign-in is not a request for anything.
+        if startup.STARTUP_FLAG in sys.argv[1:]:
+            _log.warning("an instance is already running, exiting")
+        elif wake_running_copy():
+            _log.info("an instance is already running — asked it to show itself")
+        else:
+            _log.warning("an instance is already running and did not answer")
         return 0
     return App().run()
+
+
+def wake_running_copy(timeout: float = 3.0) -> bool:
+    """Ask the copy that is already running to bring its window forward.
+
+    Through the same note and the same interface a dock uses: nothing new to
+    keep in step, and it works for whichever copy holds the note.
+    """
+    import json
+    import urllib.request
+    from .bridge import NOTE, TOKEN_HEADER
+    from .paths import data_dir
+    try:
+        note = json.loads((data_dir() / NOTE).read_text(encoding="utf-8"))
+        req = urllib.request.Request(
+            note["url"] + "api/bring_forward", data=b"{}", method="POST",
+            headers={TOKEN_HEADER: note["token"], "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as answer:
+            return json.loads(answer.read().decode("utf-8")).get("ok") is True
+    except (OSError, ValueError, KeyError):
+        return False
 
 
 if __name__ == "__main__":

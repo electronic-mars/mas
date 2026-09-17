@@ -141,10 +141,16 @@ class Tray:
         elif kind == "tip":
             self.icon.title = job[1]
         elif kind == "visible":
-            self._hold = False          # somebody has decided; stop waiting
+            # From here on visibility is somebody else's to decide. A device
+            # change must not put back an icon the dock is holding — it used to,
+            # because this flag was cleared instead of set.
+            self._hold = True
             if bool(job[1]) != self._shown:
                 self._shown = bool(job[1])
-                self.icon.visible = self._shown
+                if self._shown:
+                    self._add()
+                else:
+                    self.icon.visible = False
                 _log.info("icon %s the tray", "into" if self._shown else "out of")
         elif kind == "notify":
             _, message, title = job
@@ -154,13 +160,27 @@ class Tray:
         """Shown or not — the answer coming from outside, and the last word."""
         self._queue.put(("visible", bool(on), None))
 
+    def _add(self) -> None:
+        """Put the icon into the notification area, clearing the place first.
+
+        Held back from a start at sign-in and shown six minutes later, the icon
+        did not appear: the log said it had, the notification area said
+        otherwise. Taken out and shown again, it appeared every time. The only
+        difference between the two is a delete in front of the add, so there is
+        always one now — for a place that holds nothing it simply fails, which
+        costs nothing. What the notification area was keeping in that place was
+        never pinned down; sign-in cannot be replayed on demand.
+        """
+        self.icon._hide()
+        self.icon.visible = True
+
     def _show(self) -> None:
         """Into the tray, once, whichever of the two reasons arrives first."""
         if self._hold:
             return
         if not self._shown:
             self._shown = True
-            self.icon.visible = True
+            self._add()
             _log.info("icon in the tray: %s", self._glyph)
 
     def _show_anyway(self) -> None:

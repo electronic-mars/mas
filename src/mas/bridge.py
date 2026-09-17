@@ -29,7 +29,10 @@ TOKEN_HEADER = "X-MAS-Token"
 # us keystrokes, kill us, or replace our exe. It is not the same as letting a web
 # page do it, which is what the token is actually there to prevent.
 NOTE = "bridge.json"
-PROTOCOL = 1
+# 2: the heartbeat says whether the dock is actually drawing us. Under 1 a dock
+# that was alive but showed nothing kept the tray icon for ever, and the program
+# ran with no way in at all.
+PROTOCOL = 2
 _TOKEN_MARK = "%%MAS_TOKEN%%"  # must not match a JS var name, or substitution breaks it
 
 # The window is drawn by WebView2, which is Chromium, and Chromium refuses to

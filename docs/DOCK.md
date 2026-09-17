@@ -18,7 +18,7 @@ companion cannot guess either. So we leave a note:
 
 ```json
 {
-  "protocol": 1,
+  "protocol": 2,
   "url": "http://127.0.0.1:41235/",
   "token": "…",
   "pid": 15084,
@@ -68,9 +68,10 @@ exists to keep a browser page out, not you.
 
 | method | arguments | what it does |
 |---|---|---|
-| `dock_hello` | — | says you are there, and returns the whole state |
+| `dock_hello` | `showing: bool` | says you are there and whether our widget is on screen; returns the whole state |
 | `dock_take_over` | `hosting: bool` | take the tray icon away, or hand it back |
 | `switch_next` | — | exactly what a click on the tray icon does |
+| `bring_forward` | — | opens our window in front — what the other tray button does |
 | `switch_to` | `device_id: str` | move the sound to one device |
 | `get_state` | — | the same state without the heartbeat |
 | `media` | `action: str` — `play`, `next`, `prev` | the media keys, aimed at the chosen player |
@@ -82,7 +83,7 @@ exists to keep a browser page out, not you.
 
 ```json
 {
-  "protocol": 1,
+  "protocol": 2,
   "version": "1.0.3",
   "hosting": false,
   "state": {
@@ -121,12 +122,24 @@ choice for a panel that tints its own glyphs.
 Call `dock_take_over` with `hosting: true` and our icon leaves the tray. The
 setting is remembered, so it stays that way after a restart.
 
-**And then you must keep saying hello.** If nothing calls `dock_hello` or
-`dock_take_over` for fifteen seconds, the icon comes back by itself. This is not
+**And then you must keep saying hello — with `showing: true`.** If nothing
+calls `dock_hello` or `dock_take_over` for fifteen seconds, or the last hello did
+not say `showing: true`, the icon comes back by itself. This is not
 a quirk to work around — it is the whole reason we are willing to give the icon
 up at all. A dock that has been closed, has crashed, or has been uninstalled
 would otherwise leave a running program with no icon, no window anybody can
 reach, and no way to quit it short of the task manager. Once a second is plenty.
+
+**`showing` means our widget is on a screen the person can see, now.** Not
+"configured", not "about to be": drawn. Protocol 1 took a hello as enough, and a
+dock that was alive and answering but never drew the widget kept the tray icon
+for an hour — the program was running with no way into it at all. If the widget
+is removed, hidden with its bar, or not placed on any bar, say `showing: false`,
+or stop asking for the icon.
+
+Only call `dock_take_over` with `hosting: true` once the widget is actually on
+screen. Calling it at startup, before anything is drawn, is exactly the case
+above.
 
 Hand it back explicitly (`hosting: false`) when your widget is removed or the
 program is shutting down. Do not rely on the timeout for the tidy case: fifteen
