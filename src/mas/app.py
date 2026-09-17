@@ -14,7 +14,8 @@ from .bridge import PROTOCOL, Bridge
 from .core import devices, mixer, startup
 from .core.config import Config
 from .core.dongle import KNOWN as KNOWN_DONGLES
-from .core.dongle import MAX_CAPTURE, Dongle, deduce, product_name
+from .core.dongle import Dongle
+from .dock import Dock
 from .core.hotkey import Hotkeys
 from .core.meter import Meter
 from .core.players import Players
@@ -23,6 +24,8 @@ from .overlay import Overlay
 from .core.switcher import Switcher
 from .paths import is_frozen, log_path
 from .tray import Tray
+from .updater import Updater
+from .wizard import Wizard
 
 _log = log.get("app")
 
@@ -107,7 +110,7 @@ class Api:
         elif key in ("auto_device", "watch_dongle"):
             self.app.sync_auto_device()
         elif key == "tray_with_dock":
-            self.app.dock_apply()
+            self.app.dock.apply()
         return self.app.state()
 
     # --- updating ------------------------------------------------------
@@ -121,7 +124,7 @@ class Api:
         in to the program at all.
         """
         app = self.app
-        app.dock_seen(bool(showing))
+        app.dock.seen(bool(showing))
         return {"protocol": PROTOCOL, "version": __version__,
                 "hosting": bool(app.cfg.get("dock_hosts_us")),
                 "state": app.state()}
@@ -129,10 +132,10 @@ class Api:
     def dock_take_over(self, hosting: bool):
         """The dock offering to draw us instead of the tray, or handing it back."""
         app = self.app
-        app.dock_seen(bool(hosting))
+        app.dock.seen(bool(hosting))
         app.cfg.set("dock_hosts_us", bool(hosting))
         _log.info("the dock %s drawing us", "takes over" if hosting else "hands back")
-        app.dock_apply()
+        app.dock.apply()
         return {"hosting": bool(hosting)}
 
     def bring_forward(self):
@@ -142,13 +145,13 @@ class Api:
 
     def update_action(self, action: str):
         """One entry point: check, install, poll, forget."""
-        app = self.app
+        up = self.app.updater
         if action == "check":
-            return app.update_check()
+            return up.check()
         if action == "install":
-            return app.update_install()
+            return up.install()
         if action == "forget":
-            return app.update_forget()
+            return up.forget()
         raise ValueError(f"no such action: {action}")
 
     # --- teaching an unknown dongle ------------------------------------
@@ -156,15 +159,15 @@ class Api:
         """One entry point for the wizard: start, step, poll, finish, cancel."""
         app = self.app
         if action == "start":
-            return app.wizard_start()
+            return app.wizard.start()
         if action == "step":
-            return app.wizard_step(step)
+            return app.wizard.step(step)
         if action == "poll":
-            return app.wizard_state()
+            return app.wizard.state()
         if action == "finish":
-            return app.wizard_finish()
+            return app.wizard.finish()
         if action == "cancel":
-            app.wizard_stop()
+            app.wizard.stop()
             app.sync_dongle()
             return {"running": False}
         raise ValueError(f"no such action: {action}")
@@ -277,12 +280,8 @@ class App:
         self._engine: str | None = None
         self._engine_asking = False
         self._stopped = threading.Event()
-        # When the dock last said it was there, and what the tray currently
-        # shows. None means nobody has decided yet.
-        self._dock_seen = 0.0
-        self._dock_showing = False
-        self._dock_was_showing = False
-        self._tray_shown: bool | None = None
+        # The tray is made in run(); the dock asks for it when it needs it.
+        self.dock = Dock(self.cfg, lambda: self.tray, self.push_state, self._stopped)
         self.launched_by_startup = startup.STARTUP_FLAG in sys.argv[1:]
         self._ui_lock = threading.Lock()
         self._pending_tab: str | None = None
@@ -314,19 +313,14 @@ class App:
         self._dongle_usb: str | None = None
         # Last known headset state: None means we have not heard from it yet.
         self._dongle_on: bool | None = None
-        # The teaching wizard, while it is running: its buckets and its own
-        # listener, which holds the dongle instead of the watcher above.
-        self._wiz: dict | None = None
-        self._wiz_dongle: Dongle | None = None
+        self.wizard = Wizard(self.cfg, self.dongle_ids, self.sync_dongle,
+                             self.device_name, self.push_state)
         # What the window is called right now, and its handle. The title follows
         # the track, so the handle has to be remembered rather than looked up by
         # a name that no longer stands still.
         self._title = WINDOW_TITLE
         self._hwnd: int | None = None
-        # Where the update button has got to, and what the release page offered.
-        self._up: dict = {"state": "idle", "detail": "", "percent": 0, "notes": ""}
-        self._up_lock = threading.Lock()
-        self._up_found: dict | None = None
+        self.updater = Updater(self.push_state, self.quit)
         self._jobs: queue.SimpleQueue = queue.SimpleQueue()
 
     def own_hwnd(self) -> int | None:
@@ -334,105 +328,6 @@ class App:
         if self._hwnd is None:
             self._hwnd = screen.own_window(WINDOW_TITLE)
         return self._hwnd
-
-    # --- updating -------------------------------------------------------
-    # The whole thing is one small state, read by the page four times a second
-    # while anything is happening and left alone otherwise. Every ending is
-    # named: "failed" carries a reason, because a button that quietly returns to
-    # how it was is the one thing worse than a button that says what went wrong.
-    def update_state(self) -> dict:
-        with self._up_lock:
-            return dict(self._up)
-
-    def _update_set(self, **fields) -> None:
-        with self._up_lock:
-            self._up.update(fields)
-        self.push_state()
-
-    def update_forget(self) -> dict:
-        """Back to the plain button — the page asks for this after showing an
-        answer that has been read."""
-        self._update_set(state="idle", detail="", percent=0)
-        return self.update_state()
-
-    def update_check(self) -> dict:
-        if update.from_store():
-            return self.update_state()      # the Store does this, and does it better
-        self._update_set(state="checking", detail="", percent=0)
-        threading.Thread(target=self._update_check, daemon=True, name="mas-update").start()
-        return self.update_state()
-
-    def _update_check(self) -> None:
-        try:
-            found = update.latest()
-        except Exception as e:
-            _log.warning("could not ask about updates", exc_info=True)
-            return self._update_set(state="failed", detail=self._why(e))
-        if not update.is_newer(found["version"], __version__):
-            _log.info("version %s is the newest there is", __version__)
-            return self._update_set(state="current", detail=found["version"])
-        _log.info("version %s is available, we are %s", found["version"], __version__)
-        self._up_found = found
-        self._update_set(state="available", detail=found["version"],
-                         notes=found.get("notes", ""))
-
-    def update_install(self) -> dict:
-        if not self._up_found:
-            self._update_set(state="failed", detail="release")
-            return self.update_state()
-        self._update_set(state="downloading", detail="", percent=0)
-        threading.Thread(target=self._update_install, daemon=True,
-                         name="mas-update").start()
-        return self.update_state()
-
-    def _update_install(self) -> None:
-        found = self._up_found
-        try:
-            def progress(got: int, total: int) -> None:
-                # Without a length there is no percentage to show, and inventing
-                # one that creeps along is worse than showing none.
-                if total:
-                    self._update_set(percent=min(100, round(got * 100 / total)))
-
-            path = update.download(found["url"], progress)
-        except Exception as e:
-            _log.warning("the update did not download", exc_info=True)
-            return self._update_set(state="failed", detail=self._why(e))
-
-        self._update_set(state="checking_file", percent=100)
-        try:
-            signature = bytes.fromhex(found["signature"])
-        except ValueError:
-            signature = b""
-        if not update.verify(path, signature):
-            # Loudly, and the file goes. Something is calling itself our release
-            # and is not, and the one thing that must not happen next is running it.
-            _log.error("the downloaded installer is not signed by us — deleting it")
-            path.unlink(missing_ok=True)
-            return self._update_set(state="failed", detail="signature")
-        _log.info("the installer is signed by us, handing over")
-        self._update_set(state="installing")
-        try:
-            update.install(path)
-        except Exception as e:
-            _log.exception("the installer would not start")
-            return self._update_set(state="failed", detail=self._why(e))
-        self.quit()          # release our files: the installer is replacing them
-
-    @staticmethod
-    def _why(e: Exception) -> str:
-        """A reason short enough for the panel and specific enough to act on."""
-        import socket
-        import urllib.error
-        if isinstance(e, urllib.error.HTTPError):
-            return f"HTTP {e.code}"
-        if isinstance(e, (urllib.error.URLError, socket.timeout, OSError)):
-            return "network"
-        if isinstance(e, ValueError):
-            # Our own refusals: a release description that is incomplete, or
-            # points somewhere we do not fetch from. The log has the specifics.
-            return "release"
-        return type(e).__name__
 
     def device_name(self, device_id: str) -> str:
         """The name of an endpoint, present or not. From the cached list, so it
@@ -474,11 +369,11 @@ class App:
         settings["from_store"] = update.from_store()
         # The tray switch is only worth offering while there is a dock that
         # actually shows us; otherwise the tray icon is the only one there is.
-        settings["dock_showing"] = self.dock_showing()
+        settings["dock_showing"] = self.dock.showing()
         # The update button's whole state travels with everything else, so the
         # page needs no poller of its own: the counter it already watches is
         # bumped on every step, including each slice of the download.
-        settings["update"] = self.update_state()
+        settings["update"] = self.updater.state()
         settings["dongle_name"] = self._dongle_name
         settings["dongle_usb"] = self._dongle_usb
         known = self.known_outputs_cached(settings.get("auto_device", ""))
@@ -683,159 +578,10 @@ class App:
         if rule is None:
             return                            # unknown: the wizard is offered instead
         self._dongle_name = rule["name"]      # the interface will show a toggle
-        if self._wiz is not None or not self.cfg.get("watch_dongle"):
+        if self.wizard.running or not self.cfg.get("watch_dongle"):
             return                            # the wizard is holding the dongle
         self.dongle = Dongle(ids[0], ids[1], self._dongle_changed, rule=rule)
         self.dongle.start()
-
-    # --- teaching an unknown dongle ----------------------------------------
-    # Four steps, not two: one on and one off would also be told apart by a
-    # battery reading or a counter, and a wrong byte means headphones that grab
-    # the sound at random. Two full cycles throw those out — see dongle.deduce.
-    WIZARD_STEPS = ("on1", "off1", "on2", "off2")
-
-    def wizard_start(self) -> dict:
-        """Begin teaching. Listening runs from here to the end without a break:
-        the reports simply land in the bucket of whichever step is running, so
-        nothing is lost while the person is reaching for the headset."""
-        self.wizard_stop()
-        ids = self.dongle_ids()
-        if ids is None:
-            return {"error": "no_dongle"}
-        self._wiz = {"ids": ids, "step": "", "last": 0.0,
-                     "steps": {s: [] for s in self.WIZARD_STEPS}}
-        self.sync_dongle()                    # let go of the watcher, if any
-        self._wiz_dongle = Dongle(ids[0], ids[1], self._wizard_report, learn=True)
-        self._wiz_dongle.start()
-        return self.wizard_state()
-
-    def wizard_step(self, step: str) -> dict:
-        """Move to a step. Everything arriving from now on belongs to it."""
-        if self._wiz is None:
-            return {"error": "not_running"}
-        if step not in self.WIZARD_STEPS:
-            raise ValueError(f"no such step: {step}")
-        self._wiz["step"] = step
-        self._wiz["last"] = 0.0
-        return self.wizard_state()
-
-    def _wizard_report(self, data: bytes) -> None:
-        """Called from a dongle thread for every report that arrives."""
-        wiz = self._wiz
-        if wiz is None or wiz["step"] not in wiz["steps"]:
-            return
-        bucket = wiz["steps"][wiz["step"]]
-        if len(bucket) < MAX_CAPTURE:
-            bucket.append(data)
-        wiz["last"] = time.monotonic()
-
-    def wizard_state(self) -> dict:
-        """What the page needs to draw the current step.
-
-        "settled" is the answer to the only hard question here: has the dongle
-        finished speaking? A headset takes seconds to power up and then sends
-        several reports in a row; moving on in the middle of that would file the
-        rest of them under the next step.
-        """
-        wiz = self._wiz
-        if wiz is None:
-            return {"running": False}
-        counts = {s: len(v) for s, v in wiz["steps"].items()}
-        heard = counts.get(wiz["step"], 0)
-        return {"running": True, "step": wiz["step"], "counts": counts,
-                "heard": heard,
-                "settled": bool(heard) and time.monotonic() - wiz["last"] > 1.2}
-
-    def wizard_stop(self) -> None:
-        if self._wiz_dongle is not None:
-            self._wiz_dongle.stop()
-            self._wiz_dongle = None
-        self._wiz = None
-
-    def wizard_finish(self) -> dict:
-        """Read the four buckets, save what was learned, and prepare the report."""
-        wiz = self._wiz
-        if wiz is None:
-            return {"error": "not_running"}
-        ids = wiz["ids"]
-        steps = wiz["steps"]
-        on = steps["on1"] + steps["on2"]
-        off = steps["off1"] + steps["off2"]
-        rule = deduce(on, off) if on and off else None
-        usb = f"{ids[0]:04X}:{ids[1]:04X}"
-        name = (product_name(*ids)
-                or self.device_name(self.cfg.get("auto_device")) or usb)
-        if rule is not None:
-            rule = {**rule, "name": name}
-            rules = {**self.cfg.get("dongle_rules"), usb: rule}
-            self.cfg.set("dongle_rules", rules)
-            # They just taught it; switching it on themselves afterwards would be
-            # a step that exists only to be clicked.
-            self.cfg.set("watch_dongle", True)
-        text = self._wizard_report_text(usb, name, rule, steps)
-        self.wizard_stop()
-        self.sync_dongle()
-        self.push_state()
-        return {"ok": rule is not None, "name": name, "usb": usb,
-                "detail": self._wizard_detail(rule), "report": text,
-                "url": self._wizard_issue_url(usb, name, rule is not None, text)}
-
-    @staticmethod
-    def _wizard_detail(rule: dict | None) -> str:
-        if rule is None:
-            return ""
-        pos, val = rule["marker"]
-        return (f"report 0x{rule['report']:02X}, byte {rule['state_at']}: "
-                f"on 0x{rule['on']:02X}, off 0x{rule['off']:02X} "
-                f"(marker byte {pos} = 0x{val:02X})")
-
-    def _wizard_report_text(self, usb: str, name: str, rule: dict | None,
-                            steps: dict) -> str:
-        """The whole finding as plain text, ready to be read by a person.
-
-        Repeated lines are collapsed: a dongle that says the same thing forty
-        times adds nothing but length, and the count says it better.
-        """
-        out = [f"Dongle: {usb} — {name or 'unnamed'}",
-               f"Audio device: {self.device_name(self.cfg.get('auto_device'))}",
-               f"Program: {__version__}", ""]
-        if rule is None:
-            out.append("Result: no byte told the two states apart.")
-        else:
-            out.append(f"Result: {self._wizard_detail(rule)}")
-            if rule.get("also"):
-                out.append("Other bytes that would have worked too: " + ", ".join(
-                    f"byte {i}: on 0x{a:02X}, off 0x{b:02X}" for i, a, b in rule["also"]))
-        for step in self.WIZARD_STEPS:
-            seen: dict[str, int] = {}
-            for data in steps[step]:
-                line = data.hex(" ")
-                seen[line] = seen.get(line, 0) + 1
-            out.append("")
-            out.append(f"[{step}] {len(steps[step])} reports")
-            out.extend(f"  {line}" + (f"   ×{n}" if n > 1 else "")
-                       for line, n in seen.items())
-        return "\n".join(out)
-
-    @staticmethod
-    def _wizard_issue_url(usb: str, name: str, ok: bool, text: str) -> str:
-        """The report form, with its fields already filled in.
-
-        Through the template rather than a blank issue: the template carries the
-        label and the questions, and its field ids are what these parameters
-        fill. Sending it is the person's click and their decision — the program
-        itself sends nothing anywhere, ever.
-        """
-        from urllib.parse import urlencode
-        query = urlencode({
-            "template": "dongle.yml",
-            "title": f"Dongle: {name or usb}",
-            "model": name,
-            "ids": usb,
-            "reports": text,
-            "worked": "yes" if ok else "no",
-        })
-        return f"https://github.com/electronic-mars/mas/issues/new?{query}"
 
     def _dongle_changed(self, on: bool) -> None:
         """The dongle reported that the headset was turned on or off.
@@ -1231,10 +977,10 @@ class App:
                 self._title = WINDOW_TITLE
             except Exception:
                 _log.warning("the window title did not go back", exc_info=True)
-        if self._wiz is not None:
+        if self.wizard.running:
             # The wizard lives in the window. Closing it mid-way would otherwise
             # leave the dongle held open by a listener nobody can reach again.
-            self.wizard_stop()
+            self.wizard.stop()
             self.sync_dongle()
         with self._ui_lock:
             self._state_rev += 1      # so the page learns of it on the next poll
@@ -1305,15 +1051,15 @@ class App:
             on_middle=lambda: self.show("mixer"),
             on_quit=self.quit,
             # Last time we ran, the dock was drawing us. Hold the icon back
-            # rather than flash it for three seconds at every start — the watch
-            # above shows it within DOCK_WATCH if the dock does not appear.
+            # rather than flash it for three seconds at every start — the dock's
+            # watch shows it within Dock.WATCH if the dock does not appear.
             outside_decides=bool(self.cfg.get("dock_hosts_us"))
             and not self.cfg.get("tray_with_dock"),
         )
         self.overlay.start()
         threading.Thread(target=self.tray.run, daemon=True, name="mas-tray").start()
         threading.Thread(target=self._boot_watchdog, daemon=True, name="mas-boot").start()
-        threading.Thread(target=self._dock_watch, daemon=True, name="mas-dock").start()
+        threading.Thread(target=self.dock.watch, daemon=True, name="mas-dock").start()
 
         # Our own title bar instead of the native frame. easy_drag is off: with
         # it the window is dragged by any point of the page, and the sliders and
@@ -1358,58 +1104,6 @@ class App:
             # memory is given back by the system.
             os._exit(0)
         return 0
-
-    # --- living inside the dock ------------------------------------------
-    # The dock draws us as one of its widgets, and then the tray icon is a
-    # duplicate. It may have it — on one condition, which is that we can always
-    # take it back. A dock that has been closed, has crashed, or was uninstalled
-    # would otherwise leave a running program with no icon, no window anybody
-    # can reach and no way to quit it short of the task manager.
-    DOCK_SILENCE = 15.0     # longer than any hiccup, shorter than any patience
-    DOCK_WATCH = 3.0
-
-    def dock_seen(self, showing: bool) -> None:
-        """The dock has just spoken to us, and said whether it draws us."""
-        self._dock_seen = time.monotonic()
-        self._dock_showing = showing
-
-    def dock_showing(self) -> bool:
-        """Is a living dock drawing us right now?"""
-        return (bool(self.cfg.get("dock_hosts_us"))
-                and self._dock_showing
-                and time.monotonic() - self._dock_seen < self.DOCK_SILENCE)
-
-    def dock_has_us(self) -> bool:
-        """Does the dock stand in for the tray icon? Only if it is drawing us
-        and the person has said they do not want the icon as well."""
-        return self.dock_showing() and not self.cfg.get("tray_with_dock")
-
-    def dock_apply(self) -> None:
-        """Put the tray icon wherever the answer currently is."""
-        if not self.tray:
-            return
-        showing = self.dock_showing()
-        if showing != self._dock_was_showing:
-            # The settings page offers the tray switch only while a dock shows
-            # us, so it has to hear when that starts and stops.
-            self._dock_was_showing = showing
-            self.push_state()
-        want = not self.dock_has_us()
-        if want != self._tray_shown:
-            self._tray_shown = want
-            self.tray.set_visible(want)
-            _log.info("the tray icon is %s (the dock %s us)",
-                      "ours" if want else "the dock's",
-                      "has" if not want else "does not have")
-
-    def _dock_watch(self) -> None:
-        while not self._stopped.wait(self.DOCK_WATCH):
-            try:
-                self.dock_apply()
-            except Exception:
-                # Whatever went wrong here, the icon is the way out of the
-                # program: never let this thread die quietly.
-                _log.exception("the dock watch stumbled")
 
     def _boot_watchdog(self) -> None:
         # Devices are enumerated here and not in the main thread: the main one

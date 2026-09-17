@@ -821,7 +821,8 @@ check("a truncated report decodes to nothing",
 # step that was running, that the learned rule is saved where sync_dongle looks
 # for it, and that the report offered to a person holds what happened.
 print("\nThe teaching wizard, end to end")
-import mas.app as app_mod  # noqa: E402
+import mas.wizard as wizard_mod  # noqa: E402
+from mas.wizard import Wizard  # noqa: E402
 
 
 class FakeDongle:
@@ -839,40 +840,41 @@ class FakeDongle:
 
 
 def wizard_app():
-    app = App.__new__(App)
-    app.cfg = FakeConfig(auto_device="id-hp", dongle_rules={})
-    app._wiz = app._wiz_dongle = app.dongle = None
-    app._dongle_name = app._dongle_usb = app._dongle_on = None
-    app._known_cache = [{"id": "id-hp", "name": "Cloud Flight S"}]
-    app._known_pinned = "id-hp"
-    app.push_state = lambda: None
-    return app
+    """A Wizard wired to fakes: a config, a dongle that is always 1234:5678,
+    a resync that only counts, and a device with a name."""
+    cfg = FakeConfig(auto_device="id-hp", dongle_rules={})
+    resyncs = []
+    wiz = Wizard(cfg, lambda: (0x1234, 0x5678), lambda: resyncs.append(1),
+                 lambda device_id: "Cloud Flight S", lambda: None)
+    wiz.cfg, wiz.resyncs = cfg, resyncs
+    return wiz
 
 
 FakeDongle.started.clear()
-real_dongle, app_mod.Dongle = app_mod.Dongle, FakeDongle
-real_ids, app_mod.devices.usb_ids_of = app_mod.devices.usb_ids_of, lambda i: (0x1234, 0x5678)
-real_product, app_mod.product_name = app_mod.product_name, lambda v, p: "Test Dongle"
+real_dongle, wizard_mod.Dongle = wizard_mod.Dongle, FakeDongle
+real_product, wizard_mod.product_name = wizard_mod.product_name, lambda v, p: "Test Dongle"
 try:
     app = wizard_app()
-    check("the wizard opens the dongle", app.wizard_start()["running"], True)
+    check("the wizard opens the dongle", app.start()["running"], True)
     check("and it opens it to listen, not to decode", FakeDongle.started[-1], (0x1234, 0x5678, True))
-    check("nothing is filed before the first step", app.wizard_state()["heard"], 0)
+    check("and told the program's own listener to step aside", app.resyncs, [1])
+    check("nothing is filed before the first step", app.state()["heard"], 0)
     # A report that arrives between steps belongs to nobody, and must not be
     # filed under whichever step happens to come next.
-    app._wizard_report(b"\x0b\x00\xbb\x01\x01")
+    app._report(b"\x0b\x00\xbb\x01\x01")
     for step, byte in (("on1", 1), ("off1", 3), ("on2", 1), ("off2", 3)):
-        app.wizard_step(step)
-        app._wizard_report(bytes((0x0B, 0, 0xBB, 1, byte)))
-    check("each step kept its own reports", app.wizard_state()["counts"],
+        app.step(step)
+        app._report(bytes((0x0B, 0, 0xBB, 1, byte)))
+    check("each step kept its own reports", app.state()["counts"],
           {"on1": 1, "off1": 1, "on2": 1, "off2": 1})
-    done = app.wizard_finish()
+    done = app.finish()
     check("the headset was worked out", done["ok"], True)
     check("it is named after the dongle", done["name"], "Test Dongle")
     check("the rule is saved where the listener looks for it",
-          app.dongle_rule((0x1234, 0x5678))["state_at"], 4)
+          app.cfg.get("dongle_rules")["1234:5678"]["state_at"], 4)
     check("and watching is on without another click", app.cfg.get("watch_dongle"), True)
-    check("the wizard let the dongle go", app._wiz, None)
+    check("the wizard let the dongle go", app.running, False)
+    check("and asked the program's listener back", app.resyncs, [1, 1])
     check("the report says what was found", "byte 4: on 0x01, off 0x03" in done["report"], True)
     check("and carries the raw lines", "0b 00 bb 01 03" in done["report"], True)
     check("the report form is prefilled, not sent", done["url"].startswith(
@@ -884,18 +886,17 @@ try:
     # Nothing switched: the same reports in every step. Saying so plainly beats
     # saving a rule that would fire at random.
     app = wizard_app()
-    app.wizard_start()
-    for step in App.WIZARD_STEPS:
-        app.wizard_step(step)
-        app._wizard_report(b"\x0b\x00\xbb\x01\x01")
-    done = app.wizard_finish()
+    app.start()
+    for step in Wizard.STEPS:
+        app.step(step)
+        app._report(b"\x0b\x00\xbb\x01\x01")
+    done = app.finish()
     check("a headset that never changed is not guessed at", done["ok"], False)
     check("and nothing is saved", app.cfg.get("dongle_rules"), {})
     check("but the report is still offered", "no byte told" in done["report"], True)
 finally:
-    app_mod.Dongle = real_dongle
-    app_mod.devices.usb_ids_of = real_ids
-    app_mod.product_name = real_product
+    wizard_mod.Dongle = real_dongle
+    wizard_mod.product_name = real_product
 
 
 # --------------------------------------------------------------------------
@@ -1281,26 +1282,25 @@ def tray_after(hosting, silent_for, showing=True, keep_tray=False):
     """What the icon does, given the setting, how long the dock has been quiet,
     whether its last word was that it is drawing us, and whether the person
     wants the tray icon as well."""
+    import threading as _threading
     import time as _time
+    from mas.dock import Dock
 
-    app = App.__new__(App)
-    app.cfg = FakeConfig(dock_hosts_us=hosting, tray_with_dock=keep_tray)
-    app.tray = FakeTray()
-    app._tray_shown = None
-    app._dock_seen = _time.monotonic() - silent_for
-    app._dock_showing = showing
-    app._dock_was_showing = False
-    app.push_state = lambda: None
-    app.dock_apply()
-    return app.tray.shown
+    tray = FakeTray()
+    dock = Dock(FakeConfig(dock_hosts_us=hosting, tray_with_dock=keep_tray),
+                lambda: tray, lambda: None, _threading.Event())
+    dock._seen = _time.monotonic() - silent_for
+    dock._showing = showing
+    dock.apply()
+    return tray.shown
 
 
 check("with no dock, the icon is ours", tray_after(False, 0.0), True)
 check("the dock that is drawing us gets it", tray_after(True, 1.0), False)
 check("and keeps it while it goes on saying so",
-      tray_after(True, App.DOCK_SILENCE - 1), False)
+      tray_after(True, __import__('mas.dock', fromlist=['Dock']).Dock.SILENCE - 1), False)
 check("a dock that has gone quiet loses it",
-      tray_after(True, App.DOCK_SILENCE + 1), True)
+      tray_after(True, __import__('mas.dock', fromlist=['Dock']).Dock.SILENCE + 1), True)
 # The setting alone is not enough to take the icon away: a machine where the
 # dock has been uninstalled would come up with no icon at all and stay that way.
 check("the setting without a living dock does not hide anything",
