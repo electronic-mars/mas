@@ -1441,6 +1441,18 @@ _m._vol = _Endpoint(muted=False)
 _m.set_volume(0.7)
 check("an unmuted knob leaves mute alone", _m._vol.mute_calls, 0)
 
+# The dock asks for the state every second, each time on a fresh request thread.
+# Those questions must be answered from what the meter thread already read:
+# when they reached the audio service themselves, a click on the dock widget
+# took two and a half seconds.
+print("\nThe dock's questions stay away from the audio service")
+from mas.core import meter as _meter_mod  # noqa: E402
+
+check("the meter re-reads the default more often than the cache expires",
+      _meter_mod.REBIND_EVERY_S < devices._DEFAULT_TTL, True)
+check("the device list is not re-read on a timer every few seconds",
+      devices._LIST_TTL >= 30, True)
+
 # The tray icon of a muted device carries a cross in its lower right corner,
 # cut into the glyph rather than laid over it.
 from mas.tray import load_glyph, with_mute_mark  # noqa: E402

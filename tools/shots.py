@@ -10,12 +10,20 @@ Notifications are drawn by the overlay module itself — we take its image as is
 
     python tools/shots.py
 """
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+# A folder of our own, as the tests have. The bridge announces itself in the
+# data folder for the dock to find, and removes the note when it stops: run
+# against the real folder, a screenshot session replaced the running program's
+# note with its own and then deleted it, leaving the dock unable to find the
+# program. Set before mas is imported, because the folder is resolved then.
+os.environ["LOCALAPPDATA"] = tempfile.mkdtemp(prefix="mas-shots-data-")
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))

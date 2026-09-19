@@ -81,8 +81,19 @@ class Device:
 # endpoint, including the disabled ones. It used to be called three times per
 # switch — hence the second and a half of delay. We keep a snapshot and refresh
 # it when needed, not on every question.
-_LIST_TTL = 3.0
-_DEFAULT_TTL = 0.5
+#
+# "When needed" is decided by the meter thread, which watches the endpoints twice
+# a second and drops the snapshot the moment one changes, and which re-reads the
+# default devices every two seconds. The ages below are only a backstop for what
+# that watch cannot see, such as a device being renamed. They used to be three
+# seconds and half a second, and that put the cost on whoever asked next: the
+# dock asks every second, each question on a fresh request thread, so every
+# three seconds one of them enumerated fifty endpoints and every one of them
+# built a new device enumerator. Measured on a live machine: questions taking up
+# to 2.3 s and a click on the dock widget 2.5 s, because the audio service was
+# busy answering all that.
+_LIST_TTL = 60.0
+_DEFAULT_TTL = 5.0
 
 _lock = threading.Lock()
 _cache: dict = {"devices": None, "ts": 0.0}

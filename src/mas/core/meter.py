@@ -97,7 +97,10 @@ class Meter(threading.Thread):
 
         from . import devices
 
-        dev_id = devices.default_id(is_output=True)
+        # Read fresh here, in this thread, so that everybody else can take the
+        # cached answer: see _DEFAULT_TTL in devices.
+        dev_id = devices.default_id(is_output=True, max_age=0.0)
+        devices.default_id(is_output=False, max_age=0.0)
         if dev_id == self._bound_id and self._vol is not None:
             return
         dev = AudioUtilities.GetSpeakers()
@@ -140,6 +143,7 @@ class Meter(threading.Thread):
         if not moved:
             return
         devices.invalidate()
+        devices.list_devices()       # re-read here, not on the next request thread
         # We log every change by name: different headphones make the system
         # behave differently, and without this record the reason for "nothing
         # happens" is impossible to catch.
