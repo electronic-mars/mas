@@ -3,8 +3,15 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.0.6
 
+- a click on the Master Control Dock widget switches in a fifth of a second
+  again; it had come to take two and a half, and up to ten on a bad day. The
+  dock asks for the state every second, and every third question enumerated
+  all fifty audio endpoints of the system while each one built a new device
+  enumerator — enough to keep the Windows audio service busy for everybody,
+  including this program's own switches. The answers now come from what the
+  program already watches in its own thread, in two milliseconds;
 - switched-off sound is visible: the volume window shows a crossed speaker in
   place of the number, the tray icon gets a cross in its corner, and in the
   mixer the speaker tile changes and a muted application gets a mark on its
