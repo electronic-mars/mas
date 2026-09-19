@@ -22,11 +22,16 @@ IDLE_INTERVAL = 0.5     # the tick when the window is hidden: nobody sees the le
 
 class Meter(threading.Thread):
     def __init__(self, interval: float = 0.1, on_devices_changed=None,
-                 on_default_changed=None):
+                 on_default_changed=None, on_mute_changed=None):
         super().__init__(daemon=True, name="mas-meter")
         self.interval = interval
         self._on_devices_changed = on_devices_changed
         self._on_default_changed = on_default_changed
+        self._on_mute_changed = on_mute_changed
+        # What the listener was last told. Separate from the snapshot, which
+        # our own writes update ahead of the device: the listener hears every
+        # change once, from here, whoever made it.
+        self._told_muted: bool | None = None
         self._stop = threading.Event()
         self._lock = threading.Lock()
         # Set when the meter binds to a device for the first time: the startup
@@ -198,6 +203,12 @@ class Meter(threading.Thread):
                     continue
                 with self._lock:
                     self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
+                if muted != self._told_muted and self._on_mute_changed:
+                    self._told_muted = muted
+                    try:
+                        self._on_mute_changed(muted)
+                    except Exception:
+                        _log.warning("the mute listener failed", exc_info=True)
         finally:
             # The COM interfaces must be released here, before leaving the thread
             # and before the WebView2 window unloads the .NET runtime. Otherwise

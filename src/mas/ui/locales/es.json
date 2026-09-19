@@ -20,7 +20,6 @@
     "master": "Volumen principal",
     "apps": "Aplicaciones",
     "system_sounds": "Sonidos del sistema",
-    "muted": "Silenciado",
     "mute": "Silenciar",
     "unmute": "Activar sonido",
     "no_apps": "Ninguna aplicación reproduce sonido ahora",

@@ -125,8 +125,10 @@ class Api:
         """
         app = self.app
         app.dock.seen(bool(showing))
+        snap = app.meter.snapshot()
         return {"protocol": PROTOCOL, "version": __version__,
                 "hosting": bool(app.cfg.get("dock_hosts_us")),
+                "master": {"volume": snap["volume"], "muted": snap["muted"]},
                 "state": app.state()}
 
     def dock_take_over(self, hosting: bool):
@@ -256,7 +258,8 @@ class App:
         self.cfg = Config()
         self.switcher = Switcher(self.cfg)
         self.meter = Meter(on_devices_changed=self._devices_changed,
-                           on_default_changed=self._default_changed)
+                           on_default_changed=self._default_changed,
+                           on_mute_changed=self._mute_changed)
         if not self.cfg.get("language"):
             self.cfg.set("language", language.pick())
         # The tray and the notifications speak the same language as the window.
@@ -850,6 +853,10 @@ class App:
 
         threading.Thread(target=run, daemon=True, name="mas-beep").start()
 
+    def _mute_changed(self, muted: bool) -> None:
+        if self.tray:
+            self.tray.set_muted(muted)
+
     def refresh_tray(self) -> None:
         if not self.tray:
             return
@@ -1056,6 +1063,8 @@ class App:
             outside_decides=bool(self.cfg.get("dock_hosts_us"))
             and not self.cfg.get("tray_with_dock"),
         )
+        # The meter may have heard the mute state before the tray existed.
+        self.tray.set_muted(self.meter.snapshot()["muted"])
         self.overlay.start()
         threading.Thread(target=self.tray.run, daemon=True, name="mas-tray").start()
         threading.Thread(target=self._boot_watchdog, daemon=True, name="mas-boot").start()

@@ -1441,6 +1441,23 @@ _m._vol = _Endpoint(muted=False)
 _m.set_volume(0.7)
 check("an unmuted knob leaves mute alone", _m._vol.mute_calls, 0)
 
+# The tray icon of a muted device carries a cross in its lower right corner,
+# cut into the glyph rather than laid over it.
+from mas.tray import load_glyph, with_mute_mark  # noqa: E402
+
+for _light in (False, True):
+    _g = load_glyph("headset", _light, 20)
+    _x = with_mute_mark(_g, _light)
+    check(f"the marked icon keeps its size (light={_light})", _x.size, _g.size)
+    _a = _x.getchannel("A")
+    check(f"the cross is drawn in the corner (light={_light})",
+          _a.getpixel((15, 15)) > 128, True)
+    check(f"the rest of the glyph is untouched (light={_light})",
+          list(_x.crop((0, 0, 8, 8)).getdata()) == list(_g.crop((0, 0, 8, 8)).getdata()), True)
+    _ink = _x.getpixel((15, 15))[:3]
+    check(f"the cross is in the taskbar's ink (light={_light})",
+          sum(_ink) < 200 if _light else sum(_ink) > 560, True)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
 

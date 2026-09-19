@@ -158,6 +158,9 @@ html.mini #btn-mini .to-full{display:block}
   background:linear-gradient(158deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.04) 38%,
              transparent 60%)}
 .lcd svg{display:block}
+.lcd .lcdmute{display:none}
+.lcd.muted > svg{display:none}
+.lcd.muted > .lcdmute{display:block;margin:0 auto}
 #lcd-vol{justify-content:flex-end;gap:3px}
 #lcd-lvl{justify-content:center}
 
@@ -274,28 +277,29 @@ h2.sec{margin:12px 0 7px 3px}
    clipped. */
 .mx .ap{width:48px;height:48px;border-radius:13px;flex:none;position:relative;cursor:pointer;
   border:0;padding:0;background:var(--card-hi);display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:600;color:#fff;text-transform:uppercase;overflow:hidden}
+  font-size:13px;font-weight:600;color:#fff;text-transform:uppercase}
 .mx .ap img{width:34px;height:34px;display:block;object-fit:contain}
 /* The master volume tile: the icon through a mask, the colour contrasting with
    the orange. */
 .mx .ap .mxico{width:30px;height:30px;display:block;background:var(--on-acc);
   -webkit-mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;
   mask-position:center;mask-size:contain;mask-repeat:no-repeat}
-.mx .ap .slash{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-  border-radius:11px;background:rgba(12,14,18,.62)}
-.mx .ap .slash svg{width:18px;height:18px;fill:var(--danger)}
-.mx .ap:hover .slash{display:flex;background:rgba(12,14,18,.45)}
-.mx.muted .ap img{filter:grayscale(1);opacity:.5}
-.mx.muted .ap .slash{display:flex}
-.mx.muted .nm,.mx.muted .pc{color:var(--tx-3)}
-.mx.muted .fill{background:var(--tx-3)}
+/* Muted: the master tile changes its speaker for a crossed one, an application
+   keeps its own icon and gets a mark in the corner. Nothing is laid over the
+   icon and nothing turns grey — the level stays as it was, as in Windows. The
+   mark shows faintly on hover, to say the icon is the mute button. */
+.mx .mbadge{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:50%;
+  background:var(--bg);display:none;align-items:center;justify-content:center;
+  box-shadow:0 0 0 2px var(--card)}
+.mx .mbadge svg{width:15px;height:15px;fill:var(--tx);color:var(--tx)}
+.mx .ap:hover .mbadge{display:flex;opacity:.55}
+.mx.muted .mbadge{display:flex;opacity:1}
 .mx .col{flex:1;min-width:0}
 .mx .top{display:flex;align-items:baseline;gap:6px}
 .mx .nm{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The percentage reads as a value, not as a utility caption: the digits are
    larger and tabular so they do not jitter while dragging. */
 .mx .pc{margin-left:auto;font-size:11.5px;color:var(--tx-2);font-variant-numeric:tabular-nums}
-.mx .pc.off{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--tx-3)}
 
 /* An instrument fader: a thin recessed track, short ticks under it and a compact
    cylindrical thumb. The ticks are drawn by a gradient — separate elements for

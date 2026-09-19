@@ -20,7 +20,6 @@
     "master": "Hoofdvolume",
     "apps": "Apps",
     "system_sounds": "Systeemgeluiden",
-    "muted": "Gedempt",
     "mute": "Dempen",
     "unmute": "Dempen opheffen",
     "no_apps": "Geen app speelt nu geluid af",

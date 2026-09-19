@@ -73,6 +73,12 @@ function buildLcd() {
          <rect class="pct" x="6.6" y="16.6" width="3.4" height="3.4" rx=".9"/>
          <line class="pct" x1="1.5" y1="20.4" x2="8.5" y2="4.6"
                stroke-width="2.1" stroke-linecap="round"/>
+       </svg>`
+    // Sound switched off: a crossed speaker in place of the number, in the
+    // same ink. The knob keeps the level, as Windows does.
+    + `<svg class="lcdmute" viewBox="0 0 30 24" width="30" height="24">
+         <path class="pct" d="M2 8.5h5l6-5v17l-6-5H2z" stroke-width="1" stroke-linejoin="round"/>
+         <path class="pct" d="M17.5 8l7.5 8M25 8l-7.5 8" fill="none" stroke-width="2.4" stroke-linecap="round"/>
        </svg>`;
 
   // Right: a staircase of bars. It grows to the right, so one glance shows how
@@ -198,7 +204,12 @@ function push(lane, method, payload) {
 function setKnob(value, { push: send = true } = {}) {
   knobValue = Math.max(0, Math.min(100, value));
   paintKnob(knobValue);
-  if (send) push('master', 'set_master', { value: knobValue / 100 });
+  if (send) {
+    push('master', 'set_master', { value: knobValue / 100 });
+    // Turning switches the sound back on (see set_volume in Python); the
+    // number comes back now rather than at the next poll.
+    $('lcd-vol').classList.remove('muted');
+  }
 }
 
 const FINE = 0.25;      // with Shift held down — fine adjustment
@@ -387,22 +398,24 @@ function avatarColor(name) {
 // The master volume icon is large, level with the device icons on the first
 // tab. The old fifteen-pixel one got lost inside the orange tile.
 const SPEAKER_SVG = '<span class="mxico" style="-webkit-mask-image:url(icons/ui/vol-high.svg);mask-image:url(icons/ui/vol-high.svg)"></span>';
-const SLASH_SVG = '<span class="slash"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M15.5 9.5l6 5m0-5l-6 5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg></span>';
+const SPEAKER_OFF_SVG = SPEAKER_SVG.replaceAll('vol-high', 'vol-x');
+// An application's own icon is not touched: the mute mark sits in its corner.
+const MUTE_BADGE = '<span class="mbadge"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4.5v15L7 15H3z"/><path d="M15.5 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></span>';
 
 function sliderRow({ key, label, volume, muted, kind, icon }) {
   const pct = Math.round(volume * 100);
-  const face = kind === 'master' ? SPEAKER_SVG
+  const face = kind === 'master' ? (muted ? SPEAKER_OFF_SVG : SPEAKER_SVG)
     : icon ? `<img src="appicon/${esc(icon)}" alt="">`
       : esc((label[0] || '?'));
   const bg = kind === 'master' ? 'var(--acc)' : icon ? 'transparent' : avatarColor(label);
   return `<div class="mx ${muted ? 'muted' : ''}" data-key="${esc(key)}" data-kind="${kind}">
       <button class="ap" data-act="mute" style="background:${bg}"
               title="${muted ? t('unmute') : t('mute')}" aria-pressed="${muted}">
-        ${face}${SLASH_SVG}
+        ${face}${kind === 'master' ? '' : MUTE_BADGE}
       </button>
       <div class="col">
         <div class="top"><span class="nm">${esc(label)}</span>
-          <span class="pc ${muted ? 'off' : ''}">${muted ? t('muted') : `${pct}%`}</span></div>
+          <span class="pc">${pct}%</span></div>
         <div class="slider" data-act="vol">
           <div class="track"></div>
           <div class="fill" style="width:${pct}%"></div>
@@ -1055,7 +1068,7 @@ document.addEventListener('pointerdown', (e) => {
     // Moving the slider switches the sound back on (see set_volume in Python),
     // so the row stops looking muted right away rather than at the next refresh.
     mx.classList.remove('muted');
-    mx.querySelector('.pc').classList.remove('off');
+    if (mx.dataset.kind === 'master') mx.querySelector('.ap').innerHTML = SPEAKER_SVG;
     mx.querySelector('.ap').setAttribute('aria-pressed', 'false');
     const master = mx.dataset.kind === 'master';
     // Mixer sliders are dragged just as often, so they go through the same lane.
@@ -1185,6 +1198,7 @@ async function poll() {
       if (!knobBusy) knobValue = m.volume * 100;
       paintKnob(knobValue);
       lvlTarget = m.muted ? 0 : toLevel(m.peak);
+      $('lcd-vol').classList.toggle('muted', !!m.muted);
     }
 
     // While music is playing, the middle key shows the track instead of what

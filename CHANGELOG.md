@@ -3,6 +3,17 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+- switched-off sound is visible: the volume window shows a crossed speaker in
+  place of the number, the tray icon gets a cross in its corner, and in the
+  mixer the speaker tile changes and a muted application gets a mark on its
+  icon. It used to show only as a greyed row in the mixer, and a person with
+  the sound off by a keyboard key had to find the cause in Windows;
+- turning the knob or a mixer slider switches the sound back on, as the Windows
+  slider does;
+- `dock_hello` also answers the volume and whether the sound is off.
+
 ## 1.0.5
 
 - the tray icon beside the dock widget is the person's choice. Master Control

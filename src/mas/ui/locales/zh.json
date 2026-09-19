@@ -20,7 +20,6 @@
     "master": "主音量",
     "apps": "应用程序",
     "system_sounds": "系统声音",
-    "muted": "已静音",
     "mute": "静音",
     "unmute": "取消静音",
     "no_apps": "当前没有应用在播放声音",

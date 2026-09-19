@@ -20,7 +20,6 @@
     "master": "Hauptlautstärke",
     "apps": "Apps",
     "system_sounds": "Systemklänge",
-    "muted": "Stumm",
     "mute": "Stummschalten",
     "unmute": "Ton einschalten",
     "no_apps": "Keine App spielt gerade Ton ab",

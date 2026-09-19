@@ -14,7 +14,7 @@ import winreg
 from ctypes import wintypes
 
 import pystray
-from PIL import Image
+from PIL import Image, ImageChops, ImageDraw
 
 from . import log
 from .core import strings
@@ -69,6 +69,40 @@ def load_glyph(name: str, light_taskbar: bool, size: int | None = None) -> Image
     return Image.open(path).convert("RGBA")
 
 
+def with_mute_mark(img: Image.Image, light_taskbar: bool) -> Image.Image:
+    """The glyph with a cross cut into its lower right corner: the sound is off.
+
+    The cross stands in a hole of its own rather than on top of the glyph, so
+    it reads at twenty pixels instead of merging with the lines under it. The
+    hole and the cross are drawn eight times larger and brought down as masks,
+    so their edges are smooth; the glyph itself is never resampled — that
+    blurred every line of it.
+    """
+    k = 8
+    size = img.width
+    s = size * k
+    x0 = s / 2                                 # the corner the cross takes
+    gap = k * 1.2
+    hole = Image.new("L", (s, s), 0)
+    ImageDraw.Draw(hole).ellipse((x0 - gap, x0 - gap, s + gap, s + gap), fill=255)
+    cross = Image.new("L", (s, s), 0)
+    pad = x0 * 0.24
+    width = round(size / 13 * k)
+    draw = ImageDraw.Draw(cross)
+    draw.line((x0 + pad, x0 + pad, s - pad, s - pad), fill=255, width=width)
+    draw.line((x0 + pad, s - pad, s - pad, x0 + pad), fill=255, width=width)
+    hole = hole.resize((size, size), Image.LANCZOS)
+    cross = cross.resize((size, size), Image.LANCZOS)
+
+    out = img.copy()
+    keep = Image.eval(hole, lambda v: 255 - v)
+    out.putalpha(ImageChops.multiply(out.getchannel("A"), keep))
+    ink = (0, 0, 0, 255) if light_taskbar else (255, 255, 255, 255)
+    mark = Image.new("RGBA", out.size, ink)
+    mark.putalpha(cross)
+    return Image.alpha_composite(out, mark)
+
+
 def icon_handle(img: Image.Image) -> int:
     """A Windows icon of exactly the size it was drawn at, with no rescaling.
 
@@ -96,6 +130,7 @@ class Tray:
         self.on_middle = on_middle
         self.on_quit = on_quit
         self._glyph = DEFAULT_GLYPH
+        self._muted = False
         self._light = taskbar_is_light()
         self.icon = pystray.Icon(
             "MasterAudioSwitcher",
@@ -131,6 +166,16 @@ class Tray:
         """Tooltip only: no reason to touch the icon, and the track changes often."""
         self._queue.put(("tip", tooltip[:127], None))
 
+    def set_muted(self, muted: bool) -> None:
+        """The sound was switched off or on — by us, by a keyboard key or in
+        Windows itself. Without a mark the icon said nothing about it, and a
+        person turning the volume up heard nothing and did not know why."""
+        self._queue.put(("muted", bool(muted), None))
+
+    def _image(self, size: int | None = None) -> Image.Image:
+        img = load_glyph(self._glyph, self._light, size)
+        return with_mute_mark(img, self._light) if self._muted else img
+
     def notify(self, message: str, title: str = "Master Audio Switcher") -> None:
         self._queue.put(("notify", message, title))
 
@@ -139,9 +184,13 @@ class Tray:
         if kind == "device":
             _, glyph, tooltip = job
             self._glyph = glyph
-            self.icon.icon = load_glyph(glyph, self._light)
+            self.icon.icon = self._image()
             self.icon.title = tooltip  # Windows cuts tooltips longer than 128 chars
             self._show()
+        elif kind == "muted":
+            if job[1] != self._muted:
+                self._muted = job[1]
+                self.icon.icon = self._image()
         elif kind == "tip":
             self.icon.title = job[1]
         elif kind == "visible":
@@ -256,7 +305,7 @@ class Tray:
             # asking for another icon size — redraw it, otherwise it smears.
             if light != self._light or now != size:
                 self._light, size = light, now
-                self.icon.icon = load_glyph(self._glyph, light, now)
+                self.icon.icon = self._image(now)
                 _log.info("tray icon redrawn (light taskbar: %s, size: %s)", light, now)
 
     # --- lifecycle -----------------------------------------------

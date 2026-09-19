@@ -86,6 +86,7 @@ exists to keep a browser page out, not you.
   "protocol": 2,
   "version": "1.0.3",
   "hosting": false,
+  "master": {"volume": 0.62, "muted": false},
   "state": {
     "outputs": [
       {"id": "{0.0.0…}", "name": "Speakers (Realtek(R) Audio)",
@@ -98,6 +99,12 @@ exists to keep a browser page out, not you.
   }
 }
 ```
+
+`master` is the volume of the current device and whether its sound is off —
+by a keyboard key, in Windows or anywhere else. When `muted` is true, draw the
+widget so it says so (we put a cross in the corner of the device icon); the
+level stays as it is. `set_master` switches the sound back on by itself, as the
+Windows slider does, so turning the volume in the widget is also the way out.
 
 **Leave `get_meter` alone.** It is our own window's poll and it consumes signals
 meant for that window — calling it from outside makes our interface miss things.

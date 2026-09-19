@@ -20,7 +20,6 @@
     "master": "Master volume",
     "apps": "Applications",
     "system_sounds": "System sounds",
-    "muted": "Muted",
     "mute": "Mute",
     "unmute": "Unmute",
     "no_apps": "No application is playing sound right now",
