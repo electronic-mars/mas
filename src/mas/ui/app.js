@@ -1052,6 +1052,11 @@ document.addEventListener('pointerdown', (e) => {
     slider.querySelector('.fill').style.width = `${v * 100}%`;
     slider.querySelector('.knb').style.left = `${v * 100}%`;
     mx.querySelector('.pc').textContent = `${Math.round(v * 100)}%`;
+    // Moving the slider switches the sound back on (see set_volume in Python),
+    // so the row stops looking muted right away rather than at the next refresh.
+    mx.classList.remove('muted');
+    mx.querySelector('.pc').classList.remove('off');
+    mx.querySelector('.ap').setAttribute('aria-pressed', 'false');
     const master = mx.dataset.kind === 'master';
     // Mixer sliders are dragged just as often, so they go through the same lane.
     if (master) push('master', 'set_master', { value: v });

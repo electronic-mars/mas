@@ -1410,5 +1410,37 @@ check("every default is one of the four shapes checked",
       all(type(v) in (bool, str, list, dict) for v in _DEF.values()), True)
 _config_path().unlink()
 
+# Turning the knob while the sound is muted used to move the number and nothing
+# else: the person heard silence and went looking in the Windows settings. Now
+# turning switches the sound back on, as the Windows slider does.
+print("\nTurning the volume brings the sound back")
+from mas.core.meter import Meter  # noqa: E402
+
+
+class _Endpoint:
+    def __init__(self, muted):
+        self.muted, self.level, self.mute_calls = muted, 0.0, 0
+
+    def SetMasterVolumeLevelScalar(self, v, ctx):
+        self.level = v
+
+    def SetMute(self, m, ctx):
+        self.muted = bool(m)
+        self.mute_calls += 1
+
+
+_m = Meter()
+_m._vol = _Endpoint(muted=True)
+_m._snap["muted"] = True
+_m.set_volume(0.4)
+check("turning a muted knob switches the sound on", _m._vol.muted, False)
+check("and sets the volume it was turned to", _m._vol.level, 0.4)
+check("the page hears it at once", _m.snapshot()["muted"], False)
+_m = Meter()
+_m._vol = _Endpoint(muted=False)
+_m.set_volume(0.7)
+check("an unmuted knob leaves mute alone", _m._vol.mute_calls, 0)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
+

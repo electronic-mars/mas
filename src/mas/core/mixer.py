@@ -97,7 +97,14 @@ def _apply(name: str, fn) -> bool:
 
 def set_volume(name: str, value: float) -> bool:
     value = max(0.0, min(1.0, float(value)))
-    return _apply(name, lambda v: v.SetMasterVolume(value, None))
+
+    def turn(v):
+        # Moving a muted application's slider brings its sound back, like the
+        # master knob does.
+        v.SetMasterVolume(value, None)
+        if v.GetMute():
+            v.SetMute(False, None)
+    return _apply(name, turn)
 
 
 def set_mute(name: str, muted: bool) -> bool:

@@ -53,13 +53,21 @@ class Meter(threading.Thread):
         We update the snapshot immediately: otherwise, before the next
         measurement, the interface would read the old volume once more and throw
         the slider back to the value the person has just moved it away from.
+
+        Turning the volume also switches the sound back on, as the Windows
+        slider does: someone reaching for the knob wants to hear something, and
+        a knob that moves while the sound stays off only sends them hunting
+        through the system settings.
         """
         if self._vol is None:
             return
         value = max(0.0, min(1.0, float(value)))
         self._vol.SetMasterVolumeLevelScalar(value, None)
+        if self._snap["muted"]:
+            self._vol.SetMute(False, None)
         with self._lock:
             self._snap["volume"] = round(value, 4)
+            self._snap["muted"] = False
 
     def set_mute(self, muted: bool) -> None:
         if self._vol is None:
