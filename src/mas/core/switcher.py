@@ -55,7 +55,11 @@ class Switcher:
         ring = self.available()
         if not ring:
             return None
-        current = devices.default_id(is_output=True)
+        # Fresh, not from the cache: the cache may be two seconds behind a switch
+        # Windows made on its own, and the next device would then be counted
+        # from the old one — landing on the device already playing, a click that
+        # does nothing. A click is rare; the read is cheap next to it.
+        current = devices.default_id(is_output=True, max_age=0.0)
         if current in ring:
             return ring[(ring.index(current) + 1) % len(ring)]
         # The current device is outside the cycle (for example, Windows reset the

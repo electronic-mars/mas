@@ -68,7 +68,10 @@ class Meter(threading.Thread):
             return
         value = max(0.0, min(1.0, float(value)))
         self._vol.SetMasterVolumeLevelScalar(value, None)
-        if self._snap["muted"]:
+        # Asked of the device, not of the snapshot: the snapshot is up to half
+        # a second old, and a mute key pressed just before turning would be
+        # missed — the one case this is here for.
+        if self._vol.GetMute():
             self._vol.SetMute(False, None)
         with self._lock:
             self._snap["volume"] = round(value, 4)
@@ -143,7 +146,6 @@ class Meter(threading.Thread):
         if not moved:
             return
         devices.invalidate()
-        devices.list_devices()       # re-read here, not on the next request thread
         # We log every change by name: different headphones make the system
         # behave differently, and without this record the reason for "nothing
         # happens" is impossible to catch.
@@ -164,6 +166,11 @@ class Meter(threading.Thread):
         added, removed = live - before, before - live
         if (added or removed) and self._on_devices_changed:
             self._on_devices_changed(added, removed)
+        # Re-read here rather than on the next request thread — and only after
+        # the change has been reported: if the read fails, which a device
+        # half-way through arriving can make it do, the exception resets the
+        # watch, and a change not yet reported would be lost for good.
+        devices.list_devices()
 
     def run(self) -> None:
         import comtypes

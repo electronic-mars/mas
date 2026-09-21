@@ -1428,6 +1428,9 @@ class _Endpoint:
         self.muted = bool(m)
         self.mute_calls += 1
 
+    def GetMute(self):
+        return self.muted
+
 
 _m = Meter()
 _m._vol = _Endpoint(muted=True)
@@ -1440,6 +1443,59 @@ _m = Meter()
 _m._vol = _Endpoint(muted=False)
 _m.set_volume(0.7)
 check("an unmuted knob leaves mute alone", _m._vol.mute_calls, 0)
+# The mute key pressed a moment before turning: the meter has not measured it
+# yet, so the snapshot still says the sound is on. The device is what counts.
+_m = Meter()
+_m._vol = _Endpoint(muted=True)
+_m._snap["muted"] = False
+_m.set_volume(0.5)
+check("a mute the meter has not seen yet is still undone", _m._vol.muted, False)
+
+# A device half-way through arriving can make the device list fail to read.
+# The change must have been reported by then: the failure resets the watch, and
+# whatever was not reported before it is lost for good — a headset plugged in
+# and never taken.
+print("\nA failed device read does not swallow a device change")
+from mas.core import devices as _dev  # noqa: E402
+
+_saved = {n: getattr(_dev, n) for n in ("Presence", "list_devices", "default_id", "invalidate")}
+
+
+class _Presence:
+    states = [{"a": 1}, {"a": 1, "b": 1}]
+
+    def read(self):
+        return self.states.pop(0)
+
+
+def _broken_list(*a, **kw):
+    raise OSError("endpoint went away mid-read")
+
+
+_dev.Presence = _Presence
+_dev.list_devices = _broken_list
+_dev.default_id = lambda *a, **kw: None
+_dev.invalidate = lambda: None
+_heard = []
+_m = Meter(on_devices_changed=lambda added, removed: _heard.append((added, removed)))
+try:
+    _m._watch()            # the first look only takes stock
+    _m._watch()            # "b" arrived, then the list read fails
+except OSError:
+    pass
+check("the arrival was reported before the read failed", _heard, [({"b"}, set())])
+
+# The cycle counts the next device from the one playing now, read fresh: the
+# cache can be two seconds behind a switch Windows made on its own.
+_asked = []
+_dev.list_devices = lambda only_active=True: [
+    _dev.Device(id=i, name=i, is_output=True, active=True) for i in (A, B)]
+_dev.default_id = lambda is_output=True, max_age=None: _asked.append(max_age) or A
+check("the cycle moves on from the device playing now",
+      Switcher(FakeConfig(cycle=[A, B])).next_id(), B)
+check("and asks Windows which one that is, past the cache", _asked, [0.0])
+for _n, _v in _saved.items():
+    setattr(_dev, _n, _v)
 
 # The dock asks for the state every second, each time on a fresh request thread.
 # Those questions must be answered from what the meter thread already read:
