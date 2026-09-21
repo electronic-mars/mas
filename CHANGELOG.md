@@ -3,6 +3,18 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.7
+
+Three things the speed-up in 1.0.6 got wrong, found in review:
+
+- a headset plugged in could be missed: the device list was re-read before the
+  change was reported, and a read failing on a device half-way through
+  arriving lost the change;
+- a click within two seconds of Windows switching the sound on its own could
+  land on the device already playing and do nothing;
+- turning the volume right after pressing the mute key could leave the sound
+  off.
+
 ## 1.0.6
 
 - a click on the Master Control Dock widget switches in a fifth of a second
