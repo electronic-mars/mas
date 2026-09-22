@@ -241,10 +241,49 @@ check("previous one gone — go to the first available in the cycle", app.moved,
 app = auto_app(HP)
 fake_world([A, B], A)
 app._devices_changed({HP}, set())
-app.note_manual_switch()
+app.note_manual_switch(A)
 fake_world([A, B], A)
 app._devices_changed(set(), {HP})
 check("after a manual switch we do not interfere", app.moved, [HP])
+
+# Away from the headphones by hand and back onto them, also by hand: the person
+# chose them, so switching them off must still give the sound back — to where it
+# was before they came back to them. This is the 22.09 log: two manual switches
+# at 17:31, headset off at 19:14, and the sound left on the silent headphones.
+app = auto_app(HP)
+fake_world([A, B], A)
+app._devices_changed({HP}, set())           # the headphones take the sound
+fake_world([A, B], HP)
+app.note_manual_switch(A)                    # by hand to the speakers
+fake_world([A, B], A)
+app.note_manual_switch(HP)                   # and by hand back to the headphones
+check("chosen by hand, the headphones are held again", app._auto_held, True)
+check("and the way back is remembered", app._auto_prev, A)
+fake_world([A, B], HP)
+app._devices_changed(set(), {HP})
+check("switching them off gives the sound back", app.moved, [HP, A])
+
+# The same, as it actually happened: the headset's power switch, heard through
+# the dongle, while the endpoint itself stays in the system.
+app = auto_app(HP)
+fake_world([A, B, HP], A)
+app._dongle_changed(True)                    # the headset is switched on
+fake_world([A, B, HP], HP)
+app.note_manual_switch(A)
+fake_world([A, B, HP], A)
+app.note_manual_switch(HP)
+fake_world([A, B, HP], HP)
+app._dongle_changed(False)                   # and switched off
+check("the headset switched off by hand gives the sound back", app.moved, [HP, A])
+
+# Headphones chosen by hand without the program ever having taken them: the
+# same promise — and the way back is the device that was playing.
+app = auto_app(HP)
+fake_world([B], B)
+app.note_manual_switch(HP)
+fake_world([B], HP)
+app._devices_changed(set(), {HP})
+check("headphones chosen by hand give the sound back too", app.moved, [B])
 
 # Windows sometimes gives the sound to new headphones itself — nothing to switch.
 app = auto_app(HP)

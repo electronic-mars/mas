@@ -68,8 +68,10 @@ class Api:
         return self.app.state()
 
     def switch_to(self, device_id: str):
-        self.app.note_manual_switch()
         if device_id.startswith(devices.OUTPUT_PREFIX):
+            # Only an output decides who holds the sound: choosing a microphone
+            # by hand says nothing about where the person wants to listen.
+            self.app.note_manual_switch(device_id)
             self.app._go(device_id)          # same path as the tray: the mic follows
         else:
             # The microphone was chosen by hand. If it belongs to no headset,
@@ -446,7 +448,7 @@ class App:
             if self.tray:
                 self.tray.notify(strings.t("msg_none_marked"))
             return
-        self.note_manual_switch()
+        self.note_manual_switch(target)
         self._go(target)
 
     def _go(self, device_id: str) -> None:
@@ -536,10 +538,24 @@ class App:
             _log.exception("could not switch the microphone")
 
     # --- priority device -------------------------------------------------
-    def note_manual_switch(self) -> None:
-        """The person switched by hand — so we no longer "hold" the headphones,
-        and there is no need to butt in with our fallback when they vanish."""
-        self._auto_held = False
+    def note_manual_switch(self, target: str) -> None:
+        """The person switched by hand, to `target`.
+
+        Away from the headphones: we no longer "hold" them, and there is no
+        need to butt in with our fallback when they vanish. But onto them, the
+        person has said exactly what the program does by itself — listen here
+        while they are on — and the sound must come back when they go off. It
+        used to be dropped either way: switched away and back by hand, the
+        headphones were switched off and the sound stayed on them, silent.
+        """
+        auto = self.cfg.get("auto_device")
+        if not auto or target != auto:
+            self._auto_held = False
+            return
+        current = devices.default_id(is_output=True, max_age=0.0)
+        if current != auto:
+            self._auto_prev = current         # where the sound goes back to
+        self._auto_held = True
 
     def sync_auto_device(self) -> None:
         """The setting could have been turned on while the headphones are
