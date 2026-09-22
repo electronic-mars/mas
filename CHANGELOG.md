@@ -3,6 +3,14 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.8
+
+- headphones chosen by hand give the sound back when they are switched off,
+  just as the ones the program took by itself. Any manual switch used to drop
+  that, including a switch onto the headphones: switched away and back by hand,
+  the headset was turned off and the sound stayed on it, silent. Choosing a
+  microphone by hand no longer affects it at all.
+
 ## 1.0.7
 
 Three things the speed-up in 1.0.6 got wrong, found in review:
