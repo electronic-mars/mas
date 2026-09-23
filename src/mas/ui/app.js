@@ -1167,6 +1167,7 @@ if (!state.settings.onboarded) showWelcome();
 // once a second, and only to notice that it has been shown again.
 const TICK_SEEN = 200, TICK_UNSEEN = 1000;
 let polling = false;
+let wasHidden = true;        // the window starts out of sight
 let lastRev = -1;
 let tick = TICK_SEEN;
 let timer = null;
@@ -1185,6 +1186,21 @@ function pace(ms) {
 for (const ev of ['focus', 'resize', 'visibilitychange', 'pointerover'])
   window.addEventListener(ev, () => { if (tick !== TICK_SEEN) poll(); });
 
+// A window that has just appeared puts the focus on the first thing it can, and
+// the engine treats that as a step by keyboard: the mini-view button came up
+// ringed and with its tooltip hanging over the desktop, as though it had been
+// tabbed to. Nobody tabbed anywhere — the person clicked the tray icon — so the
+// focus is handed back to the page. Anything the person could be typing into,
+// such as the box that captures a shortcut, keeps it.
+function dropStrayFocus() {
+  const el = document.activeElement;
+  if (!el || el === document.body) return;
+  if (el.closest('input, select, textarea, [data-capture]')) return;
+  el.blur();
+}
+
+window.addEventListener('focus', dropStrayFocus);
+
 async function poll() {
   if (polling) return;
   polling = true;
@@ -1192,9 +1208,11 @@ async function poll() {
     const m = await call('get_meter');
     // The window is hidden, so there is nothing to draw. The rest is handled as
     // usual: Python hands out the tab signal once, and it must not be missed.
+    if (m.hidden) wasHidden = true;
     setPainting(!m.hidden);
     pace(m.hidden ? TICK_UNSEEN : TICK_SEEN);
     if (!m.hidden) {
+      if (wasHidden) { wasHidden = false; dropStrayFocus(); }
       if (!knobBusy) knobValue = m.volume * 100;
       paintKnob(knobValue);
       lvlTarget = m.muted ? 0 : toLevel(m.peak);
