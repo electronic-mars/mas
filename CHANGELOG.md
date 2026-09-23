@@ -3,6 +3,13 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.0.9
+
+- the sound after a switch is two soft short notes instead of a hard beep;
+- the window no longer opens with the mini-view button outlined and its
+  tooltip hanging over the desktop: the engine gave that button the focus as
+  though it had been reached with the keyboard.
+
 ## 1.0.8
 
 - headphones chosen by hand give the sound back when they are switched off,
