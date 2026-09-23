@@ -22,7 +22,7 @@ from .core.players import Players
 from .core import language, runtime, screen, strings, update
 from .overlay import Overlay
 from .core.switcher import Switcher
-from .paths import is_frozen, log_path
+from .paths import is_frozen, log_path, ui_dir
 from .tray import Tray
 from .updater import Updater
 from .wizard import Wizard
@@ -857,17 +857,17 @@ class App:
 
     @staticmethod
     def _beep() -> None:
-        """The tone plays on the default device, that is, already on the new one
-        — you hear where the sound went. In a separate thread so the click is
-        not held up."""
-        def run():
-            try:
-                import winsound
-                winsound.Beep(880, 90)
-            except Exception:
-                _log.warning("the beep did not play", exc_info=True)
-
-        threading.Thread(target=run, daemon=True, name="mas-beep").start()
+        """The sound plays on the default device, that is, already on the new
+        one — you hear where the sound went. Asynchronous, so the click is not
+        held up. Two soft notes (tools/make_switch_sound.py); it used to be
+        winsound.Beep, a hard 880 Hz tone that people found harsh."""
+        import winsound
+        try:
+            winsound.PlaySound(str(ui_dir() / "sounds" / "switch.wav"),
+                               winsound.SND_FILENAME | winsound.SND_ASYNC
+                               | winsound.SND_NODEFAULT)
+        except RuntimeError:
+            _log.warning("the switch sound did not play", exc_info=True)
 
     def _mute_changed(self, muted: bool) -> None:
         if self.tray:

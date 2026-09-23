@@ -1565,6 +1565,21 @@ for _light in (False, True):
     check(f"the cross is in the taskbar's ink (light={_light})",
           sum(_ink) < 200 if _light else sum(_ink) > 560, True)
 
+# The switch sound ships inside the interface folder, which is what the build
+# bundles. Short and quiet on purpose: the old tone was a hard beep at full level.
+print("\nThe switch sound")
+import wave as _wave  # noqa: E402
+from mas.paths import ui_dir as _ui_dir  # noqa: E402
+
+_snd = _ui_dir() / "sounds" / "switch.wav"
+check("the switch sound is there", _snd.is_file(), True)
+with _wave.open(str(_snd)) as _w:
+    _frames = _w.readframes(_w.getnframes())
+    check("it is short", _w.getnframes() / _w.getframerate() <= 0.2, True)
+_peak = max(abs(int.from_bytes(_frames[i:i + 2], "little", signed=True))
+            for i in range(0, len(_frames), 2)) / 32767
+check("it is quiet", _peak <= 0.15, True)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
 
