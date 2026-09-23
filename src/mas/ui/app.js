@@ -1192,6 +1192,11 @@ for (const ev of ['focus', 'resize', 'visibilitychange', 'pointerover'])
 // tabbed to. Nobody tabbed anywhere — the person clicked the tray icon — so the
 // focus is handed back to the page. Anything the person could be typing into,
 // such as the box that captures a shortcut, keeps it.
+//
+// Only on the way out of hiding. The window's focus event also fires every time
+// the person comes back to it from another program, and then the focus is one
+// they placed themselves — on a glyph of the icon palette, on the knob they are
+// turning with the arrows — and taking it away would leave the keyboard dead.
 function dropStrayFocus() {
   const el = document.activeElement;
   if (!el || el === document.body) return;
@@ -1199,7 +1204,7 @@ function dropStrayFocus() {
   el.blur();
 }
 
-window.addEventListener('focus', dropStrayFocus);
+window.addEventListener('focus', () => { if (wasHidden) dropStrayFocus(); });
 
 async function poll() {
   if (polling) return;
