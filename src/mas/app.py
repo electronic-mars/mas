@@ -250,6 +250,10 @@ class Api:
         self.app.hide()
         return True
 
+    def focus_lost(self):
+        self.app.focus_lost()
+        return True
+
     def quit(self):
         self.app.quit()
         return True
@@ -979,6 +983,29 @@ class App:
             tab, self._pending_tab = self._pending_tab, None
             return {"tab": tab, "rev": self._state_rev, "mini": self._mini,
                     "hidden": not self._visible, "now": self.players.snapshot()}
+
+    def focus_lost(self) -> None:
+        """The page says the window has lost the focus. With the setting on, it
+        goes away — but only once the focus has really landed somewhere else.
+
+        A moment later, not at once: while Windows hands the focus over, the
+        foreground window can be nobody. Not when the focus went to the taskbar:
+        that is the tray icon being clicked, and the icon decides what happens to
+        the window. And not while a dongle is being taught — the person is
+        reaching for the headset, and closing the window would end the lesson.
+        """
+        if not self.cfg.get("hide_on_blur") or not self._visible or self.wizard.running:
+            return
+
+        def later():
+            time.sleep(0.15)
+            if (not self._visible or screen.is_front(self.own_hwnd())
+                    or screen.front_is_taskbar()):
+                return
+            _log.info("the focus went elsewhere — hiding the window")
+            self.hide()
+
+        threading.Thread(target=later, daemon=True, name="mas-blur").start()
 
     def hide(self) -> None:
         if not self.window:

@@ -172,6 +172,9 @@ class FakeApi:
     def set_mini(self, **kw):
         return True
 
+    def focus_lost(self):
+        return True
+
     def open_data_folder(self):
         return True
 

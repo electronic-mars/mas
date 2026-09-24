@@ -633,6 +633,7 @@ function renderSettings() {
       state.settings.dock_showing
         ? toggle('tray_with_dock', t('tray_dock'), t('tray_dock_d'))
         : '',
+      toggle('hide_on_blur', t('hide_blur'), t('hide_blur_d')),
     ])}
      <h2 class="sec micro">${secIcon('sec-switching')}${t('switching')}</h2>
      ${group([
@@ -1205,6 +1206,12 @@ function dropStrayFocus() {
 }
 
 window.addEventListener('focus', () => { if (wasHidden) dropStrayFocus(); });
+
+// The window lost the focus. Whether it goes away is Python's call: it knows
+// the setting, whether a dongle is being taught, and where the focus went.
+window.addEventListener('blur', () => {
+  if (state?.settings?.hide_on_blur) call('focus_lost').catch(() => {});
+});
 
 async function poll() {
   if (polling) return;

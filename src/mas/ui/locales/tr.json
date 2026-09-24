@@ -129,6 +129,8 @@
     "g_left_d2": "Sesi sonraki cihaza geçirir",
     "w_hidden": "Simgeyi göremiyor musunuz?",
     "tray_dock": "Simge tepside de",
-    "tray_dock_d": "Program Master Control Dock'ta gösteriliyor. Tepsideki simge de aynı şekilde geçiş yapar"
+    "tray_dock_d": "Program Master Control Dock'ta gösteriliyor. Tepsideki simge de aynı şekilde geçiş yapar",
+    "hide_blur": "Başka yere tıklayınca gizle",
+    "hide_blur_d": "Başka bir pencereye veya masaüstüne tıklandığında pencere gizlenir"
   }
 }

@@ -129,6 +129,8 @@
     "g_left_d2": "Przełącza dźwięk na następne urządzenie",
     "w_hidden": "Nie widzisz ikony?",
     "tray_dock": "Ikona również na pasku",
-    "tray_dock_d": "Program jest widoczny w Master Control Dock. Ikona na pasku przełącza tak samo"
+    "tray_dock_d": "Program jest widoczny w Master Control Dock. Ikona na pasku przełącza tak samo",
+    "hide_blur": "Ukrywaj po kliknięciu obok",
+    "hide_blur_d": "Okno znika, gdy tylko klikniesz inne okno lub pulpit"
   }
 }

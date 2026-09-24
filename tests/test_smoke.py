@@ -1565,6 +1565,64 @@ for _light in (False, True):
     check(f"the cross is in the taskbar's ink (light={_light})",
           sum(_ink) < 200 if _light else sum(_ink) > 560, True)
 
+# Hiding the window when the focus goes elsewhere. The decision is made a moment
+# later, from where the focus actually landed: another program — hide; the
+# taskbar — leave it to the tray icon, which has its own say about the window.
+print("\nHiding the window when the focus goes elsewhere")
+import mas.app as _app_mod  # noqa: E402
+
+
+def _blur_app(on=True, visible=True, teaching=False):
+    a = App.__new__(App)
+    a.cfg = FakeConfig(hide_on_blur=on)
+    a._visible = visible
+    a.wizard = type("W", (), {"running": teaching})()
+    a._hwnd = 1
+    a.hidden = 0
+    a.hide = lambda: setattr(a, "hidden", a.hidden + 1)
+    return a
+
+
+class _Screen:
+    front, taskbar = 2, False
+
+    @staticmethod
+    def is_front(h):
+        return _Screen.front == h
+
+    @staticmethod
+    def front_is_taskbar():
+        return _Screen.taskbar
+
+
+def _blur(a, front=2, taskbar=False):
+    _Screen.front, _Screen.taskbar = front, taskbar
+    saved_screen, saved_threading = _app_mod.screen, _app_mod.threading
+    _app_mod.screen = _Screen
+
+    class _Now:                        # run the delayed check in place
+        def __init__(self, target, **kw):
+            self.target = target
+
+        def start(self):
+            self.target()
+    _app_mod.threading = type("T", (), {"Thread": _Now})
+    saved_sleep, _app_mod.time.sleep = _app_mod.time.sleep, lambda s: None
+    try:
+        a.focus_lost()
+    finally:
+        _app_mod.screen, _app_mod.threading = saved_screen, saved_threading
+        _app_mod.time.sleep = saved_sleep
+    return a.hidden
+
+
+check("focus went to another program: hidden", _blur(_blur_app()), 1)
+check("setting off: stays", _blur(_blur_app(on=False)), 0)
+check("focus went to the taskbar: left to the tray icon", _blur(_blur_app(), taskbar=True), 0)
+check("focus came straight back: stays", _blur(_blur_app(), front=1), 0)
+check("a dongle is being taught: stays", _blur(_blur_app(teaching=True)), 0)
+check("already hidden: nothing to do", _blur(_blur_app(visible=False)), 0)
+
 # The switch sound ships inside the interface folder, which is what the build
 # bundles. Short and quiet on purpose: the old tone was a hard beep at full level.
 print("\nThe switch sound")

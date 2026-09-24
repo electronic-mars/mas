@@ -129,6 +129,8 @@
     "g_left_d2": "Commuta l'audio al prossimo dispositivo",
     "w_hidden": "Non vedi l'icona?",
     "tray_dock": "Icona anche nell'area di notifica",
-    "tray_dock_d": "Il programma è mostrato in Master Control Dock. L'icona nell'area di notifica commuta allo stesso modo"
+    "tray_dock_d": "Il programma è mostrato in Master Control Dock. L'icona nell'area di notifica commuta allo stesso modo",
+    "hide_blur": "Nascondi cliccando altrove",
+    "hide_blur_d": "La finestra si nasconde appena si clicca su un'altra finestra o sul desktop"
   }
 }

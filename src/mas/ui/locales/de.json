@@ -129,6 +129,8 @@
     "g_left_d2": "Schaltet den Ton auf das nächste Gerät um",
     "w_hidden": "Symbol nicht zu sehen?",
     "tray_dock": "Symbol auch im Infobereich",
-    "tray_dock_d": "Das Programm wird in Master Control Dock angezeigt. Das Symbol im Infobereich schaltet genauso um"
+    "tray_dock_d": "Das Programm wird in Master Control Dock angezeigt. Das Symbol im Infobereich schaltet genauso um",
+    "hide_blur": "Beim Klick daneben ausblenden",
+    "hide_blur_d": "Das Fenster verschwindet, sobald ein anderes Fenster oder der Desktop angeklickt wird"
   }
 }

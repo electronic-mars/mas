@@ -129,6 +129,8 @@
     "g_left_d2": "Moves the sound to the next device",
     "w_hidden": "Can't see the icon?",
     "tray_dock": "Tray icon as well",
-    "tray_dock_d": "The program is shown in Master Control Dock. The tray icon switches the same way"
+    "tray_dock_d": "The program is shown in Master Control Dock. The tray icon switches the same way",
+    "hide_blur": "Hide when clicking elsewhere",
+    "hide_blur_d": "The window goes away as soon as another window or the desktop is clicked"
   }
 }

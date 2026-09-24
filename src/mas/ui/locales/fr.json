@@ -129,6 +129,8 @@
     "g_left_d2": "Bascule le son vers le prochain périphérique",
     "w_hidden": "Vous ne voyez pas l'icône ?",
     "tray_dock": "Icône aussi dans la barre d'état",
-    "tray_dock_d": "Le programme est affiché dans Master Control Dock. L'icône de la barre d'état bascule de la même façon"
+    "tray_dock_d": "Le programme est affiché dans Master Control Dock. L'icône de la barre d'état bascule de la même façon",
+    "hide_blur": "Masquer en cliquant ailleurs",
+    "hide_blur_d": "La fenêtre se ferme dès qu'on clique sur une autre fenêtre ou sur le bureau"
   }
 }

@@ -129,6 +129,8 @@
     "g_left_d2": "将声音切换到下一个设备",
     "w_hidden": "找不到图标？",
     "tray_dock": "托盘中也显示图标",
-    "tray_dock_d": "程序已显示在 Master Control Dock 中。托盘图标的切换方式相同"
+    "tray_dock_d": "程序已显示在 Master Control Dock 中。托盘图标的切换方式相同",
+    "hide_blur": "点击其他位置时隐藏",
+    "hide_blur_d": "点击其他窗口或桌面时，窗口会自动隐藏"
   }
 }

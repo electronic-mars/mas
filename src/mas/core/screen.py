@@ -94,6 +94,22 @@ def own_window(title: str) -> int | None:
     return hwnd if pid.value == os.getpid() else None
 
 
+# The taskbar and the notification area, the flyout of hidden icons included. A
+# click there is the tray icon being used, and the icon has its own say about
+# the window: hiding it first would turn "put it away" into "show it again".
+TASKBAR_CLASSES = {"Shell_TrayWnd", "Shell_SecondaryTrayWnd",
+                   "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland"}
+
+
+def front_is_taskbar() -> bool:
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        return False
+    name = ctypes.create_unicode_buffer(64)
+    user32.GetClassNameW(hwnd, name, 64)
+    return name.value in TASKBAR_CLASSES
+
+
 def is_front(hwnd: int) -> bool:
     """Is this window the one the person is actually looking at?"""
     return bool(hwnd) and int(user32.GetForegroundWindow() or 0) == int(hwnd)

@@ -77,6 +77,11 @@ DEFAULTS: dict[str, Any] = {
     # the tray icon stays unless they say otherwise: it is the one way in that
     # depends on nothing else running.
     "tray_with_dock": True,
+    # Put the window away as soon as the person clicks anywhere else, the way
+    # the Windows flyouts behave. Off by default: some people keep the mini view
+    # open beside their work, and the window vanishing from under them would be
+    # a change they never asked for.
+    "hide_on_blur": False,
     "mics_expanded": False,   # the microphone section is collapsed by default
     "onboarded": False,
 }

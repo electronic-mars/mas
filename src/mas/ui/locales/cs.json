@@ -129,6 +129,8 @@
     "g_left_d2": "Přepne zvuk na další zařízení",
     "w_hidden": "Nevidíte ikonu?",
     "tray_dock": "Ikona i v oznamovací oblasti",
-    "tray_dock_d": "Program je zobrazen v Master Control Dock. Ikona v oznamovací oblasti přepíná stejně"
+    "tray_dock_d": "Program je zobrazen v Master Control Dock. Ikona v oznamovací oblasti přepíná stejně",
+    "hide_blur": "Skrýt při kliknutí jinam",
+    "hide_blur_d": "Okno zmizí, jakmile klepnete na jiné okno nebo na plochu"
   }
 }

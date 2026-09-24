@@ -129,6 +129,8 @@
     "g_left_d2": "Schakelt geluid naar het volgende apparaat",
     "w_hidden": "Zie je het pictogram niet?",
     "tray_dock": "Pictogram ook in het systeemvak",
-    "tray_dock_d": "Het programma wordt getoond in Master Control Dock. Het pictogram in het systeemvak schakelt op dezelfde manier"
+    "tray_dock_d": "Het programma wordt getoond in Master Control Dock. Het pictogram in het systeemvak schakelt op dezelfde manier",
+    "hide_blur": "Verbergen bij klikken ernaast",
+    "hide_blur_d": "Het venster verdwijnt zodra je op een ander venster of het bureaublad klikt"
   }
 }

@@ -129,6 +129,8 @@
     "g_left_d2": "Cambia el sonido al siguiente dispositivo",
     "w_hidden": "¿No ves el icono?",
     "tray_dock": "Icono también en la bandeja",
-    "tray_dock_d": "El programa se muestra en Master Control Dock. El icono de la bandeja cambia igual"
+    "tray_dock_d": "El programa se muestra en Master Control Dock. El icono de la bandeja cambia igual",
+    "hide_blur": "Ocultar al hacer clic fuera",
+    "hide_blur_d": "La ventana se oculta en cuanto se hace clic en otra ventana o en el escritorio"
   }
 }
