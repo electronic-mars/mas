@@ -363,25 +363,37 @@ SCREENS = [
     ("26-mini-light", {"tab": "devices", "theme": "light"}, 250, "mini"),
 ]
 
-# Notifications: icon, caption, whether the theme is light.
+# Cards: the notification after a switch, and the card shown while the pointer
+# rests on the tray icon. Name, card, whether the theme is light.
+def _card(glyph, title, sub, pct, caption="Звук переключён", track=None, muted=False):
+    return {"glyph": glyph, "title": title, "sub": sub, "pct": pct, "muted": muted,
+            "caption": caption, **({"track": track} if track else {})}
+
+
 NOTES = [
-    ("19-notify-headset-dark", "headset", "Headphones (HyperX Cloud Flight S)", False),
-    ("20-notify-headset-light", "headset", "Headphones (HyperX Cloud Flight S)", True),
-    ("21-notify-speakers-dark", "laptop", "Speakers (Realtek(R) Audio)", False),
-    ("22-notify-speakers-light", "laptop", "Speakers (Realtek(R) Audio)", True),
-    ("23-notify-long-dark", "monitor", "LG HDR 4K (AMD High Definition Audio)", False),
-    ("24-notify-mic-dark", "microphone", "Microphone (HyperX Cloud Flight S)", False),
+    ("19-notify-headset-dark", _card("headset", "HyperX Cloud Flight S", "Наушники", 64), False),
+    ("20-notify-headset-light", _card("headset", "HyperX Cloud Flight S", "Наушники", 64), True),
+    ("21-notify-speakers-dark", _card("laptop", "Realtek(R) Audio", "Динамики", 38), False),
+    ("22-notify-speakers-light", _card("laptop", "Realtek(R) Audio", "Динамики", 38), True),
+    ("23-notify-long-dark", _card("monitor", "LG HDR 4K Ultra Wide Monitor With A Long Name", "", 100), False),
+    ("24-notify-mic-dark", _card("headset", "HyperX Cloud Flight S", "Микрофон гарнитуры", None), False),
+    ("34-hover-card-dark", _card("headset", "HyperX Cloud Flight S", "Наушники", 64, caption=None,
+                                 track=("Weird Fishes", "Radiohead")), False),
+    ("35-hover-card-light", _card("headset", "HyperX Cloud Flight S", "Наушники", 64, caption=None,
+                                  track=("Weird Fishes", "Radiohead")), True),
+    ("36-hover-card-muted-dark", _card("laptop", "Realtek(R) Audio", "Динамики", 38, caption=None,
+                                       muted=True), False),
 ]
 
 
 def notifications() -> None:
-    """Notification panels: as-is with transparency, and on a backdrop to show it."""
+    """The cards: as-is with transparency, and on a backdrop to show it."""
     from PIL import Image
-    for name, glyph, text, light in NOTES:
-        img = overlay._render(glyph, text, light)
+    for name, card, light in NOTES:
+        img = overlay._render(card, light, k=1.0)
         img.save(OUT / f"{name}.png")
-        # The backdrop is there so the rounded corners and the semi-transparency
-        # are visible against the white background of an image viewer.
+        # The backdrop is there so the rounded corners, the shadow and the
+        # semi-transparency are visible against the white of an image viewer.
         back = Image.new("RGBA", (img.width + 48, img.height + 48),
                          (228, 226, 222, 255) if light else (18, 20, 23, 255))
         back.alpha_composite(img, (24, 24))

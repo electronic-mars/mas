@@ -276,18 +276,17 @@ class App:
             self.cfg.set("language", language.pick())
         # The tray and the notifications speak the same language as the window.
         strings.use(self.cfg.get("language"))
-        self.players = Players(on_track=self.refresh_tip, on_dead=self._player_dead,
+        self.players = Players(on_track=self.refresh_title, on_dead=self._player_dead,
                                on_new_app=self.push_state)
         self.players.set_priority(self.cfg.get("priority_player"))
         self.hotkeys = Hotkeys(
             {"switch": self.cycle, "play": lambda: self.players.command("play")},
             {"switch": self.cfg.get("hotkey"), "play": self.cfg.get("hotkey_play")})
-        self._device_tip = strings.t("starting")
         self.api = Api(self)
         self.bridge = Bridge(self.api)
         self.window = None      # webview.Window, but the module loads later — see run()
         self.tray: Tray | None = None
-        self.overlay = Overlay()
+        self.overlay = Overlay(hover_card=self._hover_card)
         self._quitting = False
         # Version of the engine the window is drawn with, None when it is not
         # installed. Then there is no window at all, and the program lives in
@@ -361,8 +360,10 @@ class App:
         devs = devices.list_devices(only_active=True)
 
         def pack(d: devices.Device) -> dict:
+            title, what = devices.split_name(d.name)
             return {
                 "id": d.id, "name": d.name, "kind": d.kind,
+                "title": title, "purpose": strings.purpose(what),
                 "icon": icons.get(d.id) or devices.guess_icon(d.name, d.is_output),
                 "in_cycle": d.id in cycle,
                 "is_default": d.id == (cur_out if d.is_output else cur_in),
@@ -767,7 +768,7 @@ class App:
             self.show("devices")
 
     def show_device(self, dev: devices.Device | None) -> None:
-        """Only the icon and the tooltip — the fastest part of the feedback."""
+        """Only the icon — the fastest part of the feedback."""
         if dev is None or not self.tray:
             _log.warning("icon not updated: device %s, tray %s",
                          "not found" if dev is None else "there",
@@ -778,24 +779,7 @@ class App:
         # Written to the log: the complaint "the tray icon never changed" is
         # otherwise impossible to settle.
         _log.info("tray icon: %s (%s)", glyph or "default", dev.name)
-        self._device_tip = dev.name
-        self.tray.set_device(glyph, self.tray_tip())
-
-    def tray_tip(self) -> str:
-        """The tooltip on the icon.
-
-        While the music plays — only the track name. The program name, the
-        player name and the device are things the person knows anyway, and
-        because of them the main thing had to be read out of a long line. When
-        there is no music there is nothing to show, and the line goes back to
-        the device.
-        """
-        now = self.players.snapshot()
-        if now["playing"]:
-            track = " — ".join(x for x in (now["artist"], now["title"]) if x)
-            if track:
-                return track
-        return f"Master Audio Switcher — {self._device_tip}"
+        self.tray.set_device(glyph)
 
     def window_title(self) -> str:
         """What the taskbar button says.
@@ -830,12 +814,6 @@ class App:
         except Exception:
             _log.warning("the window title did not change", exc_info=True)
 
-    def refresh_tip(self) -> None:
-        """The track changed — refresh the tooltip without touching the icon."""
-        if self.tray:
-            self.tray.set_tip(self.tray_tip())
-        self.refresh_title()
-
     def _player_dead(self, who: str) -> None:
         """The player is listed in the system but does not answer: usually the
         tab has already been closed."""
@@ -849,12 +827,35 @@ class App:
         if not tray_done:
             self.refresh_tray()
         if self.cfg.get("notify_on_switch"):
-            self.overlay.show(
-                self.cfg.get("icons").get(dev.id) or devices.guess_icon(dev.name, dev.is_output),
-                dev.name, self._light_theme())
+            self.overlay.show(self._card(dev, caption=strings.t("sw_done")),
+                              self._light_theme())
         if self.cfg.get("sound_on_switch"):
             self._beep()
         self.push_state()
+
+    def _card(self, dev: devices.Device, caption: str | None = None,
+              track: bool = False) -> dict:
+        """What the notification and the hover card say about a device: its
+        name, what it is, and for an output the volume it plays at."""
+        title, what = devices.split_name(dev.name)
+        snap = self.meter.snapshot()
+        card = {"glyph": self.cfg.get("icons").get(dev.id)
+                or devices.guess_icon(dev.name, dev.is_output),
+                "title": title, "sub": strings.purpose(what),
+                "pct": round(snap["volume"] * 100) if dev.is_output else None,
+                "muted": bool(snap["muted"]) if dev.is_output else False,
+                "caption": caption}
+        if track:
+            now = self.players.snapshot()
+            if now["playing"] and now["title"]:
+                card["track"] = (now["title"], now["artist"])
+        return card
+
+    def _hover_card(self):
+        """The card for the pointer resting on the tray icon — the overlay asks
+        for it only once the pointer has settled, so it is always current."""
+        dev = self.current_device()
+        return (self._card(dev, track=True), self._light_theme()) if dev else None
 
     def _light_theme(self) -> bool:
         """The overlay follows the window theme, and with "like Windows" — the
@@ -888,8 +889,7 @@ class App:
             return
         dev = self.current_device()
         if dev is None:
-            self.tray.set_device(
-                None, f"Master Audio Switcher — {strings.t('device_unknown')}")
+            self.tray.set_device(None)
             return
         self.show_device(dev)
 
@@ -1105,6 +1105,8 @@ class App:
             on_left=lambda: self._button("left"),
             on_right=lambda: self._button("right"),
             on_middle=lambda: self.show("mixer"),
+            on_hover=self.overlay.hover,
+            on_click=self.overlay.unhover,
             on_quit=self.quit,
             # Last time we ran, the dock was drawing us. Hold the icon back
             # rather than flash it for three seconds at every start — the dock's

@@ -42,6 +42,20 @@ def use(code: str) -> None:
     _current = code if code and _load(code) else FALLBACK
 
 
+# What Windows calls an endpoint, in English, mapped to our own words: an
+# English Windows would otherwise say "Headphones" in a Russian program. Names
+# Windows already gives in another language are shown as they are.
+_PURPOSES = {"headphones": "p_headphones", "headset earphone": "p_headphones",
+             "speakers": "p_speakers", "headset": "p_headset",
+             "microphone": "p_microphone", "headset microphone": "p_headset_mic",
+             "microphone array": "p_mic_array"}
+
+
+def purpose(word: str) -> str:
+    key = _PURPOSES.get(word.lower().strip())
+    return t(key) if key else word
+
+
 def t(key: str, *args) -> str:
     text = _load(_current).get(key) or _load(FALLBACK).get(key) or key
     return text % args if args else text

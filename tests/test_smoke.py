@@ -455,29 +455,17 @@ check("what was playing is paused", loud.paused, True)
 check("what was already quiet is left alone", quiet.paused, False)
 check("the nominated one is never hushed", mine.paused, False)
 
-# Icon tooltip: while something is playing — only the track, otherwise the device.
-print("\nTray icon tooltip")
-
-
-def tip_for(**snap):
-    holder = App.__new__(App)
-    holder._device_tip = "Speakers (Realtek(R) Audio)"
-    holder.players = type("P", (), {"snapshot": staticmethod(lambda: snap)})
-    return App.tray_tip(holder)
-
-
-check("playing — the track title only",
-      tip_for(app="Spotify", artist="Biosphere", title="Infinite Reflections", playing=True),
-      "Biosphere — Infinite Reflections")
-check("paused — the device",
-      tip_for(app="Spotify", artist="Biosphere", title="Infinite Reflections", playing=False),
-      "Master Audio Switcher — Speakers (Realtek(R) Audio)")
-check("no player — the device",
-      tip_for(app="", artist="", title="", playing=False),
-      "Master Audio Switcher — Speakers (Realtek(R) Audio)")
-check("playing, but the title is unknown — the device",
-      tip_for(app="Opera", artist="", title="", playing=True),
-      "Master Audio Switcher — Speakers (Realtek(R) Audio)")
+# The name split: the device first, what it is second — and a screen, whose
+# brackets hold only the driver, left the way round it is.
+print("\nDevice names")
+check("headphones", devices.split_name("Headphones (HyperX Cloud Flight S)"),
+      ("HyperX Cloud Flight S", "Headphones"))
+check("brackets inside the device name", devices.split_name("Speakers (Realtek(R) Audio)"),
+      ("Realtek(R) Audio", "Speakers"))
+check("a screen keeps its own name", devices.split_name("LG HDR 4K (AMD High Definition Audio)"),
+      ("LG HDR 4K", ""))
+check("no brackets", devices.split_name("Digital Audio"), ("Digital Audio", ""))
+check("a Russian Windows", devices.split_name("Динамики (Realtek)"), ("Realtek", "Динамики"))
 
 print("Window height on someone else's screen")
 

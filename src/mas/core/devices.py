@@ -269,6 +269,35 @@ def _owner(name: str) -> str:
     return tail.rstrip(")").strip() if sep else ""
 
 
+# What Windows puts before the brackets when the brackets hold the device, in
+# the languages people are likely to run it in.
+_PURPOSE_WORDS = {"headphones", "speakers", "headset", "headset earphone", "microphone",
+                  "headset microphone", "microphone array", "line", "digital output",
+                  "наушники", "динамики", "головные телефоны", "гарнитура", "микрофон",
+                  "микрофон гарнитуры", "массив микрофонов", "микрофонная решетка",
+                  "микрофонная решётка", "цифровой выход"}
+
+
+def split_name(name: str) -> tuple[str, str]:
+    """'Headphones (HyperX Cloud Flight S)' -> ('HyperX Cloud Flight S', 'Headphones').
+
+    Windows leads with what the endpoint is and hides the device in brackets,
+    so every name started with the same word and the thing a person recognises
+    came last. A name with no brackets is its own title.
+
+    Only when what stands before the brackets is a kind of endpoint: a screen
+    is named the other way round, "LG HDR 4K (AMD High Definition Audio)", and
+    there the device leads and the brackets hold nothing but the driver.
+    """
+    head, sep, _ = name.partition(" (")
+    owner = _owner(name)
+    if not (sep and owner):
+        return name, ""
+    if head.strip().lower() in _PURPOSE_WORDS:
+        return owner, head.strip()
+    return head.strip(), ""
+
+
 def _common_words(a: str, b: str) -> int:
     wa, wb = a.split(), b.split()
     n = 0

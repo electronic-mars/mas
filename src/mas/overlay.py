@@ -1,8 +1,10 @@
 """Our own overlay instead of a Windows notification.
 
 A Windows notification cannot be styled, it is signed with the program name and
-piles up in the notification centre. Something else is needed: the device icon,
-its name and nothing more — it appears, hangs for a second and a half, dissolves.
+piles up in the notification centre. Something else is needed: a card with the
+device, what it is and its volume — it appears, hangs for a second and a half,
+dissolves. The same card comes up while the pointer rests on the tray icon, in
+place of the system tooltip, with the track underneath.
 
 We draw it in PIL and show it in a layered window with per-pixel transparency. The
 window takes no focus and lets clicks through: it asks nothing, it only tells.
@@ -40,9 +42,6 @@ SW_HIDE = 0
 
 HOLD = 1.4      # seconds we keep it in view
 FADE = 0.35     # seconds it takes to dissolve
-PAD, ICON, GAP = 18, 32, 14
-HEIGHT = 74
-MIN_W, MAX_W = 240, 460
 ICON_SIZES = (16, 20, 24, 32, 40, 48, 64)   # which glyph files exist on disk
 
 
@@ -155,9 +154,12 @@ user32.UpdateLayeredWindow.argtypes = [wintypes.HWND, wintypes.HDC, ctypes.POINT
                                        ctypes.POINTER(_BLEND), wintypes.DWORD]
 
 
-def _font(size: int):
+def _font(size: int, weight: str = "regular"):
     from PIL import ImageFont
-    for name in ("segoeui.ttf", "arial.ttf"):
+    names = {"regular": ("segoeui.ttf", "arial.ttf"),
+             "semibold": ("seguisb.ttf", "segoeuib.ttf", "arialbd.ttf"),
+             "bold": ("segoeuib.ttf", "arialbd.ttf")}[weight]
+    for name in names:
         try:
             return ImageFont.truetype(f"C:/Windows/Fonts/{name}", size)
         except OSError:
@@ -165,43 +167,126 @@ def _font(size: int):
     return ImageFont.load_default()
 
 
-def _render(glyph: str | None, text: str, light: bool, k: float | None = None):
-    """The panel as an image: rounded rectangle, icon, name."""
-    from PIL import Image, ImageDraw
+# The card, in panel units (multiplied by the screen scale when drawn). The same
+# picture serves the notification after a switch and the card shown while the
+# pointer rests on the tray icon; the notification adds a caption on top, the
+# hover card the track underneath.
+CARD_W, CARD_PAD, CARD_R, SHADOW = 316, 14, 14, 12
+WELL, LAMPS, LAMP_H, LAMP_GAP = 40, 20, 5, 3
+ORANGE = (242, 106, 33, 255)
+
+
+def _palette(light: bool) -> dict:
+    if light:
+        return {"bg": (247, 245, 241, 250), "line": (0, 0, 0, 30), "well": (233, 229, 221, 255),
+                "tx": (35, 38, 43, 255), "tx2": (92, 97, 105, 255), "tx3": (98, 104, 113, 255),
+                "off": (0, 0, 0, 24), "shadow": 70}
+    return {"bg": (28, 31, 36, 248), "line": (255, 255, 255, 26), "well": (18, 20, 24, 255),
+            "tx": (233, 236, 241, 255), "tx2": (152, 160, 172, 255), "tx3": (136, 144, 155, 255),
+            "off": (255, 255, 255, 26), "shadow": 120}
+
+
+def _render(card: dict, light: bool, k: float | None = None):
+    """The card as an image, shadow included. `card` holds glyph, title, sub,
+    pct (None for no volume), muted, and optionally caption and track."""
+    from PIL import Image, ImageDraw, ImageFilter
 
     k = scale() if k is None else k
     px = lambda v: int(round(v * k))         # noqa: E731 — panel units to screen pixels
-    pad, icon, gap, height = px(PAD), px(ICON), px(GAP), px(HEIGHT)
+    c = _palette(light)
+    pad, w, sh = px(CARD_PAD), px(CARD_W), px(SHADOW)
+    f_cap, f_title, f_sub = _font(px(9.5), "bold"), _font(px(15), "semibold"), _font(px(12.5))
+    f_pct, f_unit, f_track = _font(px(22), "semibold"), _font(px(12)), _font(px(12.5))
+    f_track_b = _font(px(12.5), "semibold")
 
-    font = _font(px(17))
-    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    room = px(MAX_W) - pad - icon - gap - pad
-    text = _fit(text, font, room, probe)
-    tw = int(probe.textlength(text, font=font))
-    width = max(px(MIN_W), min(px(MAX_W), pad + icon + gap + tw + pad))
+    cap_h = px(21) if card.get("caption") else 0
+    head_h = px(WELL)
+    lamps_top = cap_h + head_h + px(14)
+    track = card.get("track")
+    h = lamps_top + px(LAMP_H) + (px(26) if track else 0) + 2 * pad
 
-    bg = (247, 245, 241, 245) if light else (28, 31, 36, 242)
-    fg = (35, 38, 43, 255) if light else (233, 236, 241, 255)
-    line = (0, 0, 0, 38) if light else (255, 255, 255, 30)
-
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    img = Image.new("RGBA", (w + 2 * sh, h + 2 * sh), (0, 0, 0, 0))
+    # A soft shadow under the card: without one a borderless panel floats on
+    # the desktop with nothing to say where it ends.
+    shadow = Image.new("L", img.size, 0)
+    ImageDraw.Draw(shadow).rounded_rectangle((sh, sh + px(3), sh + w, sh + h + px(3)),
+                                             radius=px(CARD_R), fill=c["shadow"])
+    shadow = shadow.filter(ImageFilter.GaussianBlur(px(6)))
+    img.putalpha(shadow)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((0, 0, width - 1, height - 1), radius=px(16), fill=bg,
-                        outline=line, width=1)
+    d.rounded_rectangle((sh, sh, sh + w - 1, sh + h - 1), radius=px(CARD_R),
+                        fill=c["bg"], outline=c["line"], width=1)
+    x0, y = sh + pad, sh + pad
 
+    if card.get("caption"):
+        text = card["caption"].upper()
+        cx = x0 + px(2)
+        for ch in text:                       # letter-spaced by hand: PIL has no tracking
+            d.text((cx, y), ch, font=f_cap, fill=c["tx3"])
+            cx += d.textlength(ch, font=f_cap) + px(1.4)
+        y += cap_h
+
+    # the icon well
+    d.rounded_rectangle((x0, y, x0 + head_h, y + head_h), radius=px(10), fill=c["well"])
+    glyph = card.get("glyph")
     if glyph:
+        icon = px(26)
         path = _icon_file(glyph, light, icon)
         if path is not None:
             with Image.open(path) as raw:
                 ic = raw.convert("RGBA")
             if ic.width != icon:
                 ic = ic.resize((icon, icon), Image.LANCZOS)
-            img.alpha_composite(ic, (pad, (height - icon) // 2))
+            img.alpha_composite(ic, (x0 + (head_h - icon) // 2, y + (head_h - icon) // 2))
 
-    # Vertically the name is placed on the icon's middle line, not on the font's
-    # baseline: the font has varying ascenders, and the text would "jump" from one
-    # name to the next.
-    d.text((pad + icon + gap, height // 2), text, font=font, fill=fg, anchor="lm")
+    # the volume on the right
+    right = sh + w - pad
+    pct = card.get("pct")
+    text_right = right
+    if pct is not None:
+        unit_w = d.textlength("%", font=f_unit)
+        num = str(pct)
+        num_w = d.textlength(num, font=f_pct)
+        base = y + head_h // 2 + px(8)
+        d.text((right - unit_w, base), "%", font=f_unit, fill=c["tx3"], anchor="ls")
+        d.text((right - unit_w - px(1) - num_w, base), num, font=f_pct,
+               fill=c["tx3"] if card.get("muted") else c["tx"], anchor="ls")
+        text_right = right - unit_w - num_w - px(14)
+
+    # the name and what it is
+    tx = x0 + head_h + px(12)
+    room = text_right - tx
+    title = _fit(card.get("title") or "", f_title, room, d)
+    sub = _fit(card.get("sub") or "", f_sub, room, d)
+    if sub:
+        d.text((tx, y + head_h // 2 - px(2)), title, font=f_title, fill=c["tx"], anchor="ls")
+        d.text((tx, y + head_h // 2 + px(5)), sub, font=f_sub, fill=c["tx2"], anchor="lt")
+    else:
+        d.text((tx, y + head_h // 2), title, font=f_title, fill=c["tx"], anchor="lm")
+
+    # the lamps: one per five percent, the same count the volume says
+    y = sh + pad + lamps_top
+    lamp_w = (w - 2 * pad - (LAMPS - 1) * px(LAMP_GAP)) / LAMPS
+    lit = 0 if card.get("muted") or pct is None else (max(1, round(pct / 5)) if pct > 0 else 0)
+    for i in range(LAMPS):
+        lx = x0 + i * (lamp_w + px(LAMP_GAP))
+        d.rounded_rectangle((lx, y, lx + lamp_w, y + px(LAMP_H)), radius=px(1.5),
+                            fill=ORANGE if i < lit else c["off"])
+
+    if track:
+        y += px(LAMP_H) + px(12)
+        bars = ((6, 0), (10, 1), (4, 2), (8, 3))
+        for bh, i in bars:
+            bx = x0 + i * px(3.5)
+            d.rounded_rectangle((bx, y + px(12) - px(bh), bx + px(2), y + px(12)), radius=px(1), fill=ORANGE)
+        tx = x0 + px(20)
+        name, artist = track
+        name = _fit(name, f_track_b, w - 2 * pad - px(20), d)
+        d.text((tx, y + px(12)), name, font=f_track_b, fill=c["tx"], anchor="ls")
+        if artist:
+            used = d.textlength(name, font=f_track_b)
+            rest = _fit(f" — {artist}", f_track, w - 2 * pad - px(20) - used, d)
+            d.text((tx + used, y + px(12)), rest, font=f_track, fill=c["tx2"], anchor="ls")
     return img
 
 
@@ -218,17 +303,51 @@ def _premultiplied(img) -> bytes:
     return img.transpose(Image.FLIP_TOP_BOTTOM).tobytes("raw", "BGRa")
 
 
+class _PT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+
+def _cursor() -> tuple[int, int]:
+    p = _PT()
+    user32.GetCursorPos(ctypes.byref(p))
+    return p.x, p.y
+
+
+# Hovering the tray icon: the card comes up once the pointer has rested this
+# long, and goes the moment the pointer leaves the icon. Windows says nothing
+# when the pointer leaves, only while it moves over the icon, so "left" means
+# "moved further than an icon's width from where it last moved over it".
+HOVER_DELAY = 0.45
+HOVER_MAX = 12.0
+
+
 class Overlay(threading.Thread):
     """A single overlay window for the whole session, with its own message loop."""
 
-    def __init__(self):
+    def __init__(self, hover_card=None):
+        """`hover_card` returns (card, light) for the card shown on hover, or
+        None when there is nothing to show."""
         super().__init__(daemon=True, name="mas-overlay")
         self._queue: queue.SimpleQueue = queue.SimpleQueue()
         self._hwnd = None
         self._proc = WNDPROC(lambda h, m, w, l: user32.DefWindowProcW(h, m, w, l))
+        self._hover_card = hover_card
+        self._hover_at: tuple[int, int] | None = None   # where it last moved over the icon
+        self._hover_waiting = False
 
-    def show(self, glyph: str | None, text: str, light: bool = False) -> None:
-        self._queue.put((glyph, text, light))
+    def show(self, card: dict, light: bool = False) -> None:
+        self._queue.put(("note", card, light))
+
+    def hover(self) -> None:
+        """The pointer moved over the tray icon. Called for every move — cheap."""
+        self._hover_at = _cursor()
+        if not self._hover_waiting:
+            self._hover_waiting = True
+            self._queue.put(("hover", None, None))
+
+    def unhover(self) -> None:
+        """A click on the icon: whatever it does, the card is in the way."""
+        self._hover_at = None
 
     # --- internals --------------------------------------------------
     def _create(self) -> None:
@@ -277,12 +396,31 @@ class Overlay(threading.Thread):
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
 
-    def _display(self, glyph, text, light) -> None:
-        img = _render(glyph, text, light)
-        x, y = screen.anchor(img.width, img.height)
+    def _put_up(self, img):
+        # The image carries its shadow as a margin: the card itself is what sits
+        # in the corner, the shadow spills past it.
+        sh = int(round(SHADOW * scale()))
+        x, y = screen.anchor(img.width - 2 * sh, img.height - 2 * sh)
+        x, y = x - sh, y - sh
         self._paint(img, 255, x, y)
         user32.SetWindowPos(self._hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+        return x, y
+
+    def _fade(self, img, x, y, seconds) -> None:
+        start = time.monotonic()
+        while True:
+            k = (time.monotonic() - start) / seconds
+            if k >= 1 or not self._queue.empty():
+                break
+            self._paint(img, int(255 * (1 - k)), x, y)
+            self._pump()
+            time.sleep(0.02)
+        user32.ShowWindow(self._hwnd, SW_HIDE)
+
+    def _note(self, card, light) -> None:
+        img = _render(card, light)
+        x, y = self._put_up(img)
         # Hold it, then fade it out with constant alpha: there is no need to redraw
         # the image, only one blend byte changes.
         deadline = time.monotonic() + HOLD
@@ -291,15 +429,38 @@ class Overlay(threading.Thread):
                 return                      # a new one came — no point watching the old
             self._pump()
             time.sleep(0.03)
-        start = time.monotonic()
-        while True:
-            k = (time.monotonic() - start) / FADE
-            if k >= 1 or not self._queue.empty():
-                break
-            self._paint(img, int(255 * (1 - k)), x, y)
-            self._pump()
-            time.sleep(0.02)
-        user32.ShowWindow(self._hwnd, SW_HIDE)
+        self._fade(img, x, y, FADE)
+
+    def _near(self) -> bool:
+        at = self._hover_at
+        if at is None:
+            return False
+        cx, cy = _cursor()
+        reach = 20 * scale()
+        return abs(cx - at[0]) <= reach and abs(cy - at[1]) <= reach
+
+    def _hover(self) -> None:
+        try:
+            # Resting, not passing through: the pointer must stay on the icon.
+            deadline = time.monotonic() + HOVER_DELAY
+            while time.monotonic() < deadline:
+                if not self._near() or not self._queue.empty():
+                    return
+                time.sleep(0.03)
+            got = self._hover_card() if self._hover_card else None
+            if not got:
+                return
+            card, light = got
+            img = _render(card, light)
+            x, y = self._put_up(img)
+            until = time.monotonic() + HOVER_MAX
+            while self._near() and time.monotonic() < until and self._queue.empty():
+                self._pump()
+                time.sleep(0.04)
+            if self._queue.empty():
+                self._fade(img, x, y, 0.15)
+        finally:
+            self._hover_waiting = False
 
     def run(self) -> None:
         self._create()
@@ -307,10 +468,16 @@ class Overlay(threading.Thread):
             _log.warning("overlay window was not created")
             return
         while True:
-            glyph, text, light = self._queue.get()
+            job = self._queue.get()
             while not self._queue.empty():      # show only the latest one
-                glyph, text, light = self._queue.get()
+                job = self._queue.get()
+            if job[0] != "hover":
+                self._hover_waiting = False     # a dropped hover must not block the next
             try:
-                self._display(glyph, text, light)
+                if job[0] == "note":
+                    self._note(job[1], job[2])
+                else:
+                    self._hover()
             except Exception:
                 _log.exception("overlay failed to show")
+                user32.ShowWindow(self._hwnd, SW_HIDE)

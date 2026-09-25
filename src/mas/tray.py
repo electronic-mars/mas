@@ -25,6 +25,8 @@ _log = log.get("tray")
 WM_LBUTTONUP = 0x0202
 WM_RBUTTONUP = 0x0205
 WM_MBUTTONUP = 0x0208
+WM_MOUSEMOVE = 0x0200
+WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN = 0x0201, 0x0204, 0x0207
 
 DEFAULT_GLYPH = "speakers"
 SM_CXSMICON = 49
@@ -124,7 +126,12 @@ def icon_handle(img: Image.Image) -> int:
 
 
 class Tray:
-    def __init__(self, on_left, on_right, on_middle, on_quit, outside_decides=False):
+    def __init__(self, on_left, on_right, on_middle, on_quit, outside_decides=False,
+                 on_hover=None, on_click=None):
+        """`on_hover` hears every move of the pointer over the icon, `on_click`
+        every press of a button on it — the hover card lives on those two."""
+        self.on_hover = on_hover
+        self.on_click = on_click
         self.on_left = on_left
         self.on_right = on_right
         self.on_middle = on_middle
@@ -135,6 +142,9 @@ class Tray:
         self.icon = pystray.Icon(
             "MasterAudioSwitcher",
             load_glyph(self._glyph, self._light),
+            # The name only until the first sign that Windows tells us about the
+            # pointer over the icon: from then on our own card comes up there
+            # (see overlay.py), and a tooltip would open on top of it.
             "Master Audio Switcher",
             menu=pystray.Menu(pystray.MenuItem(strings.t("tray_exit"), lambda: self.on_quit())),
         )
@@ -158,13 +168,8 @@ class Tray:
     # The tray icon is a shared Windows resource. Changing it from arbitrary
     # threads (say, from an HTTP request thread when an icon is picked in the
     # window) is unsafe, so all changes are queued and run by a single thread.
-    def set_device(self, glyph: str | None, tooltip: str) -> None:
-        """The tooltip is always updated: without it nobody knows where sound goes."""
-        self._queue.put(("device", glyph or DEFAULT_GLYPH, tooltip[:127]))
-
-    def set_tip(self, tooltip: str) -> None:
-        """Tooltip only: no reason to touch the icon, and the track changes often."""
-        self._queue.put(("tip", tooltip[:127], None))
+    def set_device(self, glyph: str | None) -> None:
+        self._queue.put(("device", glyph or DEFAULT_GLYPH, None))
 
     def set_muted(self, muted: bool) -> None:
         """The sound was switched off or on — by us, by a keyboard key or in
@@ -182,17 +187,13 @@ class Tray:
     def _apply(self, job) -> None:
         kind = job[0]
         if kind == "device":
-            _, glyph, tooltip = job
-            self._glyph = glyph
+            self._glyph = job[1]
             self.icon.icon = self._image()
-            self.icon.title = tooltip  # Windows cuts tooltips longer than 128 chars
             self._show()
         elif kind == "muted":
             if job[1] != self._muted:
                 self._muted = job[1]
                 self.icon.icon = self._image()
-        elif kind == "tip":
-            self.icon.title = job[1]
         elif kind == "visible":
             self._outside_decides = True
             if bool(job[1]) != self._shown:
@@ -262,6 +263,14 @@ class Tray:
         original = self.icon._message_handlers.get(win32.WM_NOTIFY)
 
         def handler(wparam, lparam):
+            if lparam == WM_MOUSEMOVE:
+                if self.on_hover:
+                    if self.icon.title:
+                        self.icon.title = ""
+                    self._safe(self.on_hover, "hover")
+                return
+            if lparam in (WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN) and self.on_click:
+                self._safe(self.on_click, "press")
             if lparam == WM_LBUTTONUP:
                 self._safe(self.on_left, "left button")
                 return
