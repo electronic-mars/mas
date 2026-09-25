@@ -935,35 +935,75 @@ function openIconSheet(deviceId, currentGlyph) {
 }
 
 // ------------------------------------------------------------------- welcome
-function gestureCard(inner, title, desc) {
-  return `<div class="gest"><div class="n"><svg viewBox="0 0 24 24">${inner}</svg></div>
-    <div><div class="t">${title}</div><div class="d">${desc}</div></div></div>`;
+// The first run. It used to tell — three cards of text — and people still did
+// not know where the program was or what a click would do. Now it shows: a slice
+// of the taskbar with the icon ringed, the notification a click brings, and the
+// very devices the click will go through, ticked or not, right here.
+const MOUSE = (side) => `<svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="6"/>
+    <path d="${side === 'left' ? 'M6 8.5A6 6 0 0 1 12 2.5L12 8.5Z' : 'M12 2.5A6 6 0 0 1 18 8.5L12 8.5Z'}"
+      style="fill:var(--acc);stroke:none"/></svg>`;
+const devMask = (glyph, cls = 'dm') => `<span class="${cls}" style="-webkit-mask-image:url(icons/devices/${glyph}.svg);mask-image:url(icons/devices/${glyph}.svg)"></span>`;
+const UP = '<svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5"/></svg>';
+
+function welcomeList() {
+  const outs = state.outputs;
+  return outs.map((d) => `<div class="li ${d.in_cycle ? '' : 'dim'}" data-id="${esc(d.id)}">
+      <div class="di">${devMask(d.icon)}</div>
+      <div class="nm">${esc(d.purpose || d.title || d.name)}${d.purpose ? ` <small>${esc(d.title)}</small>` : ''}</div>
+      ${d.is_default ? '<span class="led"></span>' : ''}
+      <button class="chk" data-act="wcycle" role="checkbox" aria-checked="${d.in_cycle}" title="${t('in_cycle')}">
+        <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></button>
+    </div>`).join('');
 }
 
 function showWelcome() {
-  // The two buttons used to be drawn with a hairline stroke on one side, and at
-  // seventeen pixels the three cards read as the same picture repeated three
-  // times. The pressed button is filled instead: the mouse body is a rounded
-  // rectangle whose top corners have radius 6, so each button is exactly one
-  // quadrant of that corner and can be drawn as an arc, not approximated.
-  const mouse = (side) => `<rect x="6" y="2.5" width="12" height="19" rx="6"/>
-    <path d="${side === 'left' ? 'M6 8.5A6 6 0 0 1 12 2.5L12 8.5Z'
-                               : 'M12 2.5A6 6 0 0 1 18 8.5L12 8.5Z'}"
-      style="fill:var(--acc);stroke:none"/>`;
-  // Two cards, not three. The middle button opens the mixer, which is also the
-  // second tab of this window — teaching it here cost a third of the screen to
-  // say something nobody needs in their first minute, and made the two clicks
-  // that matter look like one item in a list of three.
-  $('overlays').innerHTML = `<div class="welcome" id="welcome">
-      <div class="big"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z"/></svg></div>
-      <h2>${t('w_title')}</h2>
-      <div style="margin-top:12px">
-        ${gestureCard(mouse('left'), t('g_left'), t('g_left_d2'))}
-        ${gestureCard(mouse('right'), t('g_right'), t('g_right_d'))}
-        ${gestureCard('<path d="M7 14l5-5 5 5" fill="none"/>', t('w_hidden'), t('welcome_note'))}
+  const outs = state.outputs;
+  const ring = outs.filter((d) => d.in_cycle);
+  const cur = outs.find((d) => d.is_default) || outs[0];
+  const i = ring.findIndex((d) => d.id === (cur && cur.id));
+  const next = ring.length ? ring[(i + 1) % ring.length] : cur;
+  const label = (d) => (d ? esc(d.purpose || d.title || d.name) : '');
+  const right = state.settings.switch_button === 'right';
+  $('overlays').innerHTML = `<div class="welcome intro" id="welcome">
+      <div class="hero">
+        <div class="micro acc">${t('w_hello')}</div>
+        <h2>${t('w_head')}</h2>
+        <p>${t('w_sub')}</p>
       </div>
-      <button class="btn" id="welcome-ok" style="margin-top:12px">${t('welcome_ok')}</button>
+      ${cur && next ? `<div class="stage">
+        <div class="ghostdev">${t('w_click')} ${devMask(cur.icon, 'd')}<b>${label(cur)}</b>
+          <svg class="ar" viewBox="0 0 12 12"><path d="M2 6h8M7 3l3 3-3 3"/></svg>${devMask(next.icon, 'd')}<b>${label(next)}</b></div>
+        <div class="pop"><div class="ic">${devMask(next.icon, 'pi')}</div>
+          <div><b>${label(next)}</b><span>${t('sw_done')}</span></div></div>
+        <div class="bar">
+          <div class="t">${UP}</div>
+          <div class="t me"><img src="${iconDark(cur.icon, 32)}" alt=""></div>
+          <div class="t"><svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0119 0M5.5 12.5a9.5 9.5 0 0113 0M8.7 15.8a5 5 0 016.6 0"/></svg></div>
+          <div class="t"><svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5z"/><path d="M15.5 9a4 4 0 010 6"/></svg></div>
+          <div class="clock">14:32<br>24.09</div>
+        </div>
+        <svg class="cursor" viewBox="0 0 16 22"><path d="M1 1v17l4.4-4.1 2.9 6.6 2.7-1.2-2.9-6.4H14z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+      </div>` : ''}
+      <div class="gest2">
+        <div class="g">${MOUSE(right ? 'right' : 'left')}<div><b>${right ? t('g_right') : t('g_left')}</b><span>${t('g_next')}</span></div></div>
+        <div class="g">${MOUSE(right ? 'left' : 'right')}<div><b>${right ? t('g_left') : t('g_right')}</b><span>${t('g_right_d')}</span></div></div>
+      </div>
+      <div class="sect"><div class="micro">${right ? t('w_rotates_right') : t('w_rotates_left')}</div>
+        <div class="micro cnt">${t('w_found').replace('{n}', outs.length)}</div></div>
+      <div class="list" id="welcome-list">${welcomeList()}</div>
+      <div class="wnote">${t('w_where')}</div>
+      <div class="hint">${t('w_hint').replace('{arrow}', `<span class="k">${UP}</span>`)}</div>
+      <button class="btn" id="welcome-ok">${t('welcome_ok')}</button>
     </div>`;
+  $('welcome-list').addEventListener('click', async (e) => {
+    const box = e.target.closest('[data-act="wcycle"]');
+    if (!box) return;
+    const id = box.closest('.li').dataset.id;
+    const dev = state.outputs.find((d) => d.id === id);
+    state = await call('toggle_cycle', { device_id: id, enabled: !dev.in_cycle });
+    $('welcome-list').innerHTML = welcomeList();
+    renderAll();
+  });
   $('welcome-ok').addEventListener('click', async () => {
     await call('complete_onboarding').catch(() => {});
     $('overlays').innerHTML = '';
