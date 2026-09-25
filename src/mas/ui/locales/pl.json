@@ -23,6 +23,7 @@
     "mute": "Wycisz",
     "unmute": "Włącz dźwięk",
     "no_apps": "Żadna aplikacja nie odtwarza teraz dźwięku",
+    "playing_of": "gra {n} z {m}",
     "buttons_d_left": "Lewe kliknięcie przełącza dźwięk, prawe otwiera okno",
     "buttons_d_right": "Prawe kliknięcie przełącza dźwięk, lewe otwiera okno",
     "btn_left": "Lewy",

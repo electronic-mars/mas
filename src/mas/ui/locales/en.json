@@ -23,6 +23,7 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "no_apps": "No application is playing sound right now",
+    "playing_of": "{n} of {m} playing",
     "buttons_d_left": "Left click switches sound, right click opens the window",
     "buttons_d_right": "Right click switches sound, left click opens the window",
     "btn_left": "Left",

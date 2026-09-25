@@ -402,25 +402,58 @@ const SPEAKER_OFF_SVG = SPEAKER_SVG.replaceAll('vol-high', 'vol-x');
 // An application's own icon is not touched: the mute mark sits in its corner.
 const MUTE_BADGE = '<span class="mbadge"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4.5v15L7 15H3z"/><path d="M15.5 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></span>';
 
-function sliderRow({ key, label, volume, muted, kind, icon }) {
+// Every slider of the tab carries a thin live level under it, with the peak
+// held a moment in orange. The levels come from their own quick poll (see
+// pollLevels), not from the list, so they move without the rows being redrawn.
+const SLIDER = (pct) => `<div class="slider mxs" data-act="vol">
+    <div class="track"></div><div class="fill" style="width:${pct}%"></div>
+    <div class="lvl"><i class="lv"></i><i class="pk"></i></div>
+    <div class="knb" style="left:${pct}%"></div>
+  </div>`;
+// Three bars that dance while the application is actually making sound: a
+// shape, so it reads without relying on the colour.
+const EQ = '<span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>';
+
+const PCT = (n) => `${n}<small>%</small>`;
+// System sounds are Windows itself, not an application with an icon: a bell on
+// a neutral tile rather than a coloured letter that looks like some program.
+const BELL = '<span class="mxico sysico" style="-webkit-mask-image:url(icons/ui/ui-bell.svg);mask-image:url(icons/ui/ui-bell.svg)"></span>';
+
+function sliderRow({ key, label, volume, muted, icon }) {
   const pct = Math.round(volume * 100);
-  const face = kind === 'master' ? (muted ? SPEAKER_OFF_SVG : SPEAKER_SVG)
-    : icon ? `<img src="appicon/${esc(icon)}" alt="">`
-      : esc((label[0] || '?'));
-  const bg = kind === 'master' ? 'var(--acc)' : icon ? 'transparent' : avatarColor(label);
-  return `<div class="mx ${muted ? 'muted' : ''}" data-key="${esc(key)}" data-kind="${kind}">
+  const system = key === 'System sounds';
+  const face = system ? BELL : icon ? `<img src="appicon/${esc(icon)}" alt="">` : esc((label[0] || '?'));
+  const bg = system ? 'var(--card-hi)' : icon ? 'transparent' : avatarColor(label);
+  return `<div class="mx ${muted ? 'muted' : ''}" data-key="${esc(key)}" data-kind="app">
       <button class="ap" data-act="mute" style="background:${bg}"
               title="${muted ? t('unmute') : t('mute')}" aria-pressed="${muted}">
-        ${face}${kind === 'master' ? '' : MUTE_BADGE}
+        ${face}${MUTE_BADGE}
       </button>
       <div class="col">
-        <div class="top"><span class="nm">${esc(label)}</span>
-          <span class="pc">${pct}%</span></div>
-        <div class="slider" data-act="vol">
-          <div class="track"></div>
-          <div class="fill" style="width:${pct}%"></div>
-          <div class="knb" style="left:${pct}%"></div>
+        <div class="top"><span class="nm">${esc(label)}</span>${EQ}<span class="pc">${PCT(pct)}</span></div>
+        ${SLIDER(pct)}
+      </div>
+    </div>`;
+}
+
+function masterRow() {
+  const m = mixerData.master;
+  const pct = Math.round(m.volume * 100);
+  const cur = state && state.outputs.find((d) => d.is_default);
+  const glyph = cur ? cur.icon : 'speakers';
+  return `<div class="mx master ${m.muted ? 'muted' : ''}" data-key="" data-kind="master">
+      <button class="ap" data-act="mute" style="background:var(--acc)"
+              title="${m.muted ? t('unmute') : t('mute')}" aria-pressed="${m.muted}">
+        ${m.muted ? SPEAKER_OFF_SVG : SPEAKER_SVG}
+      </button>
+      <div class="col">
+        <div class="top">
+          <div class="who"><div class="micro">${t('master')}</div>
+            <div class="dev"><span class="devico" style="-webkit-mask-image:url(icons/devices/${esc(glyph)}.svg);mask-image:url(icons/devices/${esc(glyph)}.svg)"></span>
+              <span class="nm">${esc(mixerData.device || t('master'))}</span></div></div>
+          <span class="pc">${PCT(pct)}</span>
         </div>
+        ${SLIDER(pct)}
       </div>
     </div>`;
 }
@@ -430,14 +463,12 @@ function renderMixer() {
   const apps = mixerData.sessions.map((s) => sliderRow({
     key: s.key,
     label: s.key === 'System sounds' ? t('system_sounds') : s.name,
-    volume: s.volume, muted: s.muted, kind: 'app', icon: s.icon,
+    volume: s.volume, muted: s.muted, icon: s.icon,
   })).join('');
   $('panel-mixer').innerHTML =
-    `<h2 class="lbl micro">${secIcon('vol-high')}${t('master')}</h2>
-     ${sliderRow({ key: '', label: mixerData.device || t('master'),
-      volume: mixerData.master.volume, muted: mixerData.master.muted, kind: 'master' })}
-     <h2 class="sec micro">${secIcon('ui-apps')}${t('apps')}</h2>
-     ${apps || `<div class="empty">${t('no_apps')}</div>`}`;
+    `${masterRow()}
+     <h2 class="sec micro">${secIcon('ui-apps')}${t('apps')}<span class="aside" id="mx-count"></span></h2>
+     ${apps ? `<div class="mxgroup">${apps}</div>` : `<div class="empty">${t('no_apps')}</div>`}`;
   updateFade();
 }
 
@@ -447,6 +478,53 @@ async function refreshMixer() {
     renderMixer();
   } catch (e) { /* window is closing */ }
 }
+
+// Level lines: eased like the front panel's meter, the peak held for a moment
+// and then let go. Only while the mixer is on screen — Python stops measuring
+// the applications a moment after it stops being asked.
+const levelNow = new Map(), peakHeld = new Map();
+let levelsBusy = false;
+
+function paintLine(row, target, t) {
+  const key = row.dataset.kind === 'master' ? '' : row.dataset.key;
+  const now = levelNow.get(key) || 0;
+  const v = now + (target - now) * (target > now ? 0.55 : 0.18);
+  levelNow.set(key, v);
+  let [held, at] = peakHeld.get(key) || [0, 0];
+  if (v >= held) { held = v; at = t; } else if (t - at > 900) held = Math.max(v, held - 0.02);
+  peakHeld.set(key, [held, at]);
+  row.querySelector('.lvl .lv').style.width = `${v * 100}%`;
+  const pk = row.querySelector('.lvl .pk');
+  pk.style.left = `${held * 100}%`;
+  pk.style.opacity = held > 0.02 ? '.9' : '0';
+  row.classList.toggle('sounding', target > 0.02);
+}
+
+async function pollLevels() {
+  if (levelsBusy || activeTab !== 'mixer' || !painting || !mixerData) return;
+  levelsBusy = true;
+  try {
+    const lv = await call('get_mixer_levels');
+    const at = performance.now();
+    let sounding = 0, known = 0;
+    document.querySelectorAll('#panel-mixer .mx').forEach((row) => {
+      const master = row.dataset.kind === 'master';
+      const raw = master ? lv.master : (lv.apps[row.dataset.key] || 0);
+      const target = row.classList.contains('muted') ? 0 : toLevel(raw);
+      paintLine(row, target, at);
+      if (!master) { known++; if (target > 0.02) sounding++; }
+    });
+    const count = $('mx-count');
+    if (count && known) count.textContent = t('playing_of').replace('{n}', sounding).replace('{m}', known);
+    // An application that has just started making sound is not in the list
+    // yet: fetch the list again rather than wait for the tab to be reopened.
+    const shown = new Set(mixerData.sessions.map((s) => s.key));
+    if (Object.keys(lv.apps).some((k) => !shown.has(k))) refreshMixer();
+  } catch (e) { /* window is closing */ }
+  levelsBusy = false;
+}
+
+setInterval(pollLevels, 120);
 
 // -------------------------------------------------------------- settings tab
 // A settings row: name and explanation on the left, the control on the right.
@@ -1065,7 +1143,7 @@ document.addEventListener('pointerdown', (e) => {
     const v = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
     slider.querySelector('.fill').style.width = `${v * 100}%`;
     slider.querySelector('.knb').style.left = `${v * 100}%`;
-    mx.querySelector('.pc').textContent = `${Math.round(v * 100)}%`;
+    mx.querySelector('.pc').innerHTML = PCT(Math.round(v * 100));
     // Moving the slider switches the sound back on (see set_volume in Python),
     // so the row stops looking muted right away rather than at the next refresh.
     mx.classList.remove('muted');

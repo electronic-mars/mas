@@ -301,6 +301,45 @@ h2.sec{margin:12px 0 7px 3px}
    larger and tabular so they do not jitter while dragging. */
 .mx .pc{margin-left:auto;font-size:11.5px;color:var(--tx-2);font-variant-numeric:tabular-nums}
 
+/* The mixer on one grid: the master strip on its own card, the applications
+   in one card with hairlines between them, the same icon column and the same
+   slider span in every row. */
+.mx.master{margin-top:4px}
+.mx.master .ap{width:40px;height:40px;border-radius:11px}
+.mx.master .ap .mxico{width:23px;height:23px}
+.mx.master .top{align-items:flex-end}
+.mx .who{flex:1;min-width:0}
+.mx .dev{display:flex;align-items:center;gap:6px;margin-top:3px;min-width:0}
+.mx .dev .nm{font-size:13px;font-weight:500}
+.devico{width:15px;height:15px;flex:none;background:var(--tx-2);
+  -webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.mxgroup{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mxgroup .mx{background:none;border:0;border-radius:0;margin:0;padding:10px 12px}
+.mxgroup .mx + .mx{border-top:1px solid var(--line)}
+.mxgroup .mx .ap{width:34px;height:34px;border-radius:9px}
+.mxgroup .mx .ap img{width:28px;height:28px}
+h2.sec .aside{margin-left:auto;margin-right:3px}
+.mx .pc small{font-size:9.5px;color:var(--tx-3);margin-left:1px}
+.mxgroup .mx .ap .sysico{width:19px;height:19px;background:var(--tx-2);border:0}
+.mxgroup .mx .ap:has(.sysico){box-shadow:inset 0 0 0 1px var(--line-hi)}
+.mx .top .eq{display:none}
+.mx.sounding .top .eq{display:inline-flex}
+.mx:not(.sounding) .nm{color:var(--tx-2)}
+.mx.master .nm{color:var(--tx)}
+.eq{align-items:flex-end;gap:1.5px;height:10px;flex:none;align-self:center}
+.eq i{width:2px;border-radius:1px;background:var(--led);height:4px;animation:eq .8s ease-in-out infinite alternate}
+.eq i:nth-child(2){animation-delay:-.3s}.eq i:nth-child(3){animation-delay:-.55s}
+@keyframes eq{from{height:3px}to{height:10px}}
+:root[data-theme="light"] .eq i{background:#17804A}
+/* the level line sits right under the track, thin and grey, so it reads as a
+   gauge and not as a second slider; the held peak is a short orange tick */
+.slider.mxs .track::after{display:none}
+.slider.mxs .lvl{position:absolute;left:0;right:0;top:calc(50% + 3px);height:2px;border-radius:1px;
+  background:var(--line);pointer-events:none}
+.slider.mxs .lv{position:absolute;left:0;top:0;bottom:0;border-radius:1px;background:var(--tx-3);opacity:.75}
+.slider.mxs .pk{position:absolute;top:-1px;width:2px;height:4px;border-radius:1px;background:var(--acc);opacity:0}
+:root[data-theme="light"] .slider.mxs .lv{background:#8C877E}
+
 /* An instrument fader: a thin recessed track, short ticks under it and a compact
    cylindrical thumb. The ticks are drawn by a gradient — separate elements for
    every tick are pointless here. */

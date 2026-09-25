@@ -185,6 +185,12 @@ class Api:
             "sessions": [vars(s) for s in mixer.list_sessions()],
         }
 
+    def get_mixer_levels(self):
+        """Levels only, for the mixer's frequent poll: the master from the meter
+        snapshot, the applications from the meter thread. No COM here."""
+        return {"master": self.app.meter.snapshot()["peak"],
+                "apps": self.app.meter.levels()}
+
     def set_master(self, value: float):
         self.app.meter.set_volume(value)
         return True

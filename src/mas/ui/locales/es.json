@@ -23,6 +23,7 @@
     "mute": "Silenciar",
     "unmute": "Activar sonido",
     "no_apps": "Ninguna aplicación reproduce sonido ahora",
+    "playing_of": "{n} de {m} sonando",
     "buttons_d_left": "El clic izquierdo cambia el sonido, el derecho abre la ventana",
     "buttons_d_right": "El clic derecho cambia el sonido, el izquierdo abre la ventana",
     "btn_left": "Izquierdo",

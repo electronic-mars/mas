@@ -23,6 +23,7 @@
     "mute": "Stummschalten",
     "unmute": "Ton einschalten",
     "no_apps": "Keine App spielt gerade Ton ab",
+    "playing_of": "{n} von {m} spielen",
     "buttons_d_left": "Linksklick wechselt Ton, Rechtsklick öffnet Fenster",
     "buttons_d_right": "Rechtsklick wechselt Ton, Linksklick öffnet Fenster",
     "btn_left": "Links",

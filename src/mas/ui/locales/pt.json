@@ -23,6 +23,7 @@
     "mute": "Mudo",
     "unmute": "Ativar som",
     "no_apps": "Nenhum aplicativo está reproduzindo som agora",
+    "playing_of": "{n} de {m} tocando",
     "buttons_d_left": "Clique esquerdo alterna o som, clique direito abre a janela",
     "buttons_d_right": "Clique direito alterna o som, clique esquerdo abre a janela",
     "btn_left": "Esquerdo",

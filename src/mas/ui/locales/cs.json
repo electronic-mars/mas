@@ -23,6 +23,7 @@
     "mute": "Ztlumit",
     "unmute": "Zapnout zvuk",
     "no_apps": "Žádná aplikace právě nepřehrává zvuk",
+    "playing_of": "hraje {n} z {m}",
     "buttons_d_left": "Levým kliknutím přepnete zvuk, pravým otevřete okno",
     "buttons_d_right": "Pravým kliknutím přepnete zvuk, levým otevřete okno",
     "btn_left": "Levý",

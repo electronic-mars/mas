@@ -23,6 +23,7 @@
     "mute": "Disattiva",
     "unmute": "Riattiva",
     "no_apps": "Nessuna applicazione sta riproducendo audio",
+    "playing_of": "{n} di {m} in riproduzione",
     "buttons_d_left": "Clic sinistro cambia audio, clic destro apre la finestra",
     "buttons_d_right": "Clic destro cambia audio, clic sinistro apre la finestra",
     "btn_left": "Sinistro",

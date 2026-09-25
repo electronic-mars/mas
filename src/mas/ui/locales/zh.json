@@ -23,6 +23,7 @@
     "mute": "静音",
     "unmute": "取消静音",
     "no_apps": "当前没有应用在播放声音",
+    "playing_of": "{m} 个中有 {n} 个在播放",
     "buttons_d_left": "左键切换声音，右键打开窗口",
     "buttons_d_right": "右键切换声音，左键打开窗口",
     "btn_left": "左",

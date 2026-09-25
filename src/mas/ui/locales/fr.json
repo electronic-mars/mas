@@ -23,6 +23,7 @@
     "mute": "Couper",
     "unmute": "Rétablir",
     "no_apps": "Aucune application ne joue de son actuellement",
+    "playing_of": "{n} sur {m} en lecture",
     "buttons_d_left": "Clic gauche bascule le son, clic droit ouvre la fenêtre",
     "buttons_d_right": "Clic droit bascule le son, clic gauche ouvre la fenêtre",
     "btn_left": "Gauche",

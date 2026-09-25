@@ -23,6 +23,7 @@
     "mute": "Dempen",
     "unmute": "Dempen opheffen",
     "no_apps": "Geen app speelt nu geluid af",
+    "playing_of": "{n} van {m} spelen",
     "buttons_d_left": "Links klikken schakelt geluid, rechts opent het venster",
     "buttons_d_right": "Rechts klikken schakelt geluid, links opent het venster",
     "btn_left": "Links",

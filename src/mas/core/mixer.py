@@ -82,6 +82,22 @@ def list_sessions() -> list[Session]:
     return out
 
 
+def session_meters() -> dict:
+    """A level meter for every live application, by the same key the mixer uses.
+    For the meter thread: the interfaces belong to the thread that asks."""
+    from pycaw.pycaw import IAudioMeterInformation
+    out = {}
+    for s in _sessions():
+        name = _session_name(s)
+        if name is None:
+            continue
+        try:
+            out.setdefault(name, s._ctl.QueryInterface(IAudioMeterInformation))
+        except Exception:
+            _log.info("no meter for session %s", name, exc_info=True)
+    return out
+
+
 def _apply(name: str, fn) -> bool:
     hit = False
     for s in _sessions():

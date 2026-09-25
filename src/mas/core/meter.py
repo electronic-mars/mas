@@ -18,6 +18,13 @@ _log = log.get("meter")
 WATCH_EVERY_S = 0.5     # how often we look for devices appearing
 REBIND_EVERY_S = 2.0    # how often we check whether the device changed
 IDLE_INTERVAL = 0.5     # the tick when the window is hidden: nobody sees the level
+# Applications come and go far less often than their level moves: the list of
+# sessions is re-read once a second, their meters every tick.
+SESSIONS_EVERY_S = 1.0
+# How long one question from the mixer keeps the application meters running.
+# The mixer asks several times a second while it is on screen; when it stops
+# asking — another tab, a hidden window — the meters stop with it.
+SESSIONS_WANTED_S = 1.5
 
 
 class Meter(threading.Thread):
@@ -32,6 +39,11 @@ class Meter(threading.Thread):
         # our own writes update ahead of the device: the listener hears every
         # change once, from here, whoever made it.
         self._told_muted: bool | None = None
+        # Application meters: key -> IAudioMeterInformation, and the levels read
+        # from them. Only while the mixer is asking (see levels()).
+        self._session_meters: dict = {}
+        self._levels: dict[str, float] = {}
+        self._levels_wanted_until = 0.0
         self._stop = threading.Event()
         self._lock = threading.Lock()
         # Set when the meter binds to a device for the first time: the startup
@@ -83,6 +95,36 @@ class Meter(threading.Thread):
         self._vol.SetMute(bool(muted), None)
         with self._lock:
             self._snap["muted"] = bool(muted)
+
+    def levels(self) -> dict[str, float]:
+        """The current level of every application playing, by mixer key, and a
+        promise to keep measuring for a moment longer. Nothing here touches COM:
+        the meter thread reads the levels and this hands out its last reading."""
+        import time
+        self._levels_wanted_until = time.monotonic() + SESSIONS_WANTED_S
+        with self._lock:
+            return dict(self._levels)
+
+    def _read_levels(self, relist: bool) -> None:
+        """In the meter thread only. The session list is read now and then; the
+        meters on every tick."""
+        from . import mixer
+        if relist or not self._session_meters:
+            self._session_meters = mixer.session_meters()
+        levels = {}
+        for key, meter in self._session_meters.items():
+            try:
+                levels[key] = max(levels.get(key, 0.0), round(meter.GetPeakValue(), 4))
+            except Exception:
+                levels[key] = 0.0         # the application went away mid-tick
+        with self._lock:
+            self._levels = levels
+
+    def _drop_levels(self) -> None:
+        if self._session_meters or self._levels:
+            self._session_meters = {}
+            with self._lock:
+                self._levels = {}
 
     def set_idle(self, idle: bool) -> None:
         """The window is hidden — nobody sees the level, we poll five times less
@@ -180,7 +222,8 @@ class Meter(threading.Thread):
         # fires on any thread and kills the process with a memory access
         # violation. Caught with a trap.
         comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
-        elapsed = watched = bound = 0.0
+        import time
+        elapsed = watched = bound = listed = 0.0
         try:
             while True:
                 step = IDLE_INTERVAL if self._idle.is_set() else self.interval
@@ -214,6 +257,17 @@ class Meter(threading.Thread):
                     continue
                 with self._lock:
                     self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
+                try:
+                    if time.monotonic() < self._levels_wanted_until:
+                        relist = elapsed - listed >= SESSIONS_EVERY_S
+                        if relist:
+                            listed = elapsed
+                        self._read_levels(relist)
+                    else:
+                        self._drop_levels()
+                except Exception:
+                    self._session_meters = {}
+                    _log.warning("the application meters broke down", exc_info=True)
                 if muted != self._told_muted and self._on_mute_changed:
                     self._told_muted = muted
                     try:
@@ -231,6 +285,7 @@ class Meter(threading.Thread):
             # of other threads and frees them not where they were created: the
             # process crashes.
             self._vol = self._meter = None
+            self._session_meters = {}
             self._bound_id = None
             if self._presence is not None:
                 self._presence.close()

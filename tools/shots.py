@@ -127,6 +127,11 @@ class FakeApi:
         return {"master": {"volume": 0.62, "muted": False},
                 "device": "Headphones (HyperX Cloud Flight S)", "sessions": SESSIONS}
 
+    def get_mixer_levels(self):
+        # Two applications making sound, the rest quiet: the screenshot shows
+        # both the moving line and the resting one.
+        return {"master": 0.22, "apps": {"spotify.exe": 0.31, "discord.exe": 0.12}}
+
     def get_meter(self):
         return {"volume": 0.62, "muted": False, "peak": 0.22,
                 "device": "Headphones (HyperX Cloud Flight S)",

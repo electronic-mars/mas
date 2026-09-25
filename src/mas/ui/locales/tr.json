@@ -23,6 +23,7 @@
     "mute": "Sessize al",
     "unmute": "Sesi aç",
     "no_apps": "Şu anda ses çalan uygulama yok",
+    "playing_of": "{m} uygulamadan {n} çalıyor",
     "buttons_d_left": "Sol tık sesi değiştirir, sağ tık pencereyi açar",
     "buttons_d_right": "Sağ tık sesi değiştirir, sol tık pencereyi açar",
     "btn_left": "Sol",
