@@ -1440,17 +1440,21 @@ function pace(ms) {
 for (const ev of ['focus', 'resize', 'visibilitychange', 'pointerover'])
   window.addEventListener(ev, () => { if (tick !== TICK_SEEN) poll(); });
 
-// A window that has just appeared puts the focus on the first thing it can, and
-// the engine treats that as a step by keyboard: the mini-view button came up
-// ringed and with its tooltip hanging over the desktop, as though it had been
-// tabbed to. Nobody tabbed anywhere — the person clicked the tray icon — so the
-// focus is handed back to the page. Anything the person could be typing into,
-// such as the box that captures a shortcut, keeps it.
+// Whenever the window is shown or brought forward, the engine puts the focus on
+// the first thing it can and treats that as a step by keyboard: the mini-view
+// button came up ringed, with its tooltip hanging over the desktop, as though
+// it had been tabbed to. Nobody tabbed anywhere — the person clicked the tray
+// icon. So the page remembers where the focus was when the window lost it, and
+// when the window gets it back puts it there again: on nothing, if it was on
+// nothing, or on the glyph of the icon palette or the knob the person was
+// working with the keyboard. That keeps the keyboard alive and the ring away.
 //
-// Only on the way out of hiding. The window's focus event also fires every time
-// the person comes back to it from another program, and then the focus is one
-// they placed themselves — on a glyph of the icon palette, on the knob they are
-// turning with the arrows — and taking it away would leave the keyboard dead.
+// The engine moves the focus a moment after the window's own focus event, so
+// every focus the page receives shortly after that, before the person has
+// touched anything, is taken as the engine's and corrected.
+let focusBefore = null;
+let activatedAt = -1e9;
+
 function dropStrayFocus() {
   const el = document.activeElement;
   if (!el || el === document.body) return;
@@ -1458,7 +1462,25 @@ function dropStrayFocus() {
   el.blur();
 }
 
-window.addEventListener('focus', () => { if (wasHidden) dropStrayFocus(); });
+function putFocusBack() {
+  const was = focusBefore;
+  if (document.activeElement === was) return;
+  if (was && was !== document.body && document.contains(was)) was.focus({ preventScroll: true });
+  else dropStrayFocus();
+}
+
+window.addEventListener('blur', () => { focusBefore = document.activeElement; });
+window.addEventListener('focus', () => {
+  activatedAt = performance.now();
+  if (wasHidden) focusBefore = null;     // shown from hiding: nothing was chosen
+  putFocusBack();
+});
+document.addEventListener('focusin', () => {
+  if (performance.now() - activatedAt < 400) putFocusBack();
+});
+// Anything the person does ends the grace period: from then on the focus is theirs.
+for (const ev of ['pointerdown', 'keydown'])
+  document.addEventListener(ev, () => { activatedAt = -1e9; }, true);
 
 // The window lost the focus. Whether it goes away is Python's call: it knows
 // the setting, whether a dongle is being taught, and where the focus went.
