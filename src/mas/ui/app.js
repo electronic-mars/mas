@@ -1496,7 +1496,10 @@ async function poll() {
     const m = await call('get_meter');
     // The window is hidden, so there is nothing to draw. The rest is handled as
     // usual: Python hands out the tab signal once, and it must not be missed.
-    if (m.hidden) wasHidden = true;
+    // Hidden: whatever had the focus is forgotten, so that the focus event on
+    // the next show never puts it back — even when this poll's reply lands
+    // before the window is given the focus and wasHidden is already off.
+    if (m.hidden) { wasHidden = true; focusBefore = null; }
     setPainting(!m.hidden);
     pace(m.hidden ? TICK_UNSEEN : TICK_SEEN);
     if (!m.hidden) {
