@@ -3,6 +3,15 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.1.1
+
+- the card on the tray icon waits for two seconds of the pointer resting there
+  and can be switched off in Controls;
+- "hide when left in the background" waits twenty seconds of the window standing
+  behind others with the pointer off it, instead of going at the first popup;
+- the mini-view button no longer comes up outlined when the window is brought
+  forward from the tray while already open.
+
 ## 1.1.0
 
 A redesign, every piece of it compared blind against the old screens before it
