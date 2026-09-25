@@ -52,10 +52,16 @@ class Meter(threading.Thread):
         self.ready = threading.Event()
         # When the window is hidden nobody sees the level: we poll less often.
         self._idle = threading.Event()
-        self._snap = {"peak": 0.0, "volume": 0.0, "muted": False, "device": ""}
+        self._snap = {"peak": 0.0, "volume": 0.0, "muted": False, "device": "",
+                      "mic_peak": 0.0, "mic_muted": False}
         self._vol = None
         self._meter = None
         self._bound_id: str | None = None
+        # The default microphone, the same way: its volume object for the mute
+        # key and its meter for the level shown beside it.
+        self._mic_vol = None
+        self._mic_meter = None
+        self._mic_id: str | None = None
         self._presence = None
         self._present: set[str] | None = None
 
@@ -126,6 +132,32 @@ class Meter(threading.Thread):
             with self._lock:
                 self._levels = {}
 
+    def set_input_mute(self, muted: bool) -> None:
+        """Switch the default microphone off or on — through this thread's own
+        object, like everything else here."""
+        if self._mic_vol is None:
+            return
+        self._mic_vol.SetMute(bool(muted), None)
+        with self._lock:
+            self._snap["mic_muted"] = bool(muted)
+
+    def _bind_mic(self, mic_id: str | None) -> None:
+        from comtypes import CLSCTX_ALL, POINTER, cast
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, IAudioMeterInformation
+
+        if mic_id == self._mic_id and (self._mic_vol is not None or mic_id is None):
+            return
+        self._mic_vol = self._mic_meter = None
+        self._mic_id = mic_id
+        if mic_id is None:
+            return                      # no microphone at all: nothing to show
+        dev = AudioUtilities.GetMicrophone()
+        raw = dev._dev if hasattr(dev, "_dev") else dev
+        self._mic_vol = cast(raw.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None),
+                             POINTER(IAudioEndpointVolume))
+        self._mic_meter = cast(raw.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None),
+                               POINTER(IAudioMeterInformation))
+
     def set_idle(self, idle: bool) -> None:
         """The window is hidden — nobody sees the level, we poll five times less
         often. The set of devices and the change of the default we watch at the
@@ -145,7 +177,12 @@ class Meter(threading.Thread):
         # Read fresh here, in this thread, so that everybody else can take the
         # cached answer: see _DEFAULT_TTL in devices.
         dev_id = devices.default_id(is_output=True, max_age=0.0)
-        devices.default_id(is_output=False, max_age=0.0)
+        mic_id = devices.default_id(is_output=False, max_age=0.0)
+        try:
+            self._bind_mic(mic_id)
+        except Exception:
+            self._mic_vol = self._mic_meter = self._mic_id = None
+            _log.warning("the microphone meter did not bind", exc_info=True)
         if dev_id == self._bound_id and self._vol is not None:
             return
         dev = AudioUtilities.GetSpeakers()
@@ -257,6 +294,15 @@ class Meter(threading.Thread):
                     continue
                 with self._lock:
                     self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
+                if self._mic_vol is not None:
+                    try:
+                        mic = (round(self._mic_meter.GetPeakValue(), 4),
+                               bool(self._mic_vol.GetMute()))
+                    except Exception:
+                        self._mic_vol = self._mic_meter = self._mic_id = None
+                        mic = (0.0, False)
+                    with self._lock:
+                        self._snap.update(mic_peak=mic[0], mic_muted=mic[1])
                 try:
                     if time.monotonic() < self._levels_wanted_until:
                         relist = elapsed - listed >= SESSIONS_EVERY_S
@@ -285,6 +331,7 @@ class Meter(threading.Thread):
             # of other threads and frees them not where they were created: the
             # process crashes.
             self._vol = self._meter = None
+            self._mic_vol = self._mic_meter = None
             self._session_meters = {}
             self._bound_id = None
             if self._presence is not None:

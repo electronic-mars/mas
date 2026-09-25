@@ -83,6 +83,9 @@ DEFAULTS: dict[str, Any] = {
     # a change they never asked for.
     "hide_on_blur": False,
     "mics_expanded": False,   # the microphone section is collapsed by default
+    # The microphone used when the output has none of its own — the one a person
+    # talks into without a headset. Empty: the first that belongs to no headset.
+    "mic_base": "",
     "onboarded": False,
 }
 

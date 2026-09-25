@@ -72,9 +72,9 @@ INPUTS = [
     # it. Both used to be the same picture here, which is exactly the complaint
     # these screenshots are supposed to document being over.
     {"id": MIC_HP, "name": "Microphone (HyperX Cloud Flight S)", "kind": "Microphone",
-     "icon": "headset", "in_cycle": False, "is_default": True},
+     "icon": "headset", "in_cycle": False, "is_default": True, "is_base": False},
     {"id": MIC_ARR, "name": "Microphone Array (Realtek(R) Audio)", "kind": "Microphone",
-     "icon": "laptop", "in_cycle": False, "is_default": False},
+     "icon": "laptop", "in_cycle": False, "is_default": False, "is_base": True},
 ]
 KNOWN = [
     {"id": HP, "name": "Headphones (HyperX Cloud Flight S)", "active": True},
@@ -141,7 +141,7 @@ class FakeApi:
         return {"master": 0.22, "apps": {"spotify.exe": 0.31, "discord.exe": 0.12}}
 
     def get_meter(self):
-        return {"volume": 0.62, "muted": False, "peak": 0.22,
+        return {"volume": 0.62, "muted": False, "peak": 0.22, "mic_peak": 0.2, "mic_muted": False,
                 "device": "Headphones (HyperX Cloud Flight S)",
                 "tab": self.tab, "rev": 1,
                 "now": {"app": "Spotify", "title": "Shiver", "artist": "Mannymore",
@@ -187,6 +187,12 @@ class FakeApi:
 
     def focus_lost(self):
         return True
+
+    def set_input_mute(self, **kw):
+        return True
+
+    def set_base_mic(self, **kw):
+        return self.get_state()
 
     def open_data_folder(self):
         return True

@@ -77,7 +77,7 @@ class Api:
             # The microphone was chosen by hand. If it belongs to no headset,
             # then this is the person's base microphone.
             if device_id not in devices.tied_microphones():
-                self.app._mic_base = device_id
+                self.app.set_base_mic(device_id)
             self.app.go_microphone(device_id)
         return self.app.state()
 
@@ -190,6 +190,20 @@ class Api:
         snapshot, the applications from the meter thread. No COM here."""
         return {"master": self.app.meter.snapshot()["peak"],
                 "apps": self.app.meter.levels()}
+
+    def set_input_mute(self, muted: bool):
+        self.app.meter.set_input_mute(muted)
+        return True
+
+    def set_base_mic(self, device_id: str):
+        """The base microphone chosen in the list. If the sound is not on a
+        headset with a microphone of its own right now, it takes over at once."""
+        app = self.app
+        app.set_base_mic(device_id)
+        cur = devices.default_id(is_output=True, max_age=0.0)
+        if cur and devices.microphone_of(cur) is None:
+            app.go_microphone(device_id)
+        return app.state()
 
     def set_master(self, value: float):
         self.app.meter.set_volume(value)
@@ -320,7 +334,7 @@ class App:
         self._auto_prev: str | None = None
         self._auto_held = False
         # The base microphone is the one a person uses without a headset.
-        self._mic_base: str | None = None
+        self._mic_base: str | None = self.cfg.get("mic_base") or None
         # USB dongle listener and the recognized headset name for the interface.
         self.dongle: Dongle | None = None
         self._dongle_name: str | None = None
@@ -370,6 +384,7 @@ class App:
             }
 
         outputs = [pack(d) for d in devs if d.is_output]
+        base = self._mic_base or devices.standalone_microphone()
         outputs.sort(key=lambda x: cycle.index(x["id"]) if x["id"] in cycle else len(cycle))
         settings = self.cfg.all()
         # One source for the version number: the package. It used to be written
@@ -395,7 +410,7 @@ class App:
         known = self.known_outputs_cached(settings.get("auto_device", ""))
         return {
             "outputs": outputs,
-            "inputs": [pack(d) for d in devs if not d.is_output],
+            "inputs": [{**pack(d), "is_base": d.id == base} for d in devs if not d.is_output],
             "known_outputs": known,
             "settings": settings,
         }
@@ -536,17 +551,24 @@ class App:
                     _log.info("the microphone moved to %s", mic.name)
                 return
             if cur and cur not in devices.tied_microphones():
-                self._mic_base = cur   # belongs to no headset — so it is the base
+                self.set_base_mic(cur)   # belongs to no headset — so it is the base
                 return
             base = self._mic_base or devices.standalone_microphone()
             if base and base != cur:
                 devices.set_default(base, include_communications=True)
-                self._mic_base = base
+                self.set_base_mic(base)
                 _log.info("the microphone is back on the base one")
             elif not base:
                 _log.info("no base microphone known — leaving the microphone alone")
         except Exception:
             _log.exception("could not switch the microphone")
+
+    def set_base_mic(self, device_id: str) -> None:
+        """Remembered across restarts: it used to live in memory only, and after
+        every start the program guessed again."""
+        self._mic_base = device_id
+        if self.cfg.get("mic_base") != device_id:
+            self.cfg.set("mic_base", device_id)
 
     # --- priority device -------------------------------------------------
     def note_manual_switch(self, target: str) -> None:

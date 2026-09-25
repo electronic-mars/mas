@@ -243,6 +243,27 @@ function angleAt(cx, cy, x, y) {
 /** Angle difference reduced to the nearest direction: ±180°. */
 const shortest = (d) => ((d + 540) % 360) - 180;
 
+// The microphone key: raised and green while the microphone hears, pressed in
+// and red while it is switched off.
+let micMuted = false;
+function paintMicKey(off) {
+  micMuted = off;
+  const key = $('btn-micmute');
+  if (!key) return;
+  key.classList.toggle('off', off);
+  key.setAttribute('aria-pressed', off);
+  key.querySelector('span').textContent = off ? t('mic_off') : t('mic_on');
+  key.title = off ? t('unmute') : t('mute');
+}
+
+// The level of the microphone in use. Windows only measures a microphone while
+// something is recording from it; otherwise this stays dark, which is the truth.
+function paintMicMeter(peak) {
+  const cells = document.querySelectorAll('#mic-meter i');
+  const lit = micMuted ? 0 : Math.round(toLevel(peak) * cells.length);
+  cells.forEach((c, i) => c.classList.toggle('on', i < lit));
+}
+
 // Switched off: a crossed speaker in place of the digits and the mute key
 // pressed in. The volume stays where it was, as in Windows.
 function showMuted(on) {
@@ -413,6 +434,28 @@ function deviceRow(d, { draggable = false, active = false } = {}) {
     </div>`;
 }
 
+// A microphone row: like an output, but with the level beside the one in use
+// and a round mark for the base microphone — the one used when the output has
+// no microphone of its own — instead of a checkbox.
+function micRow(d) {
+  const what = d.purpose ? esc(d.purpose) : '';
+  const sub = d.is_default
+    ? `<span class="now">${t('mic_in_use')}</span><span class="mmeter" id="mic-meter">${'<i></i>'.repeat(14)}</span>`
+    : what;
+  return `<div class="row ${d.is_default ? 'active' : ''}" data-id="${esc(d.id)}" title="${esc(d.name)}">
+      <button class="ic" data-act="icon" title="${t('icon_title')}">
+        <img src="${glyphSrc(d.icon)}" srcset="${glyphSrcset(d.icon)}" alt="">
+      </button>
+      <div class="col"><span class="nm">${esc(d.title || d.name)}</span>
+        ${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+      ${d.is_default ? '' : `<span class="go" aria-hidden="true">${t('switch_here')}</span>`}
+      <button class="rad" data-act="base" role="radio" aria-checked="${!!d.is_base}"
+              title="${t('mic_base_d')}"></button>
+    </div>`;
+}
+
+const MIC_SVG = '<svg viewBox="0 0 24 24" class="mg"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none"/></svg>';
+
 function renderDevices() {
   // The order is exactly the one the devices are switched in — otherwise
   // dragging is pointless: the list would re-sort itself right afterwards.
@@ -427,20 +470,24 @@ function renderDevices() {
   $('lcd-glyph').style.webkitMaskImage = $('lcd-glyph').style.maskImage = glyph;
 
   const note = state.settings.switch_button === 'right' ? t('cycle_note_right') : t('cycle_note');
+  const micNow = mics.find((d) => d.is_default);
   $('panel-devices').innerHTML =
     `<h2 class="lbl micro">${secIcon('ui-toggle')}${t('out_title')}<span class="aside">${t('in_queue')}</span></h2>
      ${outs.length
       ? `<div class="devgroup">${outs.map((d) => deviceRow(d, { draggable: true, active: d.is_default })).join('')}</div>`
       : `<div class="empty">${t('no_devices')}</div>`}
      <p class="foot">${note}</p>
-     <button class="fold" id="fold-mics" aria-expanded="${expanded}">
-       <span class="arw"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
-       ${secIcon('ui-mic')}<span class="micro">${t('microphones')}</span>
-       <span class="micro cnt">${mics.length}</span>
-     </button>
-     <div id="mics" class="devgroup ${expanded ? '' : 'hidden'}">
-       ${mics.map((d) => deviceRow(d, { active: d.is_default })).join('')}
-     </div>`;
+     <h2 class="lbl micro in">${secIcon('ui-mic')}${t('in_title')}${expanded ? `<span class="aside">${t('mic_base')}</span>` : ''}</h2>
+     ${mics.length ? `<div class="devgroup" id="mics">
+       <div class="fold" id="fold-mics" role="button" aria-expanded="${expanded}">
+         <span class="arw"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+         <span class="ttl">${t('mic_word')}</span>
+         <span class="cur">${expanded ? '' : esc(micNow ? (micNow.title || micNow.name) : '')}</span>
+         <button class="micbtn" id="btn-micmute" aria-pressed="false">${MIC_SVG}<span></span></button>
+       </div>
+       ${expanded ? mics.map(micRow).join('') : ''}
+     </div>` : `<div class="empty">${t('no_devices')}</div>`}`;
+  paintMicKey(micMuted);
 }
 
 // ----------------------------------------------------------------- mixer tab
@@ -1081,6 +1128,12 @@ document.addEventListener('click', async (e) => {
   const media = e.target.closest('[data-media]');
   if (media) return void call('media', { action: media.dataset.media }).catch(() => {});
 
+  if (e.target.closest('#btn-micmute')) {
+    const off = !micMuted;
+    paintMicKey(off);
+    return void call('set_input_mute', { muted: off }).catch(() => {});
+  }
+
   if (e.target.closest('#btn-mute')) {
     const off = !$('btn-mute').classList.contains('down');
     showMuted(off);
@@ -1107,6 +1160,10 @@ document.addEventListener('click', async (e) => {
       return renderAll();
     }
     if (act === 'icon') return openIconSheet(dev.id, dev.icon);
+    if (act === 'base') {
+      state = await call('set_base_mic', { device_id: dev.id });
+      return renderAll();
+    }
     if (!dev.is_default) {
       state = await call('switch_to', { device_id: dev.id });
       return renderAll();
@@ -1369,6 +1426,8 @@ async function poll() {
       paintKnob(knobValue);
       lvlTarget = m.muted ? 0 : toLevel(m.peak);
       showMuted(!!m.muted);
+      if (!!m.mic_muted !== micMuted) paintMicKey(!!m.mic_muted);
+      paintMicMeter(m.mic_peak || 0);
     }
 
     // While music is playing, the middle key shows the track instead of what
