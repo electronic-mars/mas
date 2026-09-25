@@ -11,4 +11,4 @@ full text of the license is in the LICENSE file.
 SPDX-License-Identifier: GPL-3.0-or-later
 """
 
-__version__ = "1.0.9"
+__version__ = "1.1.0"

@@ -3,6 +3,29 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## 1.1.0
+
+A redesign, every piece of it compared blind against the old screens before it
+went in.
+
+- the front panel has one display: the device playing, the volume in segment
+  digits with the signal beside it, and a volume bar that turns with the knob
+  and can be dragged instead of it; a fourth key switches the sound off;
+- the device list is one card: each device by its own name ("HyperX Cloud
+  Flight S") with what it is underneath ("Headphones"), a green "Playing now"
+  on the one playing;
+- sound input: a key on the microphone row switches it off; the main
+  microphone is picked with a round mark and remembered across restarts; a
+  microphone can be pinned to each output in the settings, automatic by default;
+- the mixer: one grid, a live level under every slider, a mark and a count of
+  the applications making sound;
+- the notification after a switch is a card with the volume, and the same card
+  with the track comes up while the pointer rests on the tray icon;
+- the first run shows the taskbar, the icon and what a click does, and lets the
+  devices it goes through be ticked right there;
+- the window can hide itself when another window is clicked (Controls, off by
+  default).
+
 ## 1.0.9
 
 - the sound after a switch is two soft short notes instead of a hard beep;
