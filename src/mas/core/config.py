@@ -86,6 +86,9 @@ DEFAULTS: dict[str, Any] = {
     # The microphone used when the output has none of its own — the one a person
     # talks into without a headset. Empty: the first that belongs to no headset.
     "mic_base": "",
+    # A microphone pinned to an output by hand, output id -> microphone id. An
+    # output missing here is automatic: its own microphone or the main one.
+    "mic_pairs": {},
     "onboarded": False,
 }
 

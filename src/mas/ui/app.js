@@ -777,6 +777,18 @@ function renderSettings() {
       stRow(t('auto_device'), t('auto_device_d'),
         `<select id="auto-select">${autoOptions}</select>`, { stack: true }),
       toggle('switch_microphone', t('mic_follow'), t('mic_follow_d')),
+      // An option, not a default: automatic means the microphone of the same
+      // headset or the main one, and that is right for almost everybody. Shown
+      // only while the microphone follows at all.
+      state.settings.switch_microphone && state.inputs.length
+        ? stRow(t('mic_pairs'), t('mic_pairs_d'), `<div class="pairs">${state.outputs.map((o) => {
+          const pinned = (state.settings.mic_pairs || {})[o.id] || '';
+          const opts = [`<option value="">${t('mic_auto')}</option>`,
+            ...state.inputs.map((m) => `<option value="${esc(m.id)}" ${m.id === pinned ? 'selected' : ''}>${esc(m.title || m.name)}</option>`)];
+          return `<div class="pair"><span class="pn" title="${esc(o.name)}">${esc(o.title || o.name)}</span>
+            <select class="narrow" data-pair="${esc(o.id)}">${opts.join('')}</select></div>`;
+        }).join('')}</div>`, { stack: true })
+        : '',
       state.settings.dongle_name
         ? toggle('watch_dongle', t('dongle'), t('dongle_d').replace('%s', state.settings.dongle_name))
         : '',
@@ -1283,6 +1295,10 @@ document.addEventListener('change', async (e) => {
   }
   if (e.target.id === 'auto-select') {
     state = await call('set_setting', { key: 'auto_device', value: e.target.value });
+    renderAll();
+  }
+  if (e.target.dataset.pair !== undefined) {
+    state = await call('set_mic_pair', { output_id: e.target.dataset.pair, mic_id: e.target.value });
     renderAll();
   }
   if (e.target.id === 'player-select') {

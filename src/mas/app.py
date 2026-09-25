@@ -191,6 +191,20 @@ class Api:
         return {"master": self.app.meter.snapshot()["peak"],
                 "apps": self.app.meter.levels()}
 
+    def set_mic_pair(self, output_id: str, mic_id: str):
+        """Pin a microphone to an output, or give it back to the automatic
+        choice with an empty id. Takes effect at once for the output playing."""
+        app = self.app
+        pairs = dict(app.cfg.get("mic_pairs"))
+        if mic_id:
+            pairs[output_id] = mic_id
+        else:
+            pairs.pop(output_id, None)
+        app.cfg.set("mic_pairs", pairs)
+        if output_id == devices.default_id(is_output=True, max_age=0.0):
+            app._follow_microphone(output_id)
+        return app.state()
+
     def set_input_mute(self, muted: bool):
         self.app.meter.set_input_mute(muted)
         return True
@@ -543,6 +557,14 @@ class App:
         if not self.cfg.get("switch_microphone"):
             return
         try:
+            # Pinned by hand in the settings, and plugged in: that one, whatever
+            # the automatic choice would have been.
+            pinned = self.cfg.get("mic_pairs").get(output_id)
+            if pinned and any(d.id == pinned for d in devices.list_devices(only_active=True)):
+                if pinned != devices.default_id(is_output=False, max_age=0.0):
+                    devices.set_default(pinned, include_communications=True)
+                    _log.info("the microphone moved to the one pinned to this output")
+                return
             mic = devices.microphone_of(output_id)
             cur = devices.default_id(is_output=False, max_age=0.0)
             if mic is not None:

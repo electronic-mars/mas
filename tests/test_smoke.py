@@ -1611,6 +1611,41 @@ check("focus came straight back: stays", _blur(_blur_app(), front=1), 0)
 check("a dongle is being taught: stays", _blur(_blur_app(teaching=True)), 0)
 check("already hidden: nothing to do", _blur(_blur_app(visible=False)), 0)
 
+# A microphone pinned to an output in the settings wins over the automatic
+# choice — while it is plugged in. Unplugged, the automatic choice is back.
+print("\nA microphone pinned to an output")
+_saved = {n: getattr(devices, n) for n in ("list_devices", "default_id", "set_default",
+                                            "microphone_of", "tied_microphones",
+                                            "standalone_microphone")}
+_moved = []
+devices.default_id = lambda is_output=True, max_age=None: "mic-array"
+devices.set_default = lambda i, include_communications=True: _moved.append(i) or True
+devices.microphone_of = lambda out: None
+devices.tied_microphones = lambda: set()
+devices.standalone_microphone = lambda: "mic-array"
+
+
+def _pinned_app(pairs, present):
+    a = App.__new__(App)
+    a.cfg = FakeConfig(switch_microphone=True, mic_pairs=pairs, mic_base="")
+    a._mic_base = None
+    devices.list_devices = lambda only_active=True: [
+        devices.Device(id=i, name=i, is_output=i.startswith("out"), active=True) for i in present]
+    return a
+
+
+_moved.clear()
+_pinned_app({"out-spk": "mic-usb"}, ["out-spk", "mic-usb", "mic-array"])._follow_microphone("out-spk")
+check("the pinned microphone takes over", _moved, ["mic-usb"])
+_moved.clear()
+_pinned_app({"out-spk": "mic-usb"}, ["out-spk", "mic-array"])._follow_microphone("out-spk")
+check("an unplugged pinned microphone is passed over", _moved, [])
+_moved.clear()
+_pinned_app({}, ["out-spk", "mic-usb", "mic-array"])._follow_microphone("out-spk")
+check("nothing pinned: the automatic choice, as before", _moved, [])
+for _n, _v in _saved.items():
+    setattr(devices, _n, _v)
+
 # The switch sound ships inside the interface folder, which is what the build
 # bundles. Short and quiet on purpose: the old tone was a hard beep at full level.
 print("\nThe switch sound")
