@@ -120,8 +120,16 @@ class FakeApi:
         return {"python": sys.version.split()[0], "frozen": False, "log": "—"}
 
     def get_state(self):
-        return {"outputs": OUTPUTS, "inputs": INPUTS, "known_outputs": KNOWN,
-                "settings": dict(self.settings)}
+        # The names split the way the program splits them, in the language
+        # of the screenshot.
+        from mas.core import devices, strings
+        strings.use(self.settings["language"])
+
+        def named(d):
+            title, what = devices.split_name(d["name"])
+            return {**d, "title": title, "purpose": strings.purpose(what)}
+        return {"outputs": [named(d) for d in OUTPUTS], "inputs": [named(d) for d in INPUTS],
+                "known_outputs": KNOWN, "settings": dict(self.settings)}
 
     def get_mixer(self):
         return {"master": {"volume": 0.62, "muted": False},

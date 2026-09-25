@@ -62,10 +62,10 @@ KEEP = ("Master Audio Switcher", "Windows", "WebView2", "GitHub", "Spotify",
 # it is simply cut off.
 TIGHT = {
     "tab_devices": 12, "tab_mixer": 12, "tab_settings": 14, "tab_about": 16,
-    "lcd_level": 10, "lcd_signal": 10, "btn_left": 10, "btn_right": 10,
+    "in_queue": 14, "switch_here": 12, "btn_left": 10, "btn_right": 10,
     "theme_system": 16, "theme_dark": 10, "theme_light": 10,
     "hk_none": 16, "hk_clear": 10, "open_btn": 12, "welcome_ok": 14,
-    "player_none": 18, "muted": 12,
+    "player_none": 18,
 }
 
 

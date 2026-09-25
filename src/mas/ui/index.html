@@ -62,27 +62,29 @@
     </button>
   </div>
 
-  <!-- Front panel: two LCD windows at the edges with the knob between them.
-       Volume in digits on the left, signal level in bars on the right.
-       The windows are marked decorative: the same value is available on the
-       knob itself through aria-valuenow, and a screen reader has no reason to
-       announce it twice. -->
+  <!-- Front panel: the knob, and beside it one display with three lines —
+       the device playing, the volume in digits with the signal beside it, and
+       a volume bar that turns with the knob and can be dragged instead of it.
+       The display is decorative for a screen reader: the knob carries the
+       value through aria-valuenow, and saying it twice helps nobody. -->
   <section class="console" id="console">
-    <div class="lcdbox">
-      <span class="micro lcdcap" data-t="lcd_level">Level</span>
-      <div class="lcd" id="lcd-vol" aria-hidden="true"></div>
+    <div class="knob" id="knob" role="slider" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-label="Volume" tabindex="0"
+         title="Turn it in a circle, drag up and down, or use the wheel">
+      <svg viewBox="0 0 130 130" id="ticks"></svg>
+      <div class="cap-body"></div>
+      <div class="ind-hold"><div class="ind" id="ind"></div></div>
     </div>
-    <div class="knobcol">
-      <div class="knob" id="knob" role="slider" aria-valuemin="0" aria-valuemax="100"
-           aria-valuenow="0" aria-label="Volume" tabindex="0"
-           title="Turn it in a circle, drag up and down, or use the wheel">
-        <svg viewBox="0 0 130 130" id="ticks"></svg>
-        <div class="cap-body"></div>
-        <div class="ind-hold"><div class="ind" id="ind"></div></div>
+    <div class="rightcol">
+      <div class="lcd" id="lcd" aria-hidden="true">
+        <div class="src"><span class="srcico" id="lcd-glyph"></span><span id="lcd-name"></span></div>
+        <div class="mid"><div class="num" id="lcd-vol"></div><div id="lcd-lvl"></div></div>
+        <div class="volbar" id="volbar"></div>
       </div>
-      <!-- Key block under the knob. The glyph on the middle key is a combined
-           one: the program sends the command but never asks the system whether
-           music is playing, so it has no right to show a state. -->
+      <!-- Key block. The glyph on the play key is a combined one: the program
+           sends the command but never asks the system whether music is
+           playing, so it has no right to show a state. The last key switches
+           the sound off and stays pressed in while it is. -->
       <div class="transport" id="transport">
         <button class="tbtn" data-media="prev" title="Previous track" aria-label="Previous track">
           <svg viewBox="0 0 24 24" class="ti"><path d="M18.6 5.7 9.6 12l9 6.3z"/><path d="M5.4 5.7h2.4v12.6H5.4z"/></svg>
@@ -93,11 +95,10 @@
         <button class="tbtn" data-media="next" title="Next track" aria-label="Next track">
           <svg viewBox="0 0 24 24" class="ti"><path d="M5.4 5.7 14.4 12l-9 6.3z"/><path d="M16.2 5.7h2.4v12.6h-2.4z"/></svg>
         </button>
+        <button class="tbtn sepl" id="btn-mute" aria-pressed="false">
+          <svg viewBox="0 0 24 24" class="ti"><path d="M3 9h4l5-4.5v15L7 15H3z"/><path d="M15.5 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+        </button>
       </div>
-    </div>
-    <div class="lcdbox">
-      <span class="micro lcdcap" data-t="lcd_signal">Signal</span>
-      <div class="lcd" id="lcd-lvl" aria-hidden="true"></div>
     </div>
   </section>
 

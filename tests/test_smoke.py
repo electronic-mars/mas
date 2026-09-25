@@ -658,7 +658,7 @@ check("English is offered first",
 # Text in a tab or on a segment cannot wrap: it is simply cut off. The budget is
 # generous — this catches a translation that ran away, not a long word.
 TIGHT = {"tab_devices": 14, "tab_mixer": 14, "tab_settings": 16, "tab_about": 18,
-         "lcd_level": 12, "lcd_signal": 12, "btn_left": 12, "btn_right": 12,
+         "in_queue": 14, "switch_here": 12, "btn_left": 12, "btn_right": 12,
          "hk_clear": 12, "open_btn": 14, "welcome_ok": 16}
 over = [(c, k, len(d["strings"][k])) for c, d in docs.items()
         for k in TIGHT if len(d["strings"][k]) > TIGHT[k]]

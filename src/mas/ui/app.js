@@ -57,18 +57,25 @@ const SEG_ORDER = 'abcdefg';
 const BARS = 10, BAR_W = 4, BAR_GAP = 2.6, BAR_MIN = 7, BAR_MAX = 24, BAR_H = 25;
 
 function buildDigit() {
+  // Leaned a few degrees, the way segment displays are cut: upright digits read
+  // as a font, not as glass.
   const rects = [...SEG_ORDER].map((s) => {
     const [x, y, w, h] = SEG_BOX[s];
-    return `<rect class="lseg" data-seg="${s}" x="${x}" y="${y}" width="${w}" height="${h}" rx="1"/>`;
+    return `<rect class="lseg" data-seg="${s}" x="${x}" y="${y}" width="${w}" height="${h}" rx=".9" transform="skewX(-6) translate(1.6 0)"/>`;
   }).join('');
-  return `<svg viewBox="0 0 14 24" width="14" height="24">${rects}</svg>`;
+  return `<svg class="dg" viewBox="0 0 15.5 24" width="22" height="34">${rects}</svg>`;
 }
+
+// The volume bar under the digits: as many cells as there is room for, lit up
+// to the volume with a taller one where it stands — the thumb. It turns with
+// the knob and can be dragged instead of it.
+const CELLS = 30;
 
 function buildLcd() {
   // Left: three digits and a percent sign. The sign is always lit — it belongs
   // to the scale, not to the value, exactly like a symbol printed on the glass.
   $('lcd-vol').innerHTML = buildDigit().repeat(3)
-    + `<svg viewBox="0 0 10 24" width="10" height="24" style="margin-left:2px">
+    + `<svg class="pctsvg" viewBox="0 0 10 24" width="8" height="19">
          <rect class="pct" x="0" y="4" width="3.4" height="3.4" rx=".9"/>
          <rect class="pct" x="6.6" y="16.6" width="3.4" height="3.4" rx=".9"/>
          <line class="pct" x1="1.5" y1="20.4" x2="8.5" y2="4.6"
@@ -91,6 +98,14 @@ function buildLcd() {
               width="${BAR_W}" height="${h.toFixed(2)}" rx="1"/>`;
   }).join('');
   $('lcd-lvl').innerHTML = `<svg viewBox="0 0 ${w} ${BAR_H}" width="${w}" height="${BAR_H}">${bars}</svg>`;
+  $('volbar').innerHTML = '<i></i>'.repeat(CELLS);
+}
+
+function paintVolumeBar(value) {
+  const thumb = Math.round(value / 100 * (CELLS - 1));
+  $('volbar').querySelectorAll('i').forEach((c, i) => {
+    c.className = i === thumb ? 'tip' : i < thumb ? 'on' : '';
+  });
 }
 
 function paintVolume(pct) {
@@ -98,6 +113,9 @@ function paintVolume(pct) {
   $('lcd-vol').querySelectorAll('svg').forEach((svg, i) => {
     if (i > 2) return;                       // the fourth one is the percent sign
     const ch = text[i];
+    // No ghost of a digit in front of the number: an unlit "8" before "62"
+    // read as a third digit that had failed.
+    svg.style.visibility = ch === ' ' ? 'hidden' : '';
     const lit = ch === ' ' ? '' : DIGITS[+ch];
     svg.querySelectorAll('.lseg').forEach((r) => {
       r.classList.toggle('on', lit.includes(r.dataset.seg));
@@ -176,6 +194,7 @@ function paintKnob(value) {
   $('ind').style.transform = `rotate(${ARC_START + ARC_SPAN * value / 100}deg)`;
   $('knob').setAttribute('aria-valuenow', Math.round(value));
   paintVolume(value);
+  paintVolumeBar(value);
 }
 
 // One call in flight per lane; the extra ones on the way collapse into the last
@@ -208,7 +227,7 @@ function setKnob(value, { push: send = true } = {}) {
     push('master', 'set_master', { value: knobValue / 100 });
     // Turning switches the sound back on (see set_volume in Python); the
     // number comes back now rather than at the next poll.
-    $('lcd-vol').classList.remove('muted');
+    showMuted(false);
   }
 }
 
@@ -223,6 +242,39 @@ function angleAt(cx, cy, x, y) {
 
 /** Angle difference reduced to the nearest direction: ±180°. */
 const shortest = (d) => ((d + 540) % 360) - 180;
+
+// Switched off: a crossed speaker in place of the digits and the mute key
+// pressed in. The volume stays where it was, as in Windows.
+function showMuted(on) {
+  $('lcd-vol').classList.toggle('muted', on);
+  const key = $('btn-mute');
+  key.classList.toggle('down', on);
+  key.setAttribute('aria-pressed', on);
+  key.title = on ? t('unmute') : t('mute');
+  key.setAttribute('aria-label', key.title);
+}
+
+// Dragging the volume bar: the same lane as the knob, so the two never argue.
+function wireVolumeBar() {
+  const bar = $('volbar');
+  const at = (ev) => {
+    const r = bar.getBoundingClientRect();
+    return Math.max(0, Math.min(100, (ev.clientX - r.left) / r.width * 100));
+  };
+  bar.addEventListener('pointerdown', (e) => {
+    bar.setPointerCapture(e.pointerId);
+    knobBusy = true;
+    setKnob(at(e));
+    const move = (ev) => setKnob(at(ev));
+    const up = () => {
+      bar.removeEventListener('pointermove', move);
+      bar.removeEventListener('pointerup', up);
+      setTimeout(() => { knobBusy = false; }, 250);
+    };
+    bar.addEventListener('pointermove', move);
+    bar.addEventListener('pointerup', up);
+  });
+}
 
 function wireKnob() {
   const el = $('knob');
@@ -337,27 +389,23 @@ function updateFade() {
 }
 
 // -------------------------------------------------------------- devices tab
-// The drag grip is drawn with dots rather than the ⣿ character: the character
-// has its own width in every font, its box had to be clipped, and the bottom
-// row of dots was cut in half.
-const GRIP = `<svg viewBox="0 0 6 16" width="6" height="16">${
-  [1.6, 5.8, 10, 14.2].map((y) => `<circle cx="1" cy="${y}" r="1"/><circle cx="5" cy="${y}" r="1"/>`).join('')
-}</svg>`;
-
+// A row: the device by its own name, what it is underneath, and on the one
+// playing now a green "Playing now". The whole row is the drag handle and the
+// switch; the tile is the icon picker. The "Enable" pill only shows on hover,
+// to say what a click on the row does.
 function deviceRow(d, { draggable = false, active = false } = {}) {
-  // The slot for the drag grip is always occupied: microphones do not have one,
-  // and without the blank space their icons would sit further left than those
-  // of output devices.
-  return `<div class="row ${active ? 'active' : ''}" data-id="${esc(d.id)}" ${draggable ? 'data-order' : ''}>
-      <span class="grip ${draggable ? '' : 'blank'}">${GRIP}</span>
+  const what = d.purpose ? esc(d.purpose) : '';
+  const sub = active
+    ? `<span class="now">${t('playing_now')}</span>${what ? `<span>· ${what}</span>` : ''}`
+    : what;
+  return `<div class="row ${active ? 'active' : ''}" data-id="${esc(d.id)}" ${draggable ? 'data-order' : ''}
+               title="${esc(d.name)}">
       <button class="ic" data-act="icon" title="${t('icon_title')}">
         <img src="${glyphSrc(d.icon)}" srcset="${glyphSrcset(d.icon)}" alt="">
-        <span class="pen"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"/></svg></span>
       </button>
-      <div class="col">
-        <span class="dot ${active ? '' : 'ghost'}"></span>
-        <span class="nm" title="${esc(d.name)}">${esc(d.name)}</span>
-      </div>
+      <div class="col"><span class="nm">${esc(d.title || d.name)}</span>
+        ${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+      ${active ? '' : `<span class="go" aria-hidden="true">${t('switch_here')}</span>`}
       <button class="chk" data-act="cycle" role="checkbox" aria-checked="${d.in_cycle}"
               title="${t('in_cycle')}">
         <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
@@ -368,22 +416,29 @@ function deviceRow(d, { draggable = false, active = false } = {}) {
 function renderDevices() {
   // The order is exactly the one the devices are switched in — otherwise
   // dragging is pointless: the list would re-sort itself right afterwards.
-  // What is playing right now is shown by the green dot and the row highlight.
   const outs = state.outputs;
   const mics = state.inputs;
   const expanded = !!state.settings.mics_expanded;
 
-  const hint = state.settings.switch_button === 'right' ? t('cycle_hint_right') : t('cycle_hint');
+  // The display on the front panel names the device playing.
+  const cur = outs.find((d) => d.is_default);
+  $('lcd-name').textContent = cur ? (cur.title || cur.name) : '';
+  const glyph = `url(icons/devices/${cur ? cur.icon : 'speakers'}.svg)`;
+  $('lcd-glyph').style.webkitMaskImage = $('lcd-glyph').style.maskImage = glyph;
+
+  const note = state.settings.switch_button === 'right' ? t('cycle_note_right') : t('cycle_note');
   $('panel-devices').innerHTML =
-    `<h2 class="lbl micro">${secIcon('ui-toggle')}${hint}</h2>
-     ${outs.length ? outs.map((d) => deviceRow(d, { draggable: true, active: d.is_default })).join('')
+    `<h2 class="lbl micro">${secIcon('ui-toggle')}${t('out_title')}<span class="aside">${t('in_queue')}</span></h2>
+     ${outs.length
+      ? `<div class="devgroup">${outs.map((d) => deviceRow(d, { draggable: true, active: d.is_default })).join('')}</div>`
       : `<div class="empty">${t('no_devices')}</div>`}
+     <p class="foot">${note}</p>
      <button class="fold" id="fold-mics" aria-expanded="${expanded}">
        <span class="arw"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
        ${secIcon('ui-mic')}<span class="micro">${t('microphones')}</span>
        <span class="micro cnt">${mics.length}</span>
      </button>
-     <div id="mics" class="${expanded ? '' : 'hidden'}">
+     <div id="mics" class="devgroup ${expanded ? '' : 'hidden'}">
        ${mics.map((d) => deviceRow(d, { active: d.is_default })).join('')}
      </div>`;
 }
@@ -1026,6 +1081,12 @@ document.addEventListener('click', async (e) => {
   const media = e.target.closest('[data-media]');
   if (media) return void call('media', { action: media.dataset.media }).catch(() => {});
 
+  if (e.target.closest('#btn-mute')) {
+    const off = !$('btn-mute').classList.contains('down');
+    showMuted(off);
+    return void call('set_master_mute', { muted: off }).catch(() => {});
+  }
+
   if (e.target.closest('#btn-mini')) return void toggleMini(!mini);
   if (e.target.closest('#btn-close')) return void call('hide_window').catch(() => {});
 
@@ -1229,6 +1290,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 buildTicks();
 buildLcd();
 wireKnob();
+wireVolumeBar();
 setPainting(true);
 await call('selfcheck', { from: 'ui' }).catch(() => {});
 await loadLanguages();
@@ -1306,7 +1368,7 @@ async function poll() {
       if (!knobBusy) knobValue = m.volume * 100;
       paintKnob(knobValue);
       lvlTarget = m.muted ? 0 : toLevel(m.peak);
-      $('lcd-vol').classList.toggle('muted', !!m.muted);
+      showMuted(!!m.muted);
     }
 
     // While music is playing, the middle key shows the track instead of what
