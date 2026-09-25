@@ -3,6 +3,16 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+- the microphone rows say what they mean: a green "Recording now" on the one
+  recording (red, with "off", while it is switched off), a "Main" tag on the
+  one used for the speakers instead of an orange round mark, "Record here" on
+  the others; a headset microphone passed over for one pinned in the settings
+  says so;
+- the mini-view button no longer comes up outlined when the window is shown
+  and the page learns it is shown before the window is given the focus.
+
 ## 1.1.1
 
 - the card on the tray icon waits for two seconds of the pointer resting there

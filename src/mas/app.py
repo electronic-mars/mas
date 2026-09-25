@@ -400,6 +400,13 @@ class App:
 
         outputs = [pack(d) for d in devs if d.is_output]
         base = self._mic_base or devices.standalone_microphone()
+        # The headset's own microphone, left aside because the settings pin
+        # another one to this output: its row says so, or the person is left
+        # wondering why the headset is on and its microphone is not.
+        own = devices.microphone_of(cur_out) if cur_out else None
+        pinned = self.cfg.get("mic_pairs").get(cur_out or "")
+        aside = own.id if own and pinned and pinned != own.id and own.id != cur_in else None
+        out_title = next((o["title"] or o["name"] for o in outputs if o["id"] == cur_out), "")
         outputs.sort(key=lambda x: cycle.index(x["id"]) if x["id"] in cycle else len(cycle))
         settings = self.cfg.all()
         # One source for the version number: the package. It used to be written
@@ -425,7 +432,9 @@ class App:
         known = self.known_outputs_cached(settings.get("auto_device", ""))
         return {
             "outputs": outputs,
-            "inputs": [{**pack(d), "is_base": d.id == base} for d in devs if not d.is_output],
+            "inputs": [{**pack(d), "is_base": d.id == base,
+                        "pinned_away": out_title if d.id == aside else ""}
+                       for d in devs if not d.is_output],
             "known_outputs": known,
             "settings": settings,
         }

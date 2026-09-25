@@ -254,6 +254,12 @@ function paintMicKey(off) {
   key.setAttribute('aria-pressed', off);
   key.querySelector('span').textContent = off ? t('mic_off') : t('mic_on');
   key.title = off ? t('unmute') : t('mute');
+  // The row of the microphone recording now repeats it: "recording now · off".
+  const now = $('mic-now');
+  if (now) {
+    now.classList.toggle('off', off);
+    now.textContent = off ? `${t('mic_rec_now')} · ${t('mic_off').toLowerCase()}` : t('mic_rec_now');
+  }
 }
 
 // The level of the microphone in use. Windows only measures a microphone while
@@ -434,23 +440,35 @@ function deviceRow(d, { draggable = false, active = false } = {}) {
     </div>`;
 }
 
-// A microphone row: like an output, but with the level beside the one in use
-// and a round mark for the base microphone — the one used when the output has
-// no microphone of its own — instead of a checkbox.
+// A microphone row: like an output, but the one recording now says so beside
+// its level (and says when it is switched off — the key in the heading alone
+// was read as belonging to some other microphone), and the base microphone —
+// the one used when the output has no microphone of its own — wears a tag
+// with a word on it. It used to be a round mark, and a round orange mark next
+// to a green "in use" read as two ways of saying "this one is on".
+const PIN_SVG = '<svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3z"/></svg>';
+
 function micRow(d) {
-  const what = d.purpose ? esc(d.purpose) : '';
-  const sub = d.is_default
-    ? `<span class="now">${t('mic_in_use')}</span><span class="mmeter" id="mic-meter">${'<i></i>'.repeat(14)}</span>`
-    : what;
+  let sub;
+  if (d.is_default) {
+    sub = `<span class="now" id="mic-now"></span><span class="mmeter" id="mic-meter">${'<i></i>'.repeat(14)}</span>`;
+  } else {
+    const notes = [d.purpose ? esc(d.purpose) : ''];
+    if (d.is_base) notes.push(t('mic_for_speakers'));
+    if (d.pinned_away) notes.push(esc(t('mic_pinned_away').replace('{out}', d.pinned_away)));
+    sub = notes.filter(Boolean).join(' · ');
+  }
+  const tag = d.is_base
+    ? `<button class="tag" data-act="base" aria-pressed="true" title="${t('mic_base_d')}">${PIN_SVG}${t('mic_base')}</button>`
+    : `<button class="tag ghost" data-act="base" aria-pressed="false" title="${t('mic_base_d')}">${t('mic_make_base')}</button>`;
   return `<div class="row ${d.is_default ? 'active' : ''}" data-id="${esc(d.id)}" title="${esc(d.name)}">
       <button class="ic" data-act="icon" title="${t('icon_title')}">
         <img src="${glyphSrc(d.icon)}" srcset="${glyphSrcset(d.icon)}" alt="">
       </button>
       <div class="col"><span class="nm">${esc(d.title || d.name)}</span>
         ${sub ? `<div class="sub">${sub}</div>` : ''}</div>
-      ${d.is_default ? '' : `<span class="go" aria-hidden="true">${t('switch_here')}</span>`}
-      <button class="rad" data-act="base" role="radio" aria-checked="${!!d.is_base}"
-              title="${t('mic_base_d')}"></button>
+      ${d.is_default ? '' : `<span class="go" aria-hidden="true">${t('mic_rec_here')}</span>`}
+      ${tag}
     </div>`;
 }
 
@@ -477,7 +495,7 @@ function renderDevices() {
       ? `<div class="devgroup">${outs.map((d) => deviceRow(d, { draggable: true, active: d.is_default })).join('')}</div>`
       : `<div class="empty">${t('no_devices')}</div>`}
      <p class="foot">${note}</p>
-     <h2 class="lbl micro in">${secIcon('ui-mic')}${t('in_title')}${expanded ? `<span class="aside">${t('mic_base')}</span>` : ''}</h2>
+     <h2 class="lbl micro in">${secIcon('ui-mic')}${t('in_title')}</h2>
      ${mics.length ? `<div class="devgroup" id="mics">
        <div class="fold" id="fold-mics" role="button" aria-expanded="${expanded}">
          <span class="arw"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>

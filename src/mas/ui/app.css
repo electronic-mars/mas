@@ -250,6 +250,9 @@ h2.sec{margin:12px 0 7px 3px}
   opacity:0;transition:opacity .12s ease}
 .row:hover .go{opacity:1}
 .lbl .aside{margin-left:auto;margin-right:12px}
+.row .now.off{color:var(--danger)}
+.row .now.off::before{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+.row .now.off + .mmeter{display:none}
 .foot{font-size:10.5px;line-height:1.5;color:var(--tx-3);margin:7px 6px 0}
 #mics{margin-top:4px}
 .chk{width:19px;height:19px;border-radius:6px;flex:none;border:1.5px solid var(--line-hi);
@@ -289,11 +292,16 @@ h2.sec{margin:12px 0 7px 3px}
 .mmeter{display:inline-flex;gap:1.5px;height:7px;width:66px;flex:none}
 .mmeter i{flex:1;border-radius:1px;background:var(--tx-3);opacity:.22}
 .mmeter i.on{background:var(--led);opacity:.95}
-/* The base microphone: a round mark, one of a kind, instead of a checkbox. */
-.rad{width:20px;height:20px;border-radius:50%;flex:none;border:1.5px solid var(--line-hi);
-  background:none;padding:0;position:relative;cursor:pointer}
-.rad[aria-checked="true"]{border-color:var(--acc)}
-.rad[aria-checked="true"]::after{content:'';position:absolute;inset:3.5px;border-radius:50%;background:var(--acc)}
+/* The base microphone: a tag with the word on it. The other rows offer the
+   tag on hover, so it is still one click to move it. */
+.tag{flex:none;height:22px;display:flex;align-items:center;gap:5px;padding:0 9px;border-radius:999px;
+  font-size:10.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--acc);
+  background:var(--acc-soft);border:1px solid rgba(242,106,33,.35);cursor:pointer}
+.tag svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag.ghost{color:var(--tx-3);background:transparent;border-color:var(--line-hi);
+  text-transform:none;letter-spacing:0;font-size:11px;opacity:0;transition:opacity .12s ease}
+.row:hover .tag.ghost,.tag.ghost:focus-visible{opacity:1}
+.tag.ghost:hover{color:var(--tx);border-color:var(--tx-3)}
 
 /* ---------- mixer ---------- */
 .mx{display:flex;align-items:center;gap:11px;padding:11px;background:var(--card);
