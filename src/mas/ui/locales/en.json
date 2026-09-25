@@ -18,6 +18,8 @@
     "mute": "Mute",
     "unmute": "Unmute",
     "no_apps": "No application is playing sound right now",
+    "hover_card": "Card on the tray icon",
+    "hover_card_d": "Hold the pointer on the icon for two seconds to see the device, the volume and the track",
     "mic_pairs": "A microphone for each output",
     "mic_pairs_d": "Usually it picks itself: the headset's own or the main one. Pin one here if you want another.",
     "mic_auto": "Automatic",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows keeps the startup list for programs from the Store. The switch for this one is there.",
     "tray_dock": "Tray icon as well",
     "tray_dock_d": "The program is shown in Master Control Dock. The tray icon switches the same way",
-    "hide_blur": "Hide when clicking elsewhere",
-    "hide_blur_d": "The window goes away as soon as another window or the desktop is clicked"
+    "hide_blur": "Hide when left in the background",
+    "hide_blur_d": "The window goes away after 20 seconds behind other windows, unless the pointer is over it"
   }
 }

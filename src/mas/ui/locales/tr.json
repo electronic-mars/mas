@@ -18,6 +18,8 @@
     "mute": "Sessize al",
     "unmute": "Sesi aç",
     "no_apps": "Şu anda ses çalan uygulama yok",
+    "hover_card": "Simgede kart",
+    "hover_card_d": "İmleci simgede iki saniye tutun: cihaz, ses düzeyi ve parça görünür",
     "mic_pairs": "Her çıkış için bir mikrofon",
     "mic_pairs_d": "Genelde kendiliğinden seçilir: aynı kulaklığın mikrofonu ya da ana mikrofon. Burada başkasını sabitleyebilirsiniz.",
     "mic_auto": "Otomatik",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows, Mağaza'daki programların başlangıç listesini tutar. Bu programın anahtarı oradadır.",
     "tray_dock": "Simge tepside de",
     "tray_dock_d": "Program Master Control Dock'ta gösteriliyor. Tepsideki simge de aynı şekilde geçiş yapar",
-    "hide_blur": "Başka yere tıklayınca gizle",
-    "hide_blur_d": "Başka bir pencereye veya masaüstüne tıklandığında pencere gizlenir"
+    "hide_blur": "Arka planda gizle",
+    "hide_blur_d": "Pencere 20 saniye diğerlerinin arkasında kalırsa gizlenir, imleç üzerindeyse gizlenmez"
   }
 }

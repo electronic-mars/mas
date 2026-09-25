@@ -826,6 +826,7 @@ function renderSettings() {
         ? toggle('tray_with_dock', t('tray_dock'), t('tray_dock_d'))
         : '',
       toggle('hide_on_blur', t('hide_blur'), t('hide_blur_d')),
+      toggle('hover_card', t('hover_card'), t('hover_card_d')),
     ])}
      <h2 class="sec micro">${secIcon('sec-switching')}${t('switching')}</h2>
      ${group([

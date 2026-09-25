@@ -18,6 +18,8 @@
     "mute": "Dempen",
     "unmute": "Dempen opheffen",
     "no_apps": "Geen app speelt nu geluid af",
+    "hover_card": "Kaart bij het pictogram",
+    "hover_card_d": "Houd de aanwijzer twee seconden op het pictogram voor apparaat, volume en nummer",
     "mic_pairs": "Een microfoon per uitvoer",
     "mic_pairs_d": "Meestal kiest hij zichzelf: die van de headset of de hoofdmicrofoon. Hier kun je een andere vastzetten.",
     "mic_auto": "Automatisch",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows bewaart de lijst met opstartprogramma's uit de Store. De schakelaar hiervoor staat daar.",
     "tray_dock": "Pictogram ook in het systeemvak",
     "tray_dock_d": "Het programma wordt getoond in Master Control Dock. Het pictogram in het systeemvak schakelt op dezelfde manier",
-    "hide_blur": "Verbergen bij klikken ernaast",
-    "hide_blur_d": "Het venster verdwijnt zodra je op een ander venster of het bureaublad klikt"
+    "hide_blur": "Verbergen op de achtergrond",
+    "hide_blur_d": "Het venster verdwijnt na 20 seconden achter andere vensters, tenzij de aanwijzer erop staat"
   }
 }

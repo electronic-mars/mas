@@ -18,6 +18,8 @@
     "mute": "Wycisz",
     "unmute": "Włącz dźwięk",
     "no_apps": "Żadna aplikacja nie odtwarza teraz dźwięku",
+    "hover_card": "Karta przy ikonie",
+    "hover_card_d": "Przytrzymaj kursor na ikonie dwie sekundy — pojawi się urządzenie, głośność i utwór",
     "mic_pairs": "Własny mikrofon dla każdego wyjścia",
     "mic_pairs_d": "Zwykle wybiera się sam: mikrofon tego samego zestawu albo główny. Tu możesz przypisać inny.",
     "mic_auto": "Automatycznie",
@@ -152,7 +154,7 @@
     "autostart_store": "Lista programów uruchamianych razem z systemem Windows dla aplikacji ze Sklepu jest przechowywana w systemie. Przełącznik dla tego programu znajduje się tam.",
     "tray_dock": "Ikona również na pasku",
     "tray_dock_d": "Program jest widoczny w Master Control Dock. Ikona na pasku przełącza tak samo",
-    "hide_blur": "Ukrywaj po kliknięciu obok",
-    "hide_blur_d": "Okno znika, gdy tylko klikniesz inne okno lub pulpit"
+    "hide_blur": "Ukrywaj w tle",
+    "hide_blur_d": "Okno znika po 20 sekundach za innymi oknami, chyba że kursor jest nad nim"
   }
 }

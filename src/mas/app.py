@@ -349,6 +349,7 @@ class App:
         self._auto_held = False
         # The base microphone is the one a person uses without a headset.
         self._mic_base: str | None = self.cfg.get("mic_base") or None
+        self._blur_watch = False     # a wait to hide the window is running
         # USB dongle listener and the recognized headset name for the interface.
         self.dongle: Dongle | None = None
         self._dongle_name: str | None = None
@@ -895,9 +896,19 @@ class App:
                 card["track"] = (now["title"], now["artist"])
         return card
 
+    def _hovered(self) -> bool:
+        """The pointer moved over the tray icon. False when the card is switched
+        off, so the tray gives the system tooltip back."""
+        if not self.cfg.get("hover_card"):
+            return False
+        self.overlay.hover()
+        return True
+
     def _hover_card(self):
         """The card for the pointer resting on the tray icon — the overlay asks
         for it only once the pointer has settled, so it is always current."""
+        if not self.cfg.get("hover_card"):
+            return None
         dev = self.current_device()
         return (self._card(dev, track=True), self._light_theme()) if dev else None
 
@@ -917,6 +928,9 @@ class App:
         held up. Two soft notes (tools/make_switch_sound.py); it used to be
         winsound.Beep, a hard 880 Hz tone that people found harsh."""
         import winsound
+        # Written down every time: "a sound played though the setting is off"
+        # is otherwise impossible to tell from the headset's own chime.
+        _log.info("the switch sound played")
         try:
             winsound.PlaySound(str(ui_dir() / "sounds" / "switch.wav"),
                                winsound.SND_FILENAME | winsound.SND_ASYNC
@@ -1034,28 +1048,44 @@ class App:
             return {"tab": tab, "rev": self._state_rev, "mini": self._mini,
                     "hidden": not self._visible, "now": self.players.snapshot()}
 
+    # How long the window has to stand in the background before it hides itself.
+    # It used to go the instant the focus left, and a popup from some other
+    # program closed it in the middle of setting something up: the person had
+    # not left at all. Twenty seconds is long enough for any such interruption
+    # and short enough that a window forgotten behind the others does go.
+    HIDE_AFTER = 20.0
+
     def focus_lost(self) -> None:
         """The page says the window has lost the focus. With the setting on, it
-        goes away — but only once the focus has really landed somewhere else.
-
-        A moment later, not at once: while Windows hands the focus over, the
-        foreground window can be nobody. Not when the focus went to the taskbar:
-        that is the tray icon being clicked, and the icon decides what happens to
-        the window. And not while a dongle is being taught — the person is
-        reaching for the headset, and closing the window would end the lesson.
-        """
-        if not self.cfg.get("hide_on_blur") or not self._visible or self.wizard.running:
+        goes away once it has stood in the background for HIDE_AFTER seconds
+        with the pointer off it — the pointer over it means the person is still
+        here, whatever took the focus. The focus coming back ends the wait, and
+        so does the window being hidden some other way. Never while a dongle is
+        being taught: the person is reaching for the headset."""
+        if (not self.cfg.get("hide_on_blur") or not self._visible or self.wizard.running
+                or self._blur_watch):
             return
+        self._blur_watch = True
 
-        def later():
-            time.sleep(0.15)
-            if (not self._visible or screen.is_front(self.own_hwnd())
-                    or screen.front_is_taskbar()):
-                return
-            _log.info("the focus went elsewhere — hiding the window")
-            self.hide()
+        def watch():
+            try:
+                hwnd = self.own_hwnd()
+                deadline = time.monotonic() + self.HIDE_AFTER
+                while self._visible and self.cfg.get("hide_on_blur") and not self.wizard.running:
+                    if screen.is_front(hwnd):
+                        return                        # the person came back
+                    if screen.pointer_over(hwnd):
+                        deadline = time.monotonic() + self.HIDE_AFTER
+                    if time.monotonic() >= deadline:
+                        _log.info("the window stood in the background for %d s — hiding it",
+                                  self.HIDE_AFTER)
+                        self.hide()
+                        return
+                    time.sleep(0.5)
+            finally:
+                self._blur_watch = False
 
-        threading.Thread(target=later, daemon=True, name="mas-blur").start()
+        threading.Thread(target=watch, daemon=True, name="mas-blur").start()
 
     def hide(self) -> None:
         if not self.window:
@@ -1149,7 +1179,7 @@ class App:
             on_left=lambda: self._button("left"),
             on_right=lambda: self._button("right"),
             on_middle=lambda: self.show("mixer"),
-            on_hover=self.overlay.hover,
+            on_hover=self._hovered,
             on_click=self.overlay.unhover,
             on_quit=self.quit,
             # Last time we ran, the dock was drawing us. Hold the icon back

@@ -18,6 +18,8 @@
     "mute": "Couper",
     "unmute": "Rétablir",
     "no_apps": "Aucune application ne joue de son actuellement",
+    "hover_card": "Carte sur l'icône",
+    "hover_card_d": "Laissez le pointeur deux secondes sur l'icône : l'appareil, le volume et le morceau apparaissent",
     "mic_pairs": "Un micro par sortie",
     "mic_pairs_d": "D'habitude il se choisit seul : celui du casque ou le principal. Vous pouvez en fixer un autre ici.",
     "mic_auto": "Automatique",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows conserve la liste de démarrage pour les programmes du Store. L'interrupteur pour celui-ci s'y trouve.",
     "tray_dock": "Icône aussi dans la barre d'état",
     "tray_dock_d": "Le programme est affiché dans Master Control Dock. L'icône de la barre d'état bascule de la même façon",
-    "hide_blur": "Masquer en cliquant ailleurs",
-    "hide_blur_d": "La fenêtre se ferme dès qu'on clique sur une autre fenêtre ou sur le bureau"
+    "hide_blur": "Masquer en arrière-plan",
+    "hide_blur_d": "La fenêtre se ferme après 20 secondes derrière d'autres fenêtres, sauf si le pointeur est dessus"
   }
 }

@@ -171,7 +171,7 @@ def _font(size: int, weight: str = "regular"):
 # picture serves the notification after a switch and the card shown while the
 # pointer rests on the tray icon; the notification adds a caption on top, the
 # hover card the track underneath.
-CARD_W, CARD_PAD, CARD_R, SHADOW = 316, 14, 14, 12
+CARD_W, CARD_PAD, CARD_R, SHADOW = 340, 14, 14, 12
 WELL, LAMPS, LAMP_H, LAMP_GAP = 40, 20, 5, 3
 ORANGE = (242, 106, 33, 255)
 
@@ -314,10 +314,11 @@ def _cursor() -> tuple[int, int]:
 
 
 # Hovering the tray icon: the card comes up once the pointer has rested this
-# long, and goes the moment the pointer leaves the icon. Windows says nothing
+# long — two seconds, not half of one: at half a second it came up on every pass
+# of the pointer towards the clock and got in the way more than it helped, and goes the moment the pointer leaves the icon. Windows says nothing
 # when the pointer leaves, only while it moves over the icon, so "left" means
 # "moved further than an icon's width from where it last moved over it".
-HOVER_DELAY = 0.45
+HOVER_DELAY = 2.0
 HOVER_MAX = 12.0
 
 

@@ -18,6 +18,8 @@
     "mute": "Disattiva",
     "unmute": "Riattiva",
     "no_apps": "Nessuna applicazione sta riproducendo audio",
+    "hover_card": "Scheda sull'icona",
+    "hover_card_d": "Tieni il puntatore sull'icona per due secondi: compaiono dispositivo, volume e brano",
     "mic_pairs": "Un microfono per ogni uscita",
     "mic_pairs_d": "Di solito si sceglie da solo: quello delle cuffie o il principale. Qui puoi fissarne un altro.",
     "mic_auto": "Automatico",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows conserva l'elenco dei programmi all'avvio per quelli dello Store. L'interruttore per questo si trova lì.",
     "tray_dock": "Icona anche nell'area di notifica",
     "tray_dock_d": "Il programma è mostrato in Master Control Dock. L'icona nell'area di notifica commuta allo stesso modo",
-    "hide_blur": "Nascondi cliccando altrove",
-    "hide_blur_d": "La finestra si nasconde appena si clicca su un'altra finestra o sul desktop"
+    "hide_blur": "Nascondi se in secondo piano",
+    "hide_blur_d": "La finestra si nasconde dopo 20 secondi dietro le altre, a meno che il puntatore sia sopra"
   }
 }

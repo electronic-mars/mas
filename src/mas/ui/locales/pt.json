@@ -18,6 +18,8 @@
     "mute": "Mudo",
     "unmute": "Ativar som",
     "no_apps": "Nenhum aplicativo está reproduzindo som agora",
+    "hover_card": "Cartão no ícone",
+    "hover_card_d": "Deixe o ponteiro dois segundos no ícone para ver o dispositivo, o volume e a faixa",
     "mic_pairs": "Um microfone para cada saída",
     "mic_pairs_d": "Normalmente ele se escolhe sozinho: o do headset ou o principal. Aqui dá para fixar outro.",
     "mic_auto": "Automático",
@@ -152,7 +154,7 @@
     "autostart_store": "O Windows mantém a lista de inicialização para programas da Store. O interruptor para este está lá.",
     "tray_dock": "Ícone também na bandeja",
     "tray_dock_d": "O programa é mostrado no Master Control Dock. O ícone da bandeja alterna da mesma forma",
-    "hide_blur": "Ocultar ao clicar fora",
-    "hide_blur_d": "A janela se oculta assim que você clica em outra janela ou na área de trabalho"
+    "hide_blur": "Ocultar em segundo plano",
+    "hide_blur_d": "A janela some após 20 segundos atrás de outras, a menos que o ponteiro esteja sobre ela"
   }
 }

@@ -18,6 +18,8 @@
     "mute": "Ztlumit",
     "unmute": "Zapnout zvuk",
     "no_apps": "Žádná aplikace právě nepřehrává zvuk",
+    "hover_card": "Karta u ikony",
+    "hover_card_d": "Podržte ukazatel na ikoně dvě sekundy — ukáže se zařízení, hlasitost a skladba",
     "mic_pairs": "Vlastní mikrofon pro každý výstup",
     "mic_pairs_d": "Obvykle se vybere sám: mikrofon stejné soupravy nebo hlavní. Tady můžete připnout jiný.",
     "mic_auto": "Automaticky",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows uchovává seznam spouštěných programů z obchodu Store. Přepínač pro tento program najdete tam.",
     "tray_dock": "Ikona i v oznamovací oblasti",
     "tray_dock_d": "Program je zobrazen v Master Control Dock. Ikona v oznamovací oblasti přepíná stejně",
-    "hide_blur": "Skrýt při kliknutí jinam",
-    "hide_blur_d": "Okno zmizí, jakmile klepnete na jiné okno nebo na plochu"
+    "hide_blur": "Skrýt v pozadí",
+    "hide_blur_d": "Okno zmizí po 20 sekundách za jinými okny, pokud nad ním není ukazatel"
   }
 }

@@ -94,20 +94,27 @@ def own_window(title: str) -> int | None:
     return hwnd if pid.value == os.getpid() else None
 
 
-# The taskbar and the notification area, the flyout of hidden icons included. A
-# click there is the tray icon being used, and the icon has its own say about
-# the window: hiding it first would turn "put it away" into "show it again".
-TASKBAR_CLASSES = {"Shell_TrayWnd", "Shell_SecondaryTrayWnd",
-                   "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland"}
+user32.WindowFromPoint.restype = wintypes.HWND
+user32.WindowFromPoint.argtypes = [wintypes.POINT]
+user32.GetAncestor.restype = wintypes.HWND
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+GA_ROOT = 2
 
 
-def front_is_taskbar() -> bool:
-    hwnd = user32.GetForegroundWindow()
+def pointer_over(hwnd: int) -> bool:
+    """Is the mouse pointer on this window — on it, not merely inside its
+    rectangle under something else?
+
+    Asked of Windows as "which window is under the pointer" rather than by
+    comparing the pointer with the window's rectangle: from a thread other than
+    the window's own the two came back in different scales, and a pointer in
+    the middle of the window counted as outside it."""
     if not hwnd:
         return False
-    name = ctypes.create_unicode_buffer(64)
-    user32.GetClassNameW(hwnd, name, 64)
-    return name.value in TASKBAR_CLASSES
+    p = wintypes.POINT()
+    user32.GetCursorPos(ctypes.byref(p))
+    under = user32.WindowFromPoint(p)
+    return bool(under) and int(user32.GetAncestor(under, GA_ROOT) or 0) == int(hwnd)
 
 
 def is_front(hwnd: int) -> bool:

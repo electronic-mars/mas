@@ -1553,10 +1553,11 @@ for _light in (False, True):
     check(f"the cross is in the taskbar's ink (light={_light})",
           sum(_ink) < 200 if _light else sum(_ink) > 560, True)
 
-# Hiding the window when the focus goes elsewhere. The decision is made a moment
-# later, from where the focus actually landed: another program — hide; the
-# taskbar — leave it to the tray icon, which has its own say about the window.
-print("\nHiding the window when the focus goes elsewhere")
+# Hiding the window when it is left in the background. It used to go the instant
+# the focus left, and a popup from another program closed it in the middle of
+# setting something up. Now it waits twenty seconds of the window standing
+# behind others with the pointer off it; the focus coming back ends the wait.
+print("\nHiding the window left in the background")
 import mas.app as _app_mod  # noqa: E402
 
 
@@ -1564,52 +1565,64 @@ def _blur_app(on=True, visible=True, teaching=False):
     a = App.__new__(App)
     a.cfg = FakeConfig(hide_on_blur=on)
     a._visible = visible
+    a._blur_watch = False
     a.wizard = type("W", (), {"running": teaching})()
     a._hwnd = 1
-    a.hidden = 0
-    a.hide = lambda: setattr(a, "hidden", a.hidden + 1)
+    a.hidden_at = None
     return a
 
 
-class _Screen:
-    front, taskbar = 2, False
+def _blur(a, front_at=None, pointer_until=0.0):
+    """Run the wait on a fake clock. `front_at`: when the focus comes back;
+    `pointer_until`: the pointer rests on the window until then."""
+    clock = {"t": 0.0}
 
-    @staticmethod
-    def is_front(h):
-        return _Screen.front == h
+    class _Time:
+        @staticmethod
+        def monotonic():
+            return clock["t"]
 
-    @staticmethod
-    def front_is_taskbar():
-        return _Screen.taskbar
+        @staticmethod
+        def sleep(s):
+            clock["t"] += s
 
+    class _Screen:
+        @staticmethod
+        def is_front(h):
+            return front_at is not None and clock["t"] >= front_at
 
-def _blur(a, front=2, taskbar=False):
-    _Screen.front, _Screen.taskbar = front, taskbar
-    saved_screen, saved_threading = _app_mod.screen, _app_mod.threading
-    _app_mod.screen = _Screen
+        @staticmethod
+        def pointer_over(h):
+            return clock["t"] < pointer_until
 
-    class _Now:                        # run the delayed check in place
+    def hide():
+        a.hidden_at = clock["t"]
+        a._visible = False
+    a.hide = hide
+
+    class _Now:
         def __init__(self, target, **kw):
             self.target = target
 
         def start(self):
             self.target()
+    saved = _app_mod.screen, _app_mod.threading, _app_mod.time
+    _app_mod.screen, _app_mod.time = _Screen, _Time
     _app_mod.threading = type("T", (), {"Thread": _Now})
-    saved_sleep, _app_mod.time.sleep = _app_mod.time.sleep, lambda s: None
     try:
         a.focus_lost()
     finally:
-        _app_mod.screen, _app_mod.threading = saved_screen, saved_threading
-        _app_mod.time.sleep = saved_sleep
-    return a.hidden
+        _app_mod.screen, _app_mod.threading, _app_mod.time = saved
+    return a.hidden_at
 
 
-check("focus went to another program: hidden", _blur(_blur_app()), 1)
-check("setting off: stays", _blur(_blur_app(on=False)), 0)
-check("focus went to the taskbar: left to the tray icon", _blur(_blur_app(), taskbar=True), 0)
-check("focus came straight back: stays", _blur(_blur_app(), front=1), 0)
-check("a dongle is being taught: stays", _blur(_blur_app(teaching=True)), 0)
-check("already hidden: nothing to do", _blur(_blur_app(visible=False)), 0)
+check("left in the background: hidden after twenty seconds", _blur(_blur_app()), 20.0)
+check("a popup took the focus and gave it back at 5 s: stays", _blur(_blur_app(), front_at=5.0), None)
+check("the pointer on the window keeps it: twenty seconds from when it left",
+      _blur(_blur_app(), pointer_until=12.2), 32.0)
+check("setting off: stays", _blur(_blur_app(on=False)), None)
+check("a dongle is being taught: stays", _blur(_blur_app(teaching=True)), None)
+check("already hidden: nothing to do", _blur(_blur_app(visible=False)), None)
 
 # A microphone pinned to an output in the settings wins over the automatic
 # choice — while it is plugged in. Unplugged, the automatic choice is back.

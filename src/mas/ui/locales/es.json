@@ -18,6 +18,8 @@
     "mute": "Silenciar",
     "unmute": "Activar sonido",
     "no_apps": "Ninguna aplicación reproduce sonido ahora",
+    "hover_card": "Tarjeta en el icono",
+    "hover_card_d": "Deja el puntero dos segundos sobre el icono para ver el dispositivo, el volumen y la pista",
     "mic_pairs": "Un micrófono por salida",
     "mic_pairs_d": "Normalmente se elige solo: el del auricular o el principal. Aquí puedes fijar otro.",
     "mic_auto": "Automático",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows guarda la lista de inicio para los programas de la Tienda. El interruptor para este está ahí.",
     "tray_dock": "Icono también en la bandeja",
     "tray_dock_d": "El programa se muestra en Master Control Dock. El icono de la bandeja cambia igual",
-    "hide_blur": "Ocultar al hacer clic fuera",
-    "hide_blur_d": "La ventana se oculta en cuanto se hace clic en otra ventana o en el escritorio"
+    "hide_blur": "Ocultar en segundo plano",
+    "hide_blur_d": "La ventana se oculta tras 20 segundos detrás de otras, salvo que el puntero esté encima"
   }
 }

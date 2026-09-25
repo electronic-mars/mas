@@ -265,9 +265,17 @@ class Tray:
         def handler(wparam, lparam):
             if lparam == WM_MOUSEMOVE:
                 if self.on_hover:
-                    if self.icon.title:
-                        self.icon.title = ""
-                    self._safe(self.on_hover, "hover")
+                    # The card and the system tooltip must not both come up:
+                    # while the card is on, the tooltip is empty; switched off
+                    # in the settings, the tooltip names the program again.
+                    try:
+                        carded = bool(self.on_hover())
+                    except Exception:
+                        _log.exception("error in handler: hover")
+                        carded = False
+                    want = "" if carded else "Master Audio Switcher"
+                    if self.icon.title != want:
+                        self.icon.title = want
                 return
             if lparam in (WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN) and self.on_click:
                 self._safe(self.on_click, "press")

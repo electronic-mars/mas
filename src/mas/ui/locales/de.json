@@ -18,6 +18,8 @@
     "mute": "Stummschalten",
     "unmute": "Ton einschalten",
     "no_apps": "Keine App spielt gerade Ton ab",
+    "hover_card": "Karte am Tray-Symbol",
+    "hover_card_d": "Zeiger zwei Sekunden auf dem Symbol halten: Gerät, Lautstärke und Titel erscheinen",
     "mic_pairs": "Ein Mikrofon je Ausgabe",
     "mic_pairs_d": "Normalerweise wählt es sich selbst: das des Headsets oder das Standardmikrofon. Hier lässt sich ein anderes festlegen.",
     "mic_auto": "Automatisch",
@@ -152,7 +154,7 @@
     "autostart_store": "Windows speichert die Startliste für Programme aus dem Store. Der Schalter dafür befindet sich dort.",
     "tray_dock": "Symbol auch im Infobereich",
     "tray_dock_d": "Das Programm wird in Master Control Dock angezeigt. Das Symbol im Infobereich schaltet genauso um",
-    "hide_blur": "Beim Klick daneben ausblenden",
-    "hide_blur_d": "Das Fenster verschwindet, sobald ein anderes Fenster oder der Desktop angeklickt wird"
+    "hide_blur": "Im Hintergrund ausblenden",
+    "hide_blur_d": "Das Fenster verschwindet nach 20 Sekunden hinter anderen Fenstern, außer der Zeiger ist darüber"
   }
 }

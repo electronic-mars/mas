@@ -82,6 +82,8 @@ DEFAULTS: dict[str, Any] = {
     # open beside their work, and the window vanishing from under them would be
     # a change they never asked for.
     "hide_on_blur": False,
+    # The card that comes up while the pointer rests on the tray icon.
+    "hover_card": True,
     "mics_expanded": False,   # the microphone section is collapsed by default
     # The microphone used when the output has none of its own — the one a person
     # talks into without a headset. Empty: the first that belongs to no headset.
