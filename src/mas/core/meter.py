@@ -53,7 +53,7 @@ class Meter(threading.Thread):
         # When the window is hidden nobody sees the level: we poll less often.
         self._idle = threading.Event()
         self._snap = {"peak": 0.0, "volume": 0.0, "muted": False, "device": "",
-                      "mic_peak": 0.0, "mic_muted": False}
+                      "mic_peak": 0.0, "mic_muted": False, "mic_id": "", "mic_calls": ""}
         self._vol = None
         self._meter = None
         self._bound_id: str | None = None
@@ -183,6 +183,10 @@ class Meter(threading.Thread):
         except Exception:
             self._mic_vol = self._mic_meter = self._mic_id = None
             _log.warning("the microphone meter did not bind", exc_info=True)
+        # Both defaults of the microphone, for the interface: the row is only
+        # green when the same microphone serves the calls as well.
+        with self._lock:
+            self._snap.update(mic_id=mic_id or "", mic_calls=devices.calls_default_id() or "")
         if dev_id == self._bound_id and self._vol is not None:
             return
         dev = AudioUtilities.GetSpeakers()

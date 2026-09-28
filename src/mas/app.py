@@ -74,10 +74,15 @@ class Api:
             self.app.note_manual_switch(device_id)
             self.app._go(device_id)          # same path as the tray: the mic follows
         else:
-            # The microphone was chosen by hand. If it belongs to no headset,
-            # then this is the person's base microphone.
+            # Picked by hand: it stays. The following is switched off, and the
+            # switch in the list shows it. A microphone that belongs to no
+            # headset is also remembered as the base one, for when the
+            # following is on again.
             if device_id not in devices.tied_microphones():
                 self.app.set_base_mic(device_id)
+            if self.app.cfg.get("switch_microphone"):
+                self.app.cfg.set("switch_microphone", False)
+                _log.info("the microphone was picked by hand — it no longer follows the output")
             self.app.go_microphone(device_id)
         return self.app.state()
 
@@ -111,6 +116,11 @@ class Api:
             self.app.players.set_priority(value)
         elif key in ("auto_device", "watch_dongle"):
             self.app.sync_auto_device()
+        elif key == "switch_microphone" and value:
+            # Switched back on: the microphone goes where the output is now.
+            out = devices.default_id(is_output=True, max_age=0.0)
+            if out:
+                self.app._follow_microphone(out)
         elif key == "tray_with_dock":
             self.app.dock.apply()
         return self.app.state()
@@ -190,20 +200,6 @@ class Api:
         snapshot, the applications from the meter thread. No COM here."""
         return {"master": self.app.meter.snapshot()["peak"],
                 "apps": self.app.meter.levels()}
-
-    def set_mic_pair(self, output_id: str, mic_id: str):
-        """Pin a microphone to an output, or give it back to the automatic
-        choice with an empty id. Takes effect at once for the output playing."""
-        app = self.app
-        pairs = dict(app.cfg.get("mic_pairs"))
-        if mic_id:
-            pairs[output_id] = mic_id
-        else:
-            pairs.pop(output_id, None)
-        app.cfg.set("mic_pairs", pairs)
-        if output_id == devices.default_id(is_output=True, max_age=0.0):
-            app._follow_microphone(output_id)
-        return app.state()
 
     def set_input_mute(self, muted: bool):
         self.app.meter.set_input_mute(muted)
@@ -399,14 +395,6 @@ class App:
             }
 
         outputs = [pack(d) for d in devs if d.is_output]
-        base = self._mic_base or devices.standalone_microphone()
-        # The headset's own microphone, left aside because the settings pin
-        # another one to this output: its row says so, or the person is left
-        # wondering why the headset is on and its microphone is not.
-        own = devices.microphone_of(cur_out) if cur_out else None
-        pinned = self.cfg.get("mic_pairs").get(cur_out or "")
-        aside = own.id if own and pinned and pinned != own.id and own.id != cur_in else None
-        out_title = next((o["title"] or o["name"] for o in outputs if o["id"] == cur_out), "")
         outputs.sort(key=lambda x: cycle.index(x["id"]) if x["id"] in cycle else len(cycle))
         settings = self.cfg.all()
         # One source for the version number: the package. It used to be written
@@ -432,9 +420,7 @@ class App:
         known = self.known_outputs_cached(settings.get("auto_device", ""))
         return {
             "outputs": outputs,
-            "inputs": [{**pack(d), "is_base": d.id == base,
-                        "pinned_away": out_title if d.id == aside else ""}
-                       for d in devs if not d.is_output],
+            "inputs": [pack(d) for d in devs if not d.is_output],
             "known_outputs": known,
             "settings": settings,
         }
@@ -553,47 +539,55 @@ class App:
         self.announce(dev)
 
     def _follow_microphone(self, output_id: str) -> None:
-        """The mic follows the headset; on speakers the base one comes back.
+        """The microphone goes with the headphones: the headset's own while
+        they play, the base one — the one that belongs to no headset — otherwise.
 
         Asking "which microphone was it a minute ago" is not allowed: Windows
         sometimes moves the microphone to the headset before we do, and then the
         previous one turns out to be that very microphone. So the base
-        microphone is determined by meaning — it is the one that belongs to no
-        headset.
+        microphone is determined by meaning.
 
-        The communications role is always included: a microphone is needed
-        exactly for talking.
+        Every branch is written down, "nothing to do" included: the log once
+        fell silent for half an hour of switching, and there was no telling
+        whether the microphone had been left alone on purpose or not at all.
         """
         if not self.cfg.get("switch_microphone"):
+            _log.info("the microphone stays where it is: picked by hand")
             return
         try:
-            # Pinned by hand in the settings, and plugged in: that one, whatever
-            # the automatic choice would have been.
-            pinned = self.cfg.get("mic_pairs").get(output_id)
-            if pinned and any(d.id == pinned for d in devices.list_devices(only_active=True)):
-                if pinned != devices.default_id(is_output=False, max_age=0.0):
-                    devices.set_default(pinned, include_communications=True)
-                    _log.info("the microphone moved to the one pinned to this output")
-                return
             mic = devices.microphone_of(output_id)
-            cur = devices.default_id(is_output=False, max_age=0.0)
             if mic is not None:
-                if mic.id != cur:
-                    devices.set_default(mic.id, include_communications=True)
-                    _log.info("the microphone moved to %s", mic.name)
+                self._put_microphone(mic.id, "the headset's own")
                 return
+            cur = devices.default_id(is_output=False, max_age=0.0)
             if cur and cur not in devices.tied_microphones():
                 self.set_base_mic(cur)   # belongs to no headset — so it is the base
-                return
-            base = self._mic_base or devices.standalone_microphone()
-            if base and base != cur:
-                devices.set_default(base, include_communications=True)
-                self.set_base_mic(base)
-                _log.info("the microphone is back on the base one")
-            elif not base:
+            base = self._mic_base
+            if not (base and any(d.id == base for d in devices.list_devices(only_active=True))):
+                base = devices.standalone_microphone()
+            if base:
+                self._put_microphone(base, "the base one")
+            else:
                 _log.info("no base microphone known — leaving the microphone alone")
         except Exception:
             _log.exception("could not switch the microphone")
+
+    def _put_microphone(self, mic_id: str, what: str) -> None:
+        """Make this the microphone for everything. Both defaults are checked —
+        the ordinary one and the one for calls — and the move takes all the
+        roles: the person had the calls on a headset with no microphone in it
+        while the ordinary default alone looked right."""
+        cur = devices.default_id(is_output=False, max_age=0.0)
+        calls = devices.calls_default_id()
+        if cur == mic_id and calls == mic_id:
+            _log.info("the microphone is already %s", what)
+            return
+        name = next((d.name for d in devices.list_devices(only_active=False) if d.id == mic_id), mic_id)
+        if devices.set_default(mic_id, include_communications=True):
+            _log.info("the microphone moved to %s — %s%s", name, what,
+                      " (the calls were on another one)" if cur == mic_id else "")
+        else:
+            _log.warning("the microphone did not move to %s", name)
 
     def set_base_mic(self, device_id: str) -> None:
         """Remembered across restarts: it used to live in memory only, and after

@@ -258,6 +258,18 @@ def default_id(is_output: bool = True, max_age: float = _DEFAULT_TTL) -> str | N
     return value
 
 
+def calls_default_id(is_output: bool = False) -> str | None:
+    """The default for calls — the communications role — read fresh every time.
+    Windows keeps it apart from the ordinary default, and the two drift apart:
+    the person had the calls on a headset with no microphone in it while the
+    ordinary default, the only one we used to look at, was fine."""
+    try:
+        flow = FLOW_RENDER if is_output else FLOW_CAPTURE
+        return _enumerator().GetDefaultAudioEndpoint(flow, ROLE_COMMUNICATIONS).GetId()
+    except Exception:
+        return None
+
+
 def _owner(name: str) -> str:
     """'Headphones (Powerbeats Pro)' -> 'Powerbeats Pro'.
 

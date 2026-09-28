@@ -659,7 +659,7 @@ check("English is offered first",
 # generous — this catches a translation that ran away, not a long word.
 TIGHT = {"tab_devices": 14, "tab_mixer": 14, "tab_settings": 16, "tab_about": 18,
          "in_queue": 14, "switch_here": 12, "btn_left": 12, "btn_right": 12,
-         "hk_clear": 12, "open_btn": 14, "welcome_ok": 16}
+         "hk_clear": 12, "open_btn": 14, "welcome_ok": 16, "mic_pick": 12}
 over = [(c, k, len(d["strings"][k])) for c, d in docs.items()
         for k in TIGHT if len(d["strings"][k]) > TIGHT[k]]
 check("nothing overflows a tab or a button", over, [])
@@ -1624,38 +1624,52 @@ check("setting off: stays", _blur(_blur_app(on=False)), None)
 check("a dongle is being taught: stays", _blur(_blur_app(teaching=True)), None)
 check("already hidden: nothing to do", _blur(_blur_app(visible=False)), None)
 
-# A microphone pinned to an output in the settings wins over the automatic
-# choice — while it is plugged in. Unplugged, the automatic choice is back.
-print("\nA microphone pinned to an output")
-_saved = {n: getattr(devices, n) for n in ("list_devices", "default_id", "set_default",
-                                            "microphone_of", "tied_microphones",
+# The microphone goes with the headphones — and with all the roles, the calls
+# included. The person had the ordinary default on the laptop and the calls on
+# a headset with no microphone in it, and everything looked fine.
+print("\nThe microphone goes with the headphones, calls included")
+_saved = {n: getattr(devices, n) for n in ("list_devices", "default_id", "calls_default_id",
+                                            "set_default", "microphone_of", "tied_microphones",
                                             "standalone_microphone")}
 _moved = []
-devices.default_id = lambda is_output=True, max_age=None: "mic-array"
-devices.set_default = lambda i, include_communications=True: _moved.append(i) or True
-devices.microphone_of = lambda out: None
-devices.tied_microphones = lambda: set()
+devices.set_default = lambda i, include_communications=True: _moved.append((i, include_communications)) or True
+devices.list_devices = lambda only_active=True: [
+    devices.Device(id=i, name=i, is_output=i.startswith("out"), active=True)
+    for i in ("out-spk", "out-hp", "mic-hp", "mic-array")]
+devices.microphone_of = lambda out: (
+    devices.Device(id="mic-hp", name="mic-hp", is_output=False, active=True) if out == "out-hp" else None)
+devices.tied_microphones = lambda: {"mic-hp"}
 devices.standalone_microphone = lambda: "mic-array"
 
 
-def _pinned_app(pairs, present):
+def _mic_app(on=True, cur="mic-array", calls="mic-array"):
     a = App.__new__(App)
-    a.cfg = FakeConfig(switch_microphone=True, mic_pairs=pairs, mic_base="")
+    a.cfg = FakeConfig(switch_microphone=on, switch_communications=False, mic_base="")
     a._mic_base = None
-    devices.list_devices = lambda only_active=True: [
-        devices.Device(id=i, name=i, is_output=i.startswith("out"), active=True) for i in present]
+    devices.default_id = lambda is_output=True, max_age=None: "out-spk" if is_output else cur
+    devices.calls_default_id = lambda is_output=False: calls
+    _moved.clear()
     return a
 
 
+_mic_app(cur="mic-hp", calls="mic-hp")._follow_microphone("out-spk")
+check("to the speakers: the base microphone, all roles", _moved, [("mic-array", True)])
+_mic_app(cur="mic-array", calls="mic-hp")._follow_microphone("out-spk")
+check("the calls on another microphone: brought together", _moved, [("mic-array", True)])
+_mic_app()._follow_microphone("out-spk")
+check("already there for everything: nothing moved", _moved, [])
+_mic_app()._follow_microphone("out-hp")
+check("to the headphones: the headset's own", _moved, [("mic-hp", True)])
+_mic_app(on=False, cur="mic-hp")._follow_microphone("out-spk")
+check("picked by hand: the microphone stays", _moved, [])
+
+from mas.core.switcher import Switcher as _Switcher  # noqa: E402
 _moved.clear()
-_pinned_app({"out-spk": "mic-usb"}, ["out-spk", "mic-usb", "mic-array"])._follow_microphone("out-spk")
-check("the pinned microphone takes over", _moved, ["mic-usb"])
+_Switcher(FakeConfig(switch_communications=False)).switch_to("mic-array")
+check("a microphone picked by hand takes the calls with it", _moved, [("mic-array", True)])
 _moved.clear()
-_pinned_app({"out-spk": "mic-usb"}, ["out-spk", "mic-array"])._follow_microphone("out-spk")
-check("an unplugged pinned microphone is passed over", _moved, [])
-_moved.clear()
-_pinned_app({}, ["out-spk", "mic-usb", "mic-array"])._follow_microphone("out-spk")
-check("nothing pinned: the automatic choice, as before", _moved, [])
+_Switcher(FakeConfig(switch_communications=False)).switch_to(devices.OUTPUT_PREFIX + "spk")
+check("an output keeps to the setting about the calls", _moved, [(devices.OUTPUT_PREFIX + "spk", False)])
 for _n, _v in _saved.items():
     setattr(devices, _n, _v)
 

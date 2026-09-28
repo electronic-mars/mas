@@ -72,9 +72,9 @@ INPUTS = [
     # it. Both used to be the same picture here, which is exactly the complaint
     # these screenshots are supposed to document being over.
     {"id": MIC_HP, "name": "Microphone (HyperX Cloud Flight S)", "kind": "Microphone",
-     "icon": "headset", "in_cycle": False, "is_default": True, "is_base": False},
+     "icon": "headset", "in_cycle": False, "is_default": True},
     {"id": MIC_ARR, "name": "Microphone Array (Realtek(R) Audio)", "kind": "Microphone",
-     "icon": "laptop", "in_cycle": False, "is_default": False, "is_base": True},
+     "icon": "laptop", "in_cycle": False, "is_default": False},
 ]
 KNOWN = [
     {"id": HP, "name": "Headphones (HyperX Cloud Flight S)", "active": True},
@@ -142,6 +142,7 @@ class FakeApi:
 
     def get_meter(self):
         return {"volume": 0.62, "muted": False, "peak": 0.22, "mic_peak": 0.2, "mic_muted": False,
+                "mic_id": MIC_HP, "mic_calls": MIC_HP,
                 "device": "Headphones (HyperX Cloud Flight S)",
                 "tab": self.tab, "rev": 1,
                 "now": {"app": "Spotify", "title": "Shiver", "artist": "Mannymore",
@@ -339,7 +340,7 @@ TALLER = 1400                          # the same, but with the diagnostics sect
 SCREENS = [
     ("01-devices-dark", {"tab": "devices", "theme": "dark"}, WIN_H, ""),
     ("02-devices-light", {"tab": "devices", "theme": "light"}, WIN_H, ""),
-    ("03-devices-mics", {"tab": "devices", "theme": "dark", "mics_expanded": True}, WIN_H, ""),
+    ("03-devices-mics", {"tab": "devices", "theme": "dark", "mics_expanded": True}, WIN_H + 250, ""),
     ("04-mixer-dark", {"tab": "mixer", "theme": "dark"}, WIN_H, ""),
     ("05-mixer-light", {"tab": "mixer", "theme": "light"}, WIN_H, ""),
     ("06-settings-dark", {"tab": "settings", "theme": "dark"}, WIN_H, ""),

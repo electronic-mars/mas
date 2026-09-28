@@ -246,20 +246,25 @@ const shortest = (d) => ((d + 540) % 360) - 180;
 // The microphone key: raised and green while the microphone hears, pressed in
 // and red while it is switched off.
 let micMuted = false;
-function paintMicKey(off) {
+let micCalls = '';   // the microphone Windows uses for calls, from the meter
+
+function paintMicKey(off, calls = micCalls) {
   micMuted = off;
+  micCalls = calls;
   const key = $('btn-micmute');
   if (!key) return;
   key.classList.toggle('off', off);
   key.setAttribute('aria-pressed', off);
   key.querySelector('span').textContent = off ? t('mic_off') : t('mic_on');
   key.title = off ? t('unmute') : t('mute');
-  // The row of the microphone recording now repeats it: "recording now · off".
+  // One word under the microphone in use, and green only when it is the truth:
+  // muted, or the calls on some other microphone, is red with the reason.
   const now = $('mic-now');
-  if (now) {
-    now.classList.toggle('off', off);
-    now.textContent = off ? `${t('mic_rec_now')} · ${t('mic_off').toLowerCase()}` : t('mic_rec_now');
-  }
+  if (!now) return;
+  const cur = state?.inputs?.find((d) => d.is_default);
+  const bad = off ? t('mic_muted_s') : (cur && calls && calls !== cur.id) ? t('mic_not_calls') : '';
+  now.classList.toggle('off', !!bad);
+  now.textContent = bad || (state?.settings?.switch_microphone ? t('mic_works') : `${t('mic_works')} · ${t('mic_by_hand')}`);
 }
 
 // The level of the microphone in use. Windows only measures a microphone while
@@ -440,35 +445,22 @@ function deviceRow(d, { draggable = false, active = false } = {}) {
     </div>`;
 }
 
-// A microphone row: like an output, but the one recording now says so beside
-// its level (and says when it is switched off — the key in the heading alone
-// was read as belonging to some other microphone), and the base microphone —
-// the one used when the output has no microphone of its own — wears a tag
-// with a word on it. It used to be a round mark, and a round orange mark next
-// to a green "in use" read as two ways of saying "this one is on".
-const PIN_SVG = '<svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3z"/></svg>';
-
+// A microphone row: the name, and under it one word about the one in use —
+// "Works" in green only when it really does (the same microphone serves the
+// calls and it is not muted), otherwise the reason in red. Nothing else: no
+// marks, no tags. There used to be an orange mark for the "base" microphone,
+// and next to a green "in use" it read as two ways of saying "this one is on".
 function micRow(d) {
-  let sub;
-  if (d.is_default) {
-    sub = `<span class="now" id="mic-now"></span><span class="mmeter" id="mic-meter">${'<i></i>'.repeat(14)}</span>`;
-  } else {
-    const notes = [d.purpose ? esc(d.purpose) : ''];
-    if (d.is_base) notes.push(t('mic_for_speakers'));
-    if (d.pinned_away) notes.push(esc(t('mic_pinned_away').replace('{out}', d.pinned_away)));
-    sub = notes.filter(Boolean).join(' · ');
-  }
-  const tag = d.is_base
-    ? `<button class="tag" data-act="base" aria-pressed="true" title="${t('mic_base_d')}">${PIN_SVG}${t('mic_base')}</button>`
-    : `<button class="tag ghost" data-act="base" aria-pressed="false" title="${t('mic_base_d')}">${t('mic_make_base')}</button>`;
+  const sub = d.is_default
+    ? `<span class="now" id="mic-now"></span><span class="mmeter" id="mic-meter">${'<i></i>'.repeat(14)}</span>`
+    : (d.purpose ? esc(d.purpose) : '');
   return `<div class="row ${d.is_default ? 'active' : ''}" data-id="${esc(d.id)}" title="${esc(d.name)}">
       <button class="ic" data-act="icon" title="${t('icon_title')}">
         <img src="${glyphSrc(d.icon)}" srcset="${glyphSrcset(d.icon)}" alt="">
       </button>
       <div class="col"><span class="nm">${esc(d.title || d.name)}</span>
         ${sub ? `<div class="sub">${sub}</div>` : ''}</div>
-      ${d.is_default ? '' : `<span class="go" aria-hidden="true">${t('mic_rec_here')}</span>`}
-      ${tag}
+      ${d.is_default ? '' : `<span class="go" aria-hidden="true">${t('mic_pick')}</span>`}
     </div>`;
 }
 
@@ -503,7 +495,10 @@ function renderDevices() {
          <span class="cur">${expanded ? '' : esc(micNow ? (micNow.title || micNow.name) : '')}</span>
          <button class="micbtn" id="btn-micmute" aria-pressed="false">${MIC_SVG}<span></span></button>
        </div>
-       ${expanded ? mics.map(micRow).join('') : ''}
+       ${expanded ? `<div class="row opt">
+         <div class="col"><span class="nm">${t('mic_follow')}</span><div class="sub wrap">${t('mic_follow_d')}</div></div>
+         <button class="sw" data-set="switch_microphone" role="switch" aria-checked="${!!state.settings.switch_microphone}"><i></i></button>
+       </div>` + mics.map(micRow).join('') : ''}
      </div>` : `<div class="empty">${t('no_devices')}</div>`}`;
   paintMicKey(micMuted);
 }
@@ -794,19 +789,6 @@ function renderSettings() {
      ${group([
       stRow(t('auto_device'), t('auto_device_d'),
         `<select id="auto-select">${autoOptions}</select>`, { stack: true }),
-      toggle('switch_microphone', t('mic_follow'), t('mic_follow_d')),
-      // An option, not a default: automatic means the microphone of the same
-      // headset or the main one, and that is right for almost everybody. Shown
-      // only while the microphone follows at all.
-      state.settings.switch_microphone && state.inputs.length
-        ? stRow(t('mic_pairs'), t('mic_pairs_d'), `<div class="pairs">${state.outputs.map((o) => {
-          const pinned = (state.settings.mic_pairs || {})[o.id] || '';
-          const opts = [`<option value="">${t('mic_auto')}</option>`,
-            ...state.inputs.map((m) => `<option value="${esc(m.id)}" ${m.id === pinned ? 'selected' : ''}>${esc(m.title || m.name)}</option>`)];
-          return `<div class="pair"><span class="pn" title="${esc(o.name)}">${esc(o.title || o.name)}</span>
-            <select class="narrow" data-pair="${esc(o.id)}">${opts.join('')}</select></div>`;
-        }).join('')}</div>`, { stack: true })
-        : '',
       state.settings.dongle_name
         ? toggle('watch_dongle', t('dongle'), t('dongle_d').replace('%s', state.settings.dongle_name))
         : '',
@@ -1220,7 +1202,7 @@ document.addEventListener('click', async (e) => {
     return renderAll();
   }
 
-  const row = e.target.closest('.row');
+  const row = e.target.closest('.row[data-id]');
   if (row) {
     if (rowDragged) return;   // the row was dragged, not selected
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -1231,11 +1213,9 @@ document.addEventListener('click', async (e) => {
       return renderAll();
     }
     if (act === 'icon') return openIconSheet(dev.id, dev.icon);
-    if (act === 'base') {
-      state = await call('set_base_mic', { device_id: dev.id });
-      return renderAll();
-    }
-    if (!dev.is_default) {
+    // A microphone can be picked again while it is the default: that puts it
+    // on the calls as well, when Windows had those on another one.
+    if (!dev.is_default || state.inputs.includes(dev)) {
       state = await call('switch_to', { device_id: dev.id });
       return renderAll();
     }
@@ -1314,10 +1294,6 @@ document.addEventListener('change', async (e) => {
   }
   if (e.target.id === 'auto-select') {
     state = await call('set_setting', { key: 'auto_device', value: e.target.value });
-    renderAll();
-  }
-  if (e.target.dataset.pair !== undefined) {
-    state = await call('set_mic_pair', { output_id: e.target.dataset.pair, mic_id: e.target.value });
     renderAll();
   }
   if (e.target.id === 'player-select') {
@@ -1526,7 +1502,7 @@ async function poll() {
       paintKnob(knobValue);
       lvlTarget = m.muted ? 0 : toLevel(m.peak);
       showMuted(!!m.muted);
-      if (!!m.mic_muted !== micMuted) paintMicKey(!!m.mic_muted);
+      if (!!m.mic_muted !== micMuted || (m.mic_calls || '') !== micCalls) paintMicKey(!!m.mic_muted, m.mic_calls || '');
       paintMicMeter(m.mic_peak || 0);
     }
 

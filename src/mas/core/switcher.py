@@ -68,7 +68,11 @@ class Switcher:
 
     def switch_to(self, device_id: str) -> devices.Device | None:
         """None means "did not switch" — both the chime and the icon must know it."""
-        if not devices.set_default(device_id, self.cfg.get("switch_communications")):
+        # The setting is about outputs. A microphone is needed exactly for
+        # talking, so it always goes with all the roles, the calls included:
+        # picked by hand without them, the calls stayed on the old microphone.
+        comms = bool(self.cfg.get("switch_communications")) or not device_id.startswith(devices.OUTPUT_PREFIX)
+        if not devices.set_default(device_id, comms):
             return None
         return self.device_by_id(device_id)
 

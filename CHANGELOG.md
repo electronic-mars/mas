@@ -5,11 +5,17 @@ One section per release, newest first. Version numbers follow
 
 ## Unreleased
 
-- the microphone rows say what they mean: a green "Recording now" on the one
-  recording (red, with "off", while it is switched off), a "Main" tag on the
-  one used for the speakers instead of an orange round mark, "Record here" on
-  the others; a headset microphone passed over for one pinned in the settings
-  says so;
+- the microphone has two ways and nothing else: with the headphones (the
+  headset's microphone while they play, the laptop's otherwise), or the one
+  picked by hand, which stays. The switch is in the list itself; the "main"
+  mark, the microphone-per-output setting and the settings toggle are gone;
+- a microphone picked by hand takes the calls with it: Discord and Teams used
+  to stay on the old one, and the list showed the new one as working;
+- the word under the microphone in use is the truth: "Works" in green only
+  when it is not muted and serves the calls too, otherwise "Muted" or "Not
+  for calls" in red;
+- every decision about the microphone is written to the log, "already there"
+  included: it used to fall silent for half an hour of switching;
 - the mini-view button no longer comes up outlined when the window is shown
   and the page learns it is shown before the window is given the focus.
 
