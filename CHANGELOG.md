@@ -3,7 +3,7 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.2
 
 - the microphone has two ways and nothing else: with the headphones (the
   headset's microphone while they play, the laptop's otherwise), or the one
