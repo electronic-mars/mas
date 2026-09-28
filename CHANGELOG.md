@@ -3,6 +3,14 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+- every string in all fifteen languages went through a plain-language review
+  (two free models per language, then by hand): "Switch" instead of "Turn
+  on" on a device row, no more "byte", "runtime" or "release" in a hint,
+  "USB receiver" instead of "dongle", the polite form throughout, and the
+  half-sentences ("the left click goes through", "sound goes back") finished.
+
 ## 1.1.2
 
 - the microphone has two ways and nothing else: with the headphones (the
