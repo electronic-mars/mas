@@ -3,7 +3,7 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.3
 
 - every string in all fifteen languages went through a plain-language review
   (two free models per language, then by hand): "Switch" instead of "Turn
