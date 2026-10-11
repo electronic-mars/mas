@@ -3,6 +3,13 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+- the sound being off or on belongs to the person, not to a device: muted on
+  the speakers and unmuted in the headphones, the speakers come back on when
+  the sound returns to them. Windows keeps the state per device, so they used
+  to stay muted. Carried on every switch, ours or not, the moment it happens.
+
 ## 1.1.3
 
 - every string in all fifteen languages went through a plain-language review

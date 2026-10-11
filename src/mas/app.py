@@ -513,6 +513,7 @@ class App:
                 self.tray.notify(strings.t("msg_switch_failed"))
             self.push_state()
             return
+        self.meter.wake()   # the sound off or on goes with it, at once
         self._follow_microphone(device_id)
         self.announce(dev, tray_done=True)
 

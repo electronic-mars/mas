@@ -57,6 +57,17 @@ class Meter(threading.Thread):
         self._vol = None
         self._meter = None
         self._bound_id: str | None = None
+        # The output device last measured and whether its sound was off. The
+        # sound being off belongs to the person, not to a device: Windows keeps
+        # it per device, so the speakers muted at night stayed muted after an
+        # evening in the headphones that had been switched back on. Whatever the
+        # device was last left in, the next one is brought to (_carry_mute).
+        self._last_out: tuple[str, bool] | None = None
+        # Set to bind again at once rather than on the next round: after our own
+        # switch the new device must not play for two seconds in a state the
+        # person did not leave the sound in.
+        self._wake = threading.Event()
+        self._rebind_now = False
         # The default microphone, the same way: its volume object for the mute
         # key and its meter for the level shown beside it.
         self._mic_vol = None
@@ -166,6 +177,12 @@ class Meter(threading.Thread):
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()
+
+    def wake(self) -> None:
+        """The default output has just been changed by us: bind to it now."""
+        self._rebind_now = True
+        self._wake.set()
 
     # --- internals ------------------------------------------------------
     def _bind(self) -> None:
@@ -189,6 +206,14 @@ class Meter(threading.Thread):
             self._snap.update(mic_id=mic_id or "", mic_calls=devices.calls_default_id() or "")
         if dev_id == self._bound_id and self._vol is not None:
             return
+        if self._vol is not None:
+            # The device being left, asked at the last moment: the tick is up to
+            # half a second old, and a mute key pressed just before the switch
+            # is the one case that matters.
+            try:
+                self._last_out = (self._bound_id, bool(self._vol.GetMute()))
+            except Exception:
+                pass
         dev = AudioUtilities.GetSpeakers()
         raw = dev._dev if hasattr(dev, "_dev") else dev
         self._vol = cast(raw.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None),
@@ -205,11 +230,29 @@ class Meter(threading.Thread):
         with self._lock:
             self._snap["device"] = name
         _log.info("meter bound to device %s", name or "?")
+        self._carry_mute(dev_id)
         # We are not the only ones changing the default: Windows itself hands the
         # sound to headphones when they connect, and the person can switch it in
         # the system settings too. The tray icon must show the truth in any case.
         if self._on_default_changed:
             self._on_default_changed(dev_id)
+
+    def _carry_mute(self, dev_id: str | None) -> None:
+        """Bring the device just bound to the state the sound was left in on
+        the previous one. Not at the start, when there is no previous one: the
+        program starting must not change anything about the sound."""
+        last = self._last_out
+        if not last or not last[0] or last[0] == dev_id or self._vol is None:
+            return
+        try:
+            if bool(self._vol.GetMute()) != last[1]:
+                self._vol.SetMute(last[1], None)
+                with self._lock:
+                    self._snap["muted"] = last[1]
+                _log.info("the sound followed to the new device %s",
+                          "switched off" if last[1] else "switched on")
+        except Exception:
+            _log.warning("could not carry the mute state to the new device", exc_info=True)
 
     def _watch(self) -> None:
         """The set of devices changes rarely, so we drop the expensive snapshot
@@ -268,7 +311,9 @@ class Meter(threading.Thread):
         try:
             while True:
                 step = IDLE_INTERVAL if self._idle.is_set() else self.interval
-                if self._stop.wait(step):
+                self._wake.wait(step)
+                self._wake.clear()
+                if self._stop.is_set():
                     break
                 elapsed += step
                 try:
@@ -279,8 +324,9 @@ class Meter(threading.Thread):
                     self._presence = self._present = None
                     _log.warning("watching the devices broke down", exc_info=True)
                 try:
-                    if elapsed - bound >= REBIND_EVERY_S or self._vol is None:
+                    if self._rebind_now or elapsed - bound >= REBIND_EVERY_S or self._vol is None:
                         bound = elapsed
+                        self._rebind_now = False
                         self._bind()
                     if self._vol is None:
                         continue
@@ -296,6 +342,7 @@ class Meter(threading.Thread):
                                      exc_info=True)
                     self._vol = self._meter = self._bound_id = None
                     continue
+                self._last_out = (self._bound_id, muted)
                 with self._lock:
                     self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
                 if self._mic_vol is not None:

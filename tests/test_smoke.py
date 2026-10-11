@@ -1478,6 +1478,36 @@ _m._snap["muted"] = False
 _m.set_volume(0.5)
 check("a mute the meter has not seen yet is still undone", _m._vol.muted, False)
 
+# The sound being off belongs to the person, not to a device. Muted on the
+# speakers, unmuted in the headphones, back to the speakers: they used to stay
+# muted, because Windows keeps the state per device.
+print("\nThe sound off or on follows to the next device")
+_m = Meter()
+_m._last_out = ("hp", False)
+_m._vol = _Endpoint(muted=True)
+_m._carry_mute("spk")
+check("unmuted in the headphones: the muted speakers come back on", _m._vol.muted, False)
+check("the page hears it at once", _m.snapshot()["muted"], False)
+_m = Meter()
+_m._last_out = ("spk", True)
+_m._vol = _Endpoint(muted=False)
+_m._carry_mute("hp")
+check("muted on the speakers: the headphones come up muted", _m._vol.muted, True)
+_m = Meter()
+_m._last_out = ("spk", True)
+_m._vol = _Endpoint(muted=False)
+_m._carry_mute("spk")
+check("bound again to the same device: nothing touched", _m._vol.mute_calls, 0)
+_m = Meter()
+_m._vol = _Endpoint(muted=True)
+_m._carry_mute("spk")
+check("at the start, with no device before: nothing touched", _m._vol.mute_calls, 0)
+_m = Meter()
+_m._last_out = ("hp", True)
+_m._vol = _Endpoint(muted=True)
+_m._carry_mute("spk")
+check("already in the same state: no call", _m._vol.mute_calls, 0)
+
 # A device half-way through arriving can make the device list fail to read.
 # The change must have been reported by then: the failure resets the watch, and
 # whatever was not reported before it is lost for good — a headset plugged in
