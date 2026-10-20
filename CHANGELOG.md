@@ -5,6 +5,10 @@ One section per release, newest first. Version numbers follow
 
 ## Unreleased
 
+- the mouse wheel over the tray icon turns the volume, two per cent a notch as
+  in Windows, and brings up the card with the device and the level; it fades a
+  moment after the last notch. A mere pass of the pointer brings nothing up any
+  more. The switch is in Controls, in place of the card on hover;
 - a crash after many hours of running is gone: the headset receiver was read
   with a request cancelled every half second of silence, and Windows finished
   the cancelled one into memory already freed. Now one read waits for as long

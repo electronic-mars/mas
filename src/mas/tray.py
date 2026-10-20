@@ -28,6 +28,52 @@ WM_MBUTTONUP = 0x0208
 WM_MOUSEMOVE = 0x0200
 WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN = 0x0201, 0x0204, 0x0207
 
+# --- the mouse wheel over the icon ------------------------------------
+# A tray icon is told about moves and presses, never about the wheel: the wheel
+# goes to the window with the focus. So while the pointer is on the icon — and
+# only then — a low-level mouse hook watches for the wheel and keeps the notches
+# that land on the icon's rectangle. Every mouse event of the whole system runs
+# through such a hook, in Python, holding up the pointer if Python is busy; a
+# hook left on for the session would be paid for by every move anywhere. It is
+# put on when the pointer arrives and taken off the moment it leaves.
+WH_MOUSE_LL = 14
+WM_MOUSEWHEEL = 0x020A
+PM_REMOVE = 1
+QS_ALLINPUT = 0x04FF
+WHEEL_LEAVE_S = 0.3     # the pointer off the icon this long: the hook comes off
+_u32 = ctypes.WinDLL("user32")
+_k32 = ctypes.WinDLL("kernel32")
+_shell = ctypes.WinDLL("shell32")
+
+
+class _MSLLHOOK(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG), ("mouseData", wintypes.DWORD),
+                ("flags", wintypes.DWORD), ("time", wintypes.DWORD),
+                ("dwExtraInfo", ctypes.c_void_p)]
+
+
+class _NOTIFYICONIDENTIFIER(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("hWnd", wintypes.HWND), ("uID", wintypes.UINT),
+                ("guidItem", ctypes.c_byte * 16)]
+
+
+_HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM)
+_u32.SetWindowsHookExW.restype = ctypes.c_void_p
+_u32.SetWindowsHookExW.argtypes = [ctypes.c_int, _HOOKPROC, wintypes.HINSTANCE, wintypes.DWORD]
+_u32.CallNextHookEx.restype = ctypes.c_ssize_t
+_u32.CallNextHookEx.argtypes = [ctypes.c_void_p, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
+_u32.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
+_u32.MsgWaitForMultipleObjects.argtypes = [wintypes.DWORD, ctypes.c_void_p, wintypes.BOOL,
+                                           wintypes.DWORD, wintypes.DWORD]
+_u32.PeekMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT,
+                              wintypes.UINT, wintypes.UINT]
+_u32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+_k32.GetModuleHandleW.restype = wintypes.HMODULE
+_k32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+_shell.Shell_NotifyIconGetRect.restype = ctypes.c_long
+_shell.Shell_NotifyIconGetRect.argtypes = [ctypes.POINTER(_NOTIFYICONIDENTIFIER),
+                                           ctypes.POINTER(wintypes.RECT)]
+
 DEFAULT_GLYPH = "speakers"
 SM_CXSMICON = 49
 HAVE_SIZES = (16, 20, 24, 32, 40, 48, 64)
@@ -127,11 +173,17 @@ def icon_handle(img: Image.Image) -> int:
 
 class Tray:
     def __init__(self, on_left, on_right, on_middle, on_quit, outside_decides=False,
-                 on_hover=None, on_click=None):
-        """`on_hover` hears every move of the pointer over the icon, `on_click`
-        every press of a button on it — the hover card lives on those two."""
+                 on_hover=None, on_click=None, on_wheel=None):
+        """`on_hover` hears every move of the pointer over the icon and says
+        whether the wheel is wanted there; `on_wheel` gets the turned notches
+        (120 a notch, up positive); `on_click` every press of a button on it."""
         self.on_hover = on_hover
         self.on_click = on_click
+        self.on_wheel = on_wheel
+        self._wheel_arm = threading.Event()
+        self._wheel_rect: tuple[int, int, int, int] | None = None
+        self._wheel_acc = 0
+        self._hook_proc = _HOOKPROC(self._on_low_level_mouse)   # kept alive: Windows calls it
         self.on_left = on_left
         self.on_right = on_right
         self.on_middle = on_middle
@@ -143,8 +195,9 @@ class Tray:
             "MasterAudioSwitcher",
             load_glyph(self._glyph, self._light),
             # The name only until the first sign that Windows tells us about the
-            # pointer over the icon: from then on our own card comes up there
-            # (see overlay.py), and a tooltip would open on top of it.
+            # pointer over the icon: from then on, with the wheel on, nothing
+            # comes up on a mere pass — the card answers the wheel, and a
+            # tooltip would open on top of it.
             "Master Audio Switcher",
             menu=pystray.Menu(pystray.MenuItem(strings.t("tray_exit"), lambda: self.on_quit())),
         )
@@ -265,15 +318,18 @@ class Tray:
         def handler(wparam, lparam):
             if lparam == WM_MOUSEMOVE:
                 if self.on_hover:
-                    # The card and the system tooltip must not both come up:
-                    # while the card is on, the tooltip is empty; switched off
-                    # in the settings, the tooltip names the program again.
+                    # The pointer is on the icon: get ready for the wheel. The
+                    # tooltip is empty while the wheel is on, so the card it
+                    # brings up is the only thing there; switched off in the
+                    # settings, the tooltip names the program again.
                     try:
-                        carded = bool(self.on_hover())
+                        wheel = bool(self.on_hover())
                     except Exception:
                         _log.exception("error in handler: hover")
-                        carded = False
-                    want = "" if carded else "Master Audio Switcher"
+                        wheel = False
+                    if wheel:
+                        self._wheel_arm.set()
+                    want = "" if wheel else "Master Audio Switcher"
                     if self.icon.title != want:
                         self.icon.title = want
                 return
@@ -293,6 +349,74 @@ class Tray:
 
         self.icon._message_handlers[win32.WM_NOTIFY] = handler
         _log.info("icon click interception installed")
+
+    def _icon_rect(self) -> tuple[int, int, int, int] | None:
+        """Where the icon is on the screen now. pystray registers it with id 0
+        (it passes its own id under a misspelt field name, so the real field
+        stays zero)."""
+        hwnd = getattr(self.icon, "_hwnd", None)
+        if not hwnd:
+            return None
+        nid = _NOTIFYICONIDENTIFIER(cbSize=ctypes.sizeof(_NOTIFYICONIDENTIFIER),
+                                    hWnd=hwnd, uID=0)
+        r = wintypes.RECT()
+        if _shell.Shell_NotifyIconGetRect(ctypes.byref(nid), ctypes.byref(r)) != 0:
+            return None
+        return r.left, r.top, r.right, r.bottom
+
+    def _on_low_level_mouse(self, code, wparam, lparam):
+        """Runs for every mouse event while the hook is on — so it only keeps
+        the notch and returns; the work happens in the loop that pumps it."""
+        try:
+            rect = self._wheel_rect
+            if code == 0 and wparam == WM_MOUSEWHEEL and rect:
+                m = ctypes.cast(lparam, ctypes.POINTER(_MSLLHOOK)).contents
+                if rect[0] <= m.x < rect[2] and rect[1] <= m.y < rect[3]:
+                    self._wheel_acc += ctypes.c_short(m.mouseData >> 16).value
+                    return 1        # ours: nothing else scrolls under the icon
+        except Exception:
+            pass
+        return _u32.CallNextHookEx(None, code, wparam, lparam)
+
+    def _wheel_loop(self) -> None:
+        """Hook on while the pointer is on the icon, off when it leaves."""
+        import time
+        hmod = _k32.GetModuleHandleW(None)
+        msg = wintypes.MSG()
+        pt = wintypes.POINT()
+        while not self._stop.is_set():
+            if not self._wheel_arm.wait(1.0):
+                continue
+            self._wheel_arm.clear()
+            rect = self._icon_rect()
+            if rect is None:
+                continue
+            hook = _u32.SetWindowsHookExW(WH_MOUSE_LL, self._hook_proc, hmod, 0)
+            if not hook:
+                _log.warning("the wheel over the tray icon was not hooked (error %s)",
+                             ctypes.get_last_error())
+                continue
+            self._wheel_rect, self._wheel_acc = rect, 0
+            last_on = time.monotonic()
+            try:
+                while not self._stop.is_set():
+                    # Woken at once by mouse input for the hook, else every 50 ms.
+                    _u32.MsgWaitForMultipleObjects(0, None, False, 50, QS_ALLINPUT)
+                    while _u32.PeekMessageW(ctypes.byref(msg), None, 0, 0, PM_REMOVE):
+                        _u32.TranslateMessage(ctypes.byref(msg))
+                        _u32.DispatchMessageW(ctypes.byref(msg))
+                    acc, self._wheel_acc = self._wheel_acc, 0
+                    if acc and self.on_wheel:
+                        self._safe(lambda: self.on_wheel(acc), "wheel")
+                    _u32.GetCursorPos(ctypes.byref(pt))
+                    l, t, r, b = rect
+                    if l - 2 <= pt.x < r + 2 and t - 2 <= pt.y < b + 2:
+                        last_on = time.monotonic()
+                    elif time.monotonic() - last_on > WHEEL_LEAVE_S:
+                        break
+            finally:
+                self._wheel_rect = None
+                _u32.UnhookWindowsHookEx(hook)
 
     def _install_icon_loader(self) -> None:
         """Our own icon loading instead of pystray's: see `icon_handle`."""
@@ -333,6 +457,7 @@ class Tray:
             threading.Thread(target=self._worker, daemon=True, name="mas-tray-jobs").start()
             threading.Thread(target=self._show_anyway, daemon=True, name="mas-tray-show").start()
             threading.Thread(target=self._theme_poller, daemon=True, name="mas-theme").start()
+            threading.Thread(target=self._wheel_loop, daemon=True, name="mas-wheel").start()
 
         self.icon.run(setup=setup)
 

@@ -170,7 +170,7 @@ def _font(size: int, weight: str = "regular"):
 # The card, in panel units (multiplied by the screen scale when drawn). The same
 # picture serves the notification after a switch and the card shown while the
 # pointer rests on the tray icon; the notification adds a caption on top, the
-# hover card the track underneath.
+# wheel card the track underneath.
 CARD_W, CARD_PAD, CARD_R, SHADOW = 340, 14, 14, 12
 WELL, LAMPS, LAMP_H, LAMP_GAP = 40, 20, 5, 3
 ORANGE = (242, 106, 33, 255)
@@ -313,42 +313,44 @@ def _cursor() -> tuple[int, int]:
     return p.x, p.y
 
 
-# Hovering the tray icon: the card comes up once the pointer has rested this
-# long — two seconds, not half of one: at half a second it came up on every pass
-# of the pointer towards the clock and got in the way more than it helped, and goes the moment the pointer leaves the icon. Windows says nothing
-# when the pointer leaves, only while it moves over the icon, so "left" means
-# "moved further than an icon's width from where it last moved over it".
-HOVER_DELAY = 2.0
-HOVER_MAX = 12.0
+# The wheel over the tray icon: the card comes up at the first notch, follows
+# every one after it, and stays this long after the last before fading. A mere
+# pass of the pointer brings nothing up any more — at two seconds of resting it
+# still came up when nobody had asked for it.
+WHEEL_HOLD = 1.5
+WHEEL_FADE = 0.25
 
 
 class Overlay(threading.Thread):
     """A single overlay window for the whole session, with its own message loop."""
 
     def __init__(self, hover_card=None):
-        """`hover_card` returns (card, light) for the card shown on hover, or
-        None when there is nothing to show."""
+        """`hover_card` returns (card, light) for the card the wheel brings up,
+        or None when there is nothing to show."""
         super().__init__(daemon=True, name="mas-overlay")
         self._queue: queue.SimpleQueue = queue.SimpleQueue()
         self._hwnd = None
         self._proc = WNDPROC(lambda h, m, w, l: user32.DefWindowProcW(h, m, w, l))
         self._hover_card = hover_card
-        self._hover_at: tuple[int, int] | None = None   # where it last moved over the icon
-        self._hover_waiting = False
+        self._wheel_at = 0.0          # when the wheel last turned over the icon
+        self._wheel_dirty = False     # the card shows an older volume than now
+        self._wheel_on = False        # a wheel card is up or queued
 
     def show(self, card: dict, light: bool = False) -> None:
         self._queue.put(("note", card, light))
 
-    def hover(self) -> None:
-        """The pointer moved over the tray icon. Called for every move — cheap."""
-        self._hover_at = _cursor()
-        if not self._hover_waiting:
-            self._hover_waiting = True
-            self._queue.put(("hover", None, None))
+    def wheel(self) -> None:
+        """The wheel turned over the tray icon: bring the card up, or bring the
+        one that is up to the new volume. Called for every notch — cheap."""
+        self._wheel_at = time.monotonic()
+        self._wheel_dirty = True
+        if not self._wheel_on:
+            self._wheel_on = True
+            self._queue.put(("wheel", None, None))
 
     def unhover(self) -> None:
         """A click on the icon: whatever it does, the card is in the way."""
-        self._hover_at = None
+        self._wheel_at = 0.0
 
     # --- internals --------------------------------------------------
     def _create(self) -> None:
@@ -432,36 +434,35 @@ class Overlay(threading.Thread):
             time.sleep(0.03)
         self._fade(img, x, y, FADE)
 
-    def _near(self) -> bool:
-        at = self._hover_at
-        if at is None:
-            return False
-        cx, cy = _cursor()
-        reach = 20 * scale()
-        return abs(cx - at[0]) <= reach and abs(cy - at[1]) <= reach
-
-    def _hover(self) -> None:
+    def _wheel(self) -> None:
+        """The card for the wheel: redrawn when the volume moves, held while the
+        wheel keeps turning, faded after it stops. A notch during the fade
+        brings it back to full at once."""
+        img = None
+        x = y = 0
         try:
-            # Resting, not passing through: the pointer must stay on the icon.
-            deadline = time.monotonic() + HOVER_DELAY
-            while time.monotonic() < deadline:
-                if not self._near() or not self._queue.empty():
-                    return
-                time.sleep(0.03)
-            got = self._hover_card() if self._hover_card else None
-            if not got:
-                return
-            card, light = got
-            img = _render(card, light)
-            x, y = self._put_up(img)
-            until = time.monotonic() + HOVER_MAX
-            while self._near() and time.monotonic() < until and self._queue.empty():
+            while self._queue.empty():
+                age = time.monotonic() - self._wheel_at
+                if age >= WHEEL_HOLD + WHEEL_FADE:
+                    break
+                if self._wheel_dirty:
+                    self._wheel_dirty = False
+                    got = self._hover_card() if self._hover_card else None
+                    if not got:
+                        break
+                    first = img is None
+                    img = _render(*got)
+                    if first:
+                        x, y = self._put_up(img)
+                if img is not None:
+                    k = max(0.0, age - WHEEL_HOLD) / WHEEL_FADE
+                    self._paint(img, int(255 * (1 - min(1.0, k))), x, y)
                 self._pump()
-                time.sleep(0.04)
-            if self._queue.empty():
-                self._fade(img, x, y, 0.15)
+                time.sleep(0.03)
+            if img is not None and self._queue.empty():
+                user32.ShowWindow(self._hwnd, SW_HIDE)
         finally:
-            self._hover_waiting = False
+            self._wheel_on = False
 
     def run(self) -> None:
         self._create()
@@ -472,13 +473,13 @@ class Overlay(threading.Thread):
             job = self._queue.get()
             while not self._queue.empty():      # show only the latest one
                 job = self._queue.get()
-            if job[0] != "hover":
-                self._hover_waiting = False     # a dropped hover must not block the next
+            if job[0] != "wheel":
+                self._wheel_on = False          # a dropped wheel card must not block the next
             try:
                 if job[0] == "note":
                     self._note(job[1], job[2])
                 else:
-                    self._hover()
+                    self._wheel()
             except Exception:
                 _log.exception("overlay failed to show")
                 user32.ShowWindow(self._hwnd, SW_HIDE)

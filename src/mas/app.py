@@ -346,6 +346,7 @@ class App:
         # The base microphone is the one a person uses without a headset.
         self._mic_base: str | None = self.cfg.get("mic_base") or None
         self._blur_watch = False     # a wait to hide the window is running
+        self._wheel_rest = 0         # part of a wheel notch not yet turned into volume
         # USB dongle listener and the recognized headset name for the interface.
         self.dongle: Dongle | None = None
         self._dongle_name: str | None = None
@@ -901,18 +902,34 @@ class App:
         return card
 
     def _hovered(self) -> bool:
-        """The pointer moved over the tray icon. False when the card is switched
-        off, so the tray gives the system tooltip back."""
-        if not self.cfg.get("hover_card"):
-            return False
-        self.overlay.hover()
-        return True
+        """The pointer moved over the tray icon: is the wheel wanted there?
+        False gives the tray its system tooltip back. Nothing comes up on a
+        mere pass — the card answers the wheel only."""
+        return bool(self.cfg.get("tray_wheel"))
+
+    # The volume per notch of the wheel over the tray icon, in whole per cent,
+    # as in the Windows volume flyout: two up or two down from where it is.
+    WHEEL_STEP = 2
+
+    def _wheel(self, delta: int) -> None:
+        """The wheel turned over the tray icon: `delta` in 120ths of a notch,
+        up positive. Fine-grained wheels send less than a notch at a time, so
+        the remainder is kept for the next turn."""
+        if not self.cfg.get("tray_wheel"):
+            return
+        self._wheel_rest += delta
+        notches = int(self._wheel_rest / 120)
+        if not notches:
+            return
+        self._wheel_rest -= notches * 120
+        now = round(self.meter.snapshot()["volume"] * 100)
+        value = max(0, min(100, now + notches * self.WHEEL_STEP)) / 100
+        self.meter.set_volume(value)    # turning brings the sound back on, as in Windows
+        self.overlay.wheel()
 
     def _hover_card(self):
-        """The card for the pointer resting on the tray icon — the overlay asks
-        for it only once the pointer has settled, so it is always current."""
-        if not self.cfg.get("hover_card"):
-            return None
+        """The card the wheel brings up, asked for at every notch so it shows
+        the volume just set."""
         dev = self.current_device()
         return (self._card(dev, track=True), self._light_theme()) if dev else None
 
@@ -1185,6 +1202,7 @@ class App:
             on_middle=lambda: self.show("mixer"),
             on_hover=self._hovered,
             on_click=self.overlay.unhover,
+            on_wheel=self._wheel,
             on_quit=self.quit,
             # Last time we ran, the dock was drawing us. Hold the icon back
             # rather than flash it for three seconds at every start — the dock's

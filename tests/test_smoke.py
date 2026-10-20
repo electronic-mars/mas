@@ -1703,6 +1703,76 @@ check("an output keeps to the setting about the calls", _moved, [(devices.OUTPUT
 for _n, _v in _saved.items():
     setattr(devices, _n, _v)
 
+# The wheel over the tray icon turns the volume: two per cent a notch from where
+# it is, as in Windows; a fine-grained wheel's part-notches add up; switched off
+# in the settings, it does nothing. Nothing comes up on a mere pass any more.
+print("\nThe wheel over the tray icon")
+
+
+class _WheelMeter:
+    def __init__(self, v):
+        self.v, self.set = v, []
+
+    def snapshot(self):
+        return {"volume": self.v}
+
+    def set_volume(self, v):
+        self.set.append(v)
+        self.v = v
+
+
+class _WheelOverlay:
+    def __init__(self):
+        self.cards = 0
+
+    def wheel(self):
+        self.cards += 1
+
+
+def _wheel_app(v, on=True):
+    a = App.__new__(App)
+    a.cfg = FakeConfig(tray_wheel=on)
+    a.meter, a.overlay, a._wheel_rest = _WheelMeter(v), _WheelOverlay(), 0
+    return a
+
+
+_a = _wheel_app(0.33); _a._wheel(120)
+check("a notch up from 33: 35", _a.meter.set, [0.35])
+check("and the card comes up", _a.overlay.cards, 1)
+_a = _wheel_app(0.33); _a._wheel(-240)
+check("two notches down from 33: 29", _a.meter.set, [0.29])
+_a = _wheel_app(0.99); _a._wheel(120)
+check("never past 100", _a.meter.set, [1.0])
+_a = _wheel_app(0.01); _a._wheel(-120)
+check("never below 0", _a.meter.set, [0.0])
+_a = _wheel_app(0.50); _a._wheel(60); _a._wheel(60)
+check("two half-notches make one", _a.meter.set, [0.52])
+_a = _wheel_app(0.50, on=False); _a._wheel(120)
+check("switched off: nothing", (_a.meter.set, _a.overlay.cards), ([], 0))
+check("a pass of the pointer only asks for the wheel", _wheel_app(0.5)._hovered(), True)
+check("switched off, the tooltip comes back", _wheel_app(0.5, on=False)._hovered(), False)
+
+# The hook keeps only the notches that land on the icon, and swallows them.
+from mas import tray as _tray  # noqa: E402
+_t = _tray.Tray.__new__(_tray.Tray)
+_t._wheel_rect, _t._wheel_acc = (100, 100, 140, 160), 0
+
+
+def _ll(x, y, delta, msg=_tray.WM_MOUSEWHEEL):
+    m = _tray._MSLLHOOK(x=x, y=y, mouseData=(delta & 0xFFFF) << 16)
+    return _t._on_low_level_mouse(0, msg, ctypes.addressof(m))
+
+
+import ctypes  # noqa: E402
+check("a notch on the icon is kept and swallowed", (_ll(120, 130, 120), _t._wheel_acc), (1, 120))
+_ll(120, 130, -120); _ll(120, 130, -120)
+check("down counts down", _t._wheel_acc, -120)
+_t._wheel_acc = 0
+check("a notch beside the icon passes on", (_ll(150, 130, 120) != 1, _t._wheel_acc), (True, 0))
+check("a move on the icon passes on", (_ll(120, 130, 0, msg=0x0200) != 1, _t._wheel_acc), (True, 0))
+_t._wheel_rect = None
+check("no hook on: nothing kept", (_ll(120, 130, 120) != 1, _t._wheel_acc), (True, 0))
+
 # The switch sound ships inside the interface folder, which is what the build
 # bundles. Short and quiet on purpose: the old tone was a hard beep at full level.
 print("\nThe switch sound")
