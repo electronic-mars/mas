@@ -52,7 +52,7 @@ class Meter(threading.Thread):
         self.ready = threading.Event()
         # When the window is hidden nobody sees the level: we poll less often.
         self._idle = threading.Event()
-        self._snap = {"peak": 0.0, "volume": 0.0, "muted": False, "device": "",
+        self._snap = {"peak": 0.0, "volume": 0.0, "muted": False, "device": "", "device_id": "",
                       "mic_peak": 0.0, "mic_muted": False, "mic_id": "", "mic_calls": ""}
         self._vol = None
         self._meter = None
@@ -68,6 +68,11 @@ class Meter(threading.Thread):
         # person did not leave the sound in.
         self._wake = threading.Event()
         self._rebind_now = False
+        # Counts our own writes of the volume and the mute. A tick that read the
+        # device before a write and stores after it would put the old value
+        # back: the wheel card showed 42 while the sound was already at 44, and
+        # stayed at 42 until the next notch.
+        self._writes = 0
         # The default microphone, the same way: its volume object for the mute
         # key and its meter for the level shown beside it.
         self._mic_vol = None
@@ -103,6 +108,7 @@ class Meter(threading.Thread):
         if self._vol.GetMute():
             self._vol.SetMute(False, None)
         with self._lock:
+            self._writes += 1
             self._snap["volume"] = round(value, 4)
             self._snap["muted"] = False
 
@@ -111,6 +117,7 @@ class Meter(threading.Thread):
             return
         self._vol.SetMute(bool(muted), None)
         with self._lock:
+            self._writes += 1
             self._snap["muted"] = bool(muted)
 
     def levels(self) -> dict[str, float]:
@@ -229,6 +236,7 @@ class Meter(threading.Thread):
                 break
         with self._lock:
             self._snap["device"] = name
+            self._snap["device_id"] = dev_id or ""
         _log.info("meter bound to device %s", name or "?")
         self._carry_mute(dev_id)
         # We are not the only ones changing the default: Windows itself hands the
@@ -330,6 +338,7 @@ class Meter(threading.Thread):
                         self._bind()
                     if self._vol is None:
                         continue
+                    writes = self._writes
                     peak = self._meter.GetPeakValue()
                     vol = self._vol.GetMasterVolumeLevelScalar()
                     muted = bool(self._vol.GetMute())
@@ -344,7 +353,10 @@ class Meter(threading.Thread):
                     continue
                 self._last_out = (self._bound_id, muted)
                 with self._lock:
-                    self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
+                    if self._writes == writes:
+                        self._snap.update(peak=round(peak, 4), volume=round(vol, 4), muted=muted)
+                    else:
+                        self._snap["peak"] = round(peak, 4)   # our write is newer than this read
                 if self._mic_vol is not None:
                     try:
                         mic = (round(self._mic_meter.GetPeakValue(), 4),

@@ -1752,6 +1752,27 @@ check("switched off: nothing", (_a.meter.set, _a.overlay.cards), ([], 0))
 check("a pass of the pointer only asks for the wheel", _wheel_app(0.5)._hovered(), True)
 check("switched off, the tooltip comes back", _wheel_app(0.5, on=False)._hovered(), False)
 
+# The card asks the meter, never Windows: a stale device list made it enumerate
+# every endpoint on the overlay's thread, and the card froze for half a second.
+class _CardMeter:
+    def snapshot(self):
+        return {"volume": 0.44, "muted": False, "device": "Speakers (Realtek(R) Audio)",
+                "device_id": "out-spk"}
+
+
+_saved_list = devices.list_devices
+devices.list_devices = lambda *a, **k: (_ for _ in ()).throw(AssertionError("enumerated"))
+_c = App.__new__(App)
+_c.cfg = FakeConfig(theme="dark")
+_c.meter = _CardMeter()
+_c.players = type("P", (), {"snapshot": lambda self: {"playing": False, "title": "", "artist": ""}})()
+_card = _c._hover_card()
+devices.list_devices = _saved_list
+check("the wheel card is built without asking Windows", (_card[0]["title"], _card[0]["pct"]),
+      ("Realtek(R) Audio", 44))
+_c.meter = type("M", (), {"snapshot": lambda self: {"device_id": ""}})()
+check("no device yet: no card", _c._hover_card(), None)
+
 # The hook keeps only the notches that land on the icon, and swallows them.
 from mas import tray as _tray  # noqa: E402
 _t = _tray.Tray.__new__(_tray.Tray)

@@ -929,9 +929,15 @@ class App:
 
     def _hover_card(self):
         """The card the wheel brings up, asked for at every notch so it shows
-        the volume just set."""
-        dev = self.current_device()
-        return (self._card(dev, track=True), self._light_theme()) if dev else None
+        the volume just set. The device comes from the meter, which already
+        knows it: asking Windows here enumerated all the endpoints whenever the
+        list had gone a minute old — half a second, on the overlay's thread,
+        with the card frozen at its last number while the wheel kept turning."""
+        snap = self.meter.snapshot()
+        if not snap.get("device_id"):
+            return None
+        dev = devices.Device(id=snap["device_id"], name=snap["device"], is_output=True, active=True)
+        return self._card(dev, track=True), self._light_theme()
 
     def _light_theme(self) -> bool:
         """The overlay follows the window theme, and with "like Windows" — the
