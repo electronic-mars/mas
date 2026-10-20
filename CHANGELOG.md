@@ -5,6 +5,10 @@ One section per release, newest first. Version numbers follow
 
 ## Unreleased
 
+- a crash after many hours of running is gone: the headset receiver was read
+  with a request cancelled every half second of silence, and Windows finished
+  the cancelled one into memory already freed. Now one read waits for as long
+  as it takes, and is cancelled only when listening stops;
 - the sound being off or on belongs to the person, not to a device: muted on
   the speakers and unmuted in the headphones, the speakers come back on when
   the sound returns to them. Windows keeps the state per device, so they used

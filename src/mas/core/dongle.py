@@ -287,27 +287,42 @@ class Dongle(threading.Thread):
             k32.CloseHandle(wintypes.HANDLE(h))
             return
         ev = k32.CreateEventW(None, True, False, None)
+        # One buffer and one OVERLAPPED for the life of the listener, and one
+        # read in flight that is waited out rather than cancelled. Windows
+        # writes into both when a read completes — a cancelled one too, a moment
+        # after CancelIo returns. The read used to be cancelled every half
+        # second of silence and both rebuilt at once, so the late completion
+        # landed in memory Python had already freed; after half a day of it the
+        # process died with an access violation (crash.log, 20.10.2026).
+        buf = ctypes.create_string_buffer(size)
+        ov = _OVERLAPPED()
+        ov.hEvent = ev
+        read = wintypes.DWORD()
+        pending = False
         try:
             while not self._stop.is_set():
-                buf = ctypes.create_string_buffer(size)
-                ov = _OVERLAPPED()
-                ov.hEvent = ev
-                k32.ResetEvent(wintypes.HANDLE(ev))
-                read = wintypes.DWORD()
-                ok = k32.ReadFile(wintypes.HANDLE(h), buf, size, ctypes.byref(read),
-                                  ctypes.byref(ov))
-                if not ok and k32.GetLastError() != ERROR_IO_PENDING:
-                    # Usually this means the dongle was unplugged. The listener
-                    # dies, and watching stays dead until the program is
-                    # restarted — that at least has to be said out loud.
+                if not pending:
+                    k32.ResetEvent(wintypes.HANDLE(ev))
+                    ok = k32.ReadFile(wintypes.HANDLE(h), buf, size, ctypes.byref(read),
+                                      ctypes.byref(ov))
+                    err = 0 if ok else k32.GetLastError()
+                    if err and err != ERROR_IO_PENDING:
+                        # Usually this means the dongle was unplugged. The
+                        # listener dies, and watching stays dead until the
+                        # program is restarted — that at least has to be said.
+                        _log.warning("reading dongle reports was cut off (error %s), "
+                                     "watching this collection stopped", err)
+                        break
+                    pending = True
+                # Woken twice a second only to notice a stop; the read stays.
+                if k32.WaitForSingleObject(wintypes.HANDLE(ev), 500) != 0:
+                    continue
+                pending = False
+                if not k32.GetOverlappedResult(wintypes.HANDLE(h), ctypes.byref(ov),
+                                               ctypes.byref(read), False):
                     _log.warning("reading dongle reports was cut off (error %s), "
                                  "watching this collection stopped", k32.GetLastError())
                     break
-                if k32.WaitForSingleObject(wintypes.HANDLE(ev), 500) != 0:
-                    k32.CancelIo(wintypes.HANDLE(h))
-                    continue
-                k32.GetOverlappedResult(wintypes.HANDLE(h), ctypes.byref(ov),
-                                        ctypes.byref(read), False)
                 data = buf.raw[:read.value]
                 if self.learn:
                     import time
@@ -330,6 +345,12 @@ class Dongle(threading.Thread):
                 except Exception:
                     _log.exception("headset state handler crashed")
         finally:
+            if pending:
+                # Cancel, then wait for the cancellation to land before the
+                # buffer and the OVERLAPPED can be freed.
+                k32.CancelIoEx(wintypes.HANDLE(h), ctypes.byref(ov))
+                k32.GetOverlappedResult(wintypes.HANDLE(h), ctypes.byref(ov),
+                                        ctypes.byref(read), True)
             k32.CloseHandle(wintypes.HANDLE(h))
             k32.CloseHandle(wintypes.HANDLE(ev))
 
