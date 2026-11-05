@@ -52,7 +52,6 @@
     "p_microphone": "마이크",
     "p_headset_mic": "헤드셋 마이크",
     "p_mic_array": "내장 마이크",
-    "playing_of": "{m}개 중 {n}개 재생 중",
     "buttons_d_left": "왼쪽 클릭으로 소리를 전환하고, 오른쪽 클릭으로 창을 엽니다",
     "buttons_d_right": "오른쪽 클릭으로 소리를 전환하고, 왼쪽 클릭으로 창을 엽니다",
     "btn_left": "왼쪽",

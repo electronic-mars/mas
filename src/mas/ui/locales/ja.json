@@ -52,7 +52,6 @@
     "p_microphone": "マイク",
     "p_headset_mic": "ヘッドセットのマイク",
     "p_mic_array": "内蔵マイク",
-    "playing_of": "{m} 件中 {n} 件が再生中",
     "buttons_d_left": "左クリックで音を切り替え、右クリックでウィンドウを開きます",
     "buttons_d_right": "右クリックで音を切り替え、左クリックでウィンドウを開きます",
     "btn_left": "左",

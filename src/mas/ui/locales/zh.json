@@ -52,7 +52,6 @@
     "p_microphone": "麦克风",
     "p_headset_mic": "耳麦麦克风",
     "p_mic_array": "内置麦克风",
-    "playing_of": "{m} 个中有 {n} 个正在播放",
     "buttons_d_left": "左键切换声音，右键打开窗口",
     "buttons_d_right": "右键切换声音，左键打开窗口",
     "btn_left": "左键",

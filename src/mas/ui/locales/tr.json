@@ -52,7 +52,6 @@
     "p_microphone": "Mikrofon",
     "p_headset_mic": "Kulaklık mikrofonu",
     "p_mic_array": "Dahili mikrofon",
-    "playing_of": "{n} / {m} çalıyor",
     "buttons_d_left": "Sol tık sesi değiştirir, sağ tık pencereyi açar",
     "buttons_d_right": "Sağ tık sesi değiştirir, sol tık pencereyi açar",
     "btn_left": "Sol",

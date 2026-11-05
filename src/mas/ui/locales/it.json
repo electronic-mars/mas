@@ -52,7 +52,6 @@
     "p_microphone": "Microfono",
     "p_headset_mic": "Microfono delle cuffie",
     "p_mic_array": "Microfono integrato",
-    "playing_of": "{n} di {m} in riproduzione",
     "buttons_d_left": "Clic sinistro cambia l'audio, clic destro apre la finestra",
     "buttons_d_right": "Clic destro cambia l'audio, clic sinistro apre la finestra",
     "btn_left": "Sinistro",

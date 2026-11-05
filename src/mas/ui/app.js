@@ -582,7 +582,7 @@ function renderMixer() {
   })).join('');
   $('panel-mixer').innerHTML =
     `${masterRow()}
-     <h2 class="sec micro">${secIcon('ui-apps')}${t('apps')}<span class="aside" id="mx-count"></span></h2>
+     <h2 class="sec micro">${secIcon('ui-apps')}${t('apps')}</h2>
      ${apps ? `<div class="mxgroup">${apps}</div>` : `<div class="empty">${t('no_apps')}</div>`}`;
   updateFade();
 }
@@ -622,16 +622,12 @@ async function pollLevels() {
   try {
     const lv = await call('get_mixer_levels');
     const at = performance.now();
-    let sounding = 0, known = 0;
     document.querySelectorAll('#panel-mixer .mx').forEach((row) => {
       const master = row.dataset.kind === 'master';
       const raw = master ? lv.master : (lv.apps[row.dataset.key] || 0);
       const target = row.classList.contains('muted') ? 0 : toLevel(raw);
       paintLine(row, target, at);
-      if (!master) { known++; if (target > 0.02) sounding++; }
     });
-    const count = $('mx-count');
-    if (count && known) count.textContent = t('playing_of').replace('{n}', sounding).replace('{m}', known);
     // An application that has just started making sound is not in the list
     // yet: fetch the list again rather than wait for the tab to be reopened.
     // Once per newcomer: an application the list cannot show would otherwise

@@ -52,7 +52,6 @@
     "p_microphone": "Microphone",
     "p_headset_mic": "Headset microphone",
     "p_mic_array": "Built-in microphone",
-    "playing_of": "{n} of {m} playing",
     "buttons_d_left": "Left click switches sound, right click opens the window",
     "buttons_d_right": "Right click switches sound, left click opens the window",
     "btn_left": "Left",
