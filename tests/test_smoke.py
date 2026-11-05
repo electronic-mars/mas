@@ -679,10 +679,10 @@ SPEC = (ROOT / "build" / "mas.spec").read_text(encoding="utf-8")
 check("the support button leads somewhere real", "example.invalid" in APP_JS, False)
 check("no button points at a bare github.com",
       'data-url="https://github.com/"' in APP_JS, False)
-check("support goes to Patreon",
-      'data-url="https://www.patreon.com/ElectronicMARS"' in APP_JS, True)
-check("GitHub goes to our repository",
-      'data-url="https://github.com/electronic-mars/mas"' in APP_JS, True)
+check("support goes to the support page of the developer's site",
+      'data-url="https://electronic-mars.github.io/#support"' in APP_JS, True)
+check("the developer's site opens on this program",
+      'data-url="https://electronic-mars.github.io/#mas"' in APP_JS, True)
 # Updating is no longer a link to a page for the person to work out for
 # themselves — the button does the whole thing, so the address moved into
 # core/update.py, where it is checked against the host allowlist.

@@ -906,8 +906,8 @@ function renderAbout() {
       <h2>Master Audio Switcher</h2>
       <div class="micro" style="margin-top:6px">${t('version')} ${state.settings.version}</div>
       <p>${t('about_text')}</p>
-      <button class="btn" data-url="https://www.patreon.com/ElectronicMARS">${secIcon('ui-heart')}${t('donate')}</button>
-      <button class="btn ghost" data-url="https://github.com/electronic-mars/mas">${secIcon('ui-github')}${t('github')}</button>
+      <button class="btn" data-url="https://electronic-mars.github.io/#support">${secIcon('ui-heart')}${t('donate')}</button>
+      <button class="btn ghost" data-url="https://electronic-mars.github.io/#mas">${secIcon('ui-globe')}${t('dev_site')}</button>
       ${updateBlock()}
       <button class="btn ghost quit" data-act="quit" style="margin-top:16px">${secIcon('ui-exit')}${t('quit')}</button>
     </div>`;
