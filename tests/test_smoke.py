@@ -1809,6 +1809,120 @@ _peak = max(abs(int.from_bytes(_frames[i:i + 2], "little", signed=True))
             for i in range(0, len(_frames), 2)) / 32767
 check("it is quiet", _peak <= 0.15, True)
 
+# A game or a program running as administrator does not give its path to an
+# ordinary process. It used to vanish from the mixer while its level was still
+# measured — and the page fetched the list again on every tick.
+print("\nAn application whose path cannot be read stays in the mixer")
+from mas.core import mixer as _mixer  # noqa: E402
+
+
+class _Proc:
+    def __init__(self, name, path):
+        self._name, self._path = name, path
+
+    def name(self):
+        return self._name
+
+    def exe(self):
+        if self._path is None:
+            raise PermissionError("access denied")
+        return self._path
+
+
+class _Vol:
+    def GetMasterVolume(self):
+        return 0.5
+
+    def GetMute(self):
+        return 0
+
+
+class _Sess:
+    def __init__(self, name, path):
+        self.Process, self.SimpleAudioVolume = _Proc(name, path), _Vol()
+
+
+_saved_mx = (_mixer._sessions, _mixer.appicons.ensure)
+_mixer._sessions = lambda: [_Sess("game.exe", None), _Sess("chrome.exe", r"C:\chrome.exe")]
+_mixer.appicons.ensure = lambda exe: "icon.png" if exe else None
+_rows = {s.key: s.icon for s in _mixer.list_sessions()}
+check("the elevated one is listed, with a letter for an icon", _rows,
+      {"game.exe": None, "chrome.exe": "icon.png"})
+_mixer._sessions, _mixer.appicons.ensure = _saved_mx
+
+# With every output disabled the meter used to rebind on every tick, and each
+# attempt made a new device enumerator in the audio service.
+print("\nNo output device: the meter waits instead of hammering")
+from pycaw.pycaw import AudioUtilities as _AU  # noqa: E402
+
+_spk = []
+_saved_b = (_dev.default_id, _dev.calls_default_id, _AU.GetSpeakers)
+_dev.default_id = lambda is_output=True, max_age=None: None
+_dev.calls_default_id = lambda is_output=False: None
+_AU.GetSpeakers = staticmethod(lambda: _spk.append(1) or (_ for _ in ()).throw(OSError("no device")))
+_m = Meter()
+try:
+    _m._bind()
+except OSError:
+    pass
+check("no default output: the speakers are not asked for", _spk, [])
+_dev.default_id, _dev.calls_default_id, _AU.GetSpeakers = _saved_b
+
+import threading as _th  # noqa: E402
+import time as _time  # noqa: E402
+
+_binds = []
+_m = Meter(interval=0.01)
+_m._bind = lambda: _binds.append(1)
+_m._watch = lambda: None
+_t_run = _th.Thread(target=_m.run, daemon=True)
+_t_run.start()
+_time.sleep(0.4)
+_m.stop()
+_t_run.join(2)
+check("unbound, it tries about once a second, not every tick", len(_binds) <= 2, True)
+check("and the first tick still binds", len(_binds) >= 1, True)
+
+# Two presses of the update button used to download and run the installer twice.
+print("\nThe update button does not start a second download")
+import mas.updater as _upd_mod  # noqa: E402
+
+_started = []
+
+
+class _NoThread:
+    def __init__(self, *a, **kw):
+        pass
+
+    def start(self):
+        _started.append(1)
+
+
+_saved_thread = _upd_mod.threading.Thread
+_upd_mod.threading.Thread = _NoThread
+_u = _upd_mod.Updater(lambda: None, lambda: None)
+_u._found = {"version": "9.9.9", "url": "x", "signature": ""}
+_u.install()
+_u.install()
+_upd_mod.threading.Thread = _saved_thread
+check("the second press while downloading starts nothing", len(_started), 1)
+
+# A notch that came while the wheel card was ending found it still on and
+# queued nothing: the card stayed away for that notch.
+print("\nA notch at the very end of the wheel card brings it back")
+_ov = overlay_mod.Overlay()
+_ov._wheel_on = True
+_ov._wheel_at = 0.0           # the card's time is long up: the loop ends at once
+_ov._wheel_dirty = True       # but a notch has just come
+_ov._wheel()
+check("the card is queued again", _ov._queue.empty(), False)
+
+# The tray icon is changed by one thread only; the theme watch used to set it
+# directly from its own.
+print("\nThe theme change goes through the tray's queue")
+check("the theme watch does not touch the icon itself",
+      "self.icon.icon" in __import__("inspect").getsource(_tray.Tray._theme_poller), False)
+
 print(f"\npassed {_passed}, failed {_failed}")
 sys.exit(1 if _failed else 0)
 

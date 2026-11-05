@@ -95,6 +95,7 @@ DEFAULTS: dict[str, Any] = {
 class Config:
     def __init__(self):
         self._lock = threading.Lock()
+        self._save_lock = threading.Lock()
         self._data = dict(DEFAULTS)
         self.load()
 
@@ -131,13 +132,16 @@ class Config:
     def save(self) -> None:
         path = config_path()
         tmp = path.with_suffix(".json.tmp")
-        with self._lock:
-            data = dict(self._data)
-        try:
-            tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(path)  # write via a temp file: a crash leaves no broken config
-        except OSError:
-            _log.exception("settings were not saved")
+        # One at a time, from the snapshot to the rename: two saves from two
+        # threads shared the temp file, and the older snapshot could land last.
+        with self._save_lock:
+            with self._lock:
+                data = dict(self._data)
+            try:
+                tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                tmp.replace(path)  # write via a temp file: a crash leaves no broken config
+            except OSError:
+                _log.exception("settings were not saved")
 
     def get(self, key: str) -> Any:
         with self._lock:

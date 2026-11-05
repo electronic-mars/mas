@@ -68,6 +68,12 @@ class Updater:
         if not self._found:
             self._set(state="failed", detail="release")
             return self.state()
+        with self._lock:
+            # A second press while the first is still going would download and
+            # run the installer twice.
+            busy = self._state["state"] in ("downloading", "checking_file", "installing")
+        if busy:
+            return self.state()
         self._set(state="downloading", detail="", percent=0)
         threading.Thread(target=self._install, daemon=True, name="mas-update").start()
         return self.state()

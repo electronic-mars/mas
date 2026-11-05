@@ -381,6 +381,12 @@ class Overlay(threading.Thread):
         ptr = ctypes.c_void_p()
         bitmap = gdi32.CreateDIBSection(mem_dc, ctypes.byref(bmi), 0,
                                         ctypes.byref(ptr), None, 0)
+        if not bitmap or not ptr:
+            # Out of GDI handles: copying into a null pointer would take the
+            # process down, a missed card costs nothing.
+            gdi32.DeleteDC(mem_dc)
+            user32.ReleaseDC(None, screen_dc)
+            raise OSError("CreateDIBSection failed")
         ctypes.memmove(ptr, bits, len(bits))
         old = gdi32.SelectObject(mem_dc, bitmap)
         blend = _BLEND(AC_SRC_OVER, 0, alpha, AC_SRC_ALPHA)
@@ -463,6 +469,10 @@ class Overlay(threading.Thread):
                 user32.ShowWindow(self._hwnd, SW_HIDE)
         finally:
             self._wheel_on = False
+            # A notch that came while this card was ending found it still on
+            # and queued nothing: bring the card back for it.
+            if self._wheel_dirty and self._queue.empty():
+                self.wheel()
 
     def run(self) -> None:
         self._create()

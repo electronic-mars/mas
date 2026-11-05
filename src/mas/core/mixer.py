@@ -60,18 +60,22 @@ def list_sessions() -> list[Session]:
         name = _session_name(s)
         if name is None:
             continue
+        # The path is only for the icon. A game or a program running as
+        # administrator does not give it to an ordinary process; such an
+        # application used to vanish from the mixer, while its level was still
+        # measured by name — and the page, seeing a level with no row, fetched
+        # the list again on every tick. Now it gets a letter instead of an icon.
+        try:
+            exe = s.Process.exe() if s.Process else None
+        except Exception:
+            exe = None
         try:
             vol = s.SimpleAudioVolume
-            exe = s.Process.exe() if s.Process else None
             item = Session(key=name, name=pretty(name),
                            volume=round(vol.GetMasterVolume(), 3),
                            muted=bool(vol.GetMute()),
                            icon=appicons.ensure(exe))
         except Exception:
-            # Most often this is a game or a program running as administrator:
-            # the path to its file is not given to an ordinary process. Such an
-            # application simply disappears from the mixer, and without a log
-            # entry the reason cannot be established.
             _log.info("session %s skipped", name, exc_info=True)
             continue
         if item.key in seen:  # one application can hold several sessions

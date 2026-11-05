@@ -599,6 +599,7 @@ async function refreshMixer() {
 // the applications a moment after it stops being asked.
 const levelNow = new Map(), peakHeld = new Map();
 let levelsBusy = false;
+const missingAsked = new Set();   // levels with no row, the list already fetched for them
 
 function paintLine(row, target, t) {
   const key = row.dataset.kind === 'master' ? '' : row.dataset.key;
@@ -633,8 +634,15 @@ async function pollLevels() {
     if (count && known) count.textContent = t('playing_of').replace('{n}', sounding).replace('{m}', known);
     // An application that has just started making sound is not in the list
     // yet: fetch the list again rather than wait for the tab to be reopened.
+    // Once per newcomer: an application the list cannot show would otherwise
+    // have the list fetched again on every tick, for as long as it plays.
     const shown = new Set(mixerData.sessions.map((s) => s.key));
-    if (Object.keys(lv.apps).some((k) => !shown.has(k))) refreshMixer();
+    for (const k of missingAsked) if (!(k in lv.apps)) missingAsked.delete(k);
+    const missing = Object.keys(lv.apps).filter((k) => !shown.has(k) && !missingAsked.has(k));
+    if (missing.length) {
+      missing.forEach((k) => missingAsked.add(k));
+      await refreshMixer();
+    }
   } catch (e) { /* window is closing */ }
   levelsBusy = false;
 }
@@ -1282,7 +1290,13 @@ document.addEventListener('click', async (e) => {
   if (e.target.closest('[data-act="quit"]')) return void call('quit').catch(() => {});
 });
 
-document.addEventListener('change', async (e) => {
+document.addEventListener('change', (e) => onChange(e).catch(() => {
+  // Not saved: draw the page from the state we have, so the dropdown goes
+  // back to what is actually set instead of showing a choice that never took.
+  renderAll();
+}));
+
+async function onChange(e) {
   if (e.target.id === 'lang-select') {
     state = await call('set_setting', { key: 'language', value: e.target.value });
     // The file has to be here before anything is drawn in it. Without this the
@@ -1300,7 +1314,7 @@ document.addEventListener('change', async (e) => {
     state = await call('set_setting', { key: 'priority_player', value: e.target.value });
     renderAll();
   }
-});
+}
 
 // mixer sliders
 document.addEventListener('pointerdown', (e) => {

@@ -349,6 +349,7 @@ class App:
         self._wheel_rest = 0         # part of a wheel notch not yet turned into volume
         # USB dongle listener and the recognized headset name for the interface.
         self.dongle: Dongle | None = None
+        self._dongle_lock = threading.Lock()
         self._dongle_name: str | None = None
         self._dongle_usb: str | None = None
         # Last known headset state: None means we have not heard from it yet.
@@ -641,7 +642,16 @@ class App:
         return self.cfg.get("dongle_rules").get(f"{ids[0]:04X}:{ids[1]:04X}")
 
     def sync_dongle(self) -> None:
-        """Start or stop the dongle listener to match the current settings."""
+        """Start or stop the dongle listener to match the current settings.
+
+        Called from the job thread (the headset's device came back) and from
+        request threads (a setting changed, the wizard closed). Two at once
+        could each start a listener, and the one overwritten kept running with
+        nobody able to stop it."""
+        with self._dongle_lock:
+            self._sync_dongle()
+
+    def _sync_dongle(self) -> None:
         if self.dongle is not None:
             self.dongle.stop()
             self.dongle = None

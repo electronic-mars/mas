@@ -256,6 +256,10 @@ class Tray:
                 else:
                     self.icon.visible = False
                 _log.info("icon %s the tray", "into" if self._shown else "out of")
+        elif kind == "theme":
+            _, self._light, size = job
+            self.icon.icon = self._image(size)
+            _log.info("tray icon redrawn (light taskbar: %s, size: %s)", self._light, size)
         elif kind == "notify":
             _, message, title = job
             self.icon.notify(message, title)
@@ -439,15 +443,15 @@ class Tray:
 
     # --- taskbar theme -----------------------------------------
     def _theme_poller(self) -> None:
-        size = tray_icon_size()
+        light, size = self._light, tray_icon_size()
         while not self._stop.wait(2.0):
-            light, now = taskbar_is_light(), tray_icon_size()
+            now_light, now = taskbar_is_light(), tray_icon_size()
             # People change screen scaling on the fly, and then the tray starts
             # asking for another icon size — redraw it, otherwise it smears.
-            if light != self._light or now != size:
-                self._light, size = light, now
-                self.icon.icon = self._image(now)
-                _log.info("tray icon redrawn (light taskbar: %s, size: %s)", light, now)
+            # Through the queue like every other change of the icon.
+            if now_light != light or now != size:
+                light, size = now_light, now
+                self._queue.put(("theme", light, size))
 
     # --- lifecycle -----------------------------------------------
     def run(self) -> None:

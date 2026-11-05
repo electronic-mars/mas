@@ -17,6 +17,7 @@ _log = log.get("meter")
 # of the default has to happen equally often in both cases.
 WATCH_EVERY_S = 0.5     # how often we look for devices appearing
 REBIND_EVERY_S = 2.0    # how often we check whether the device changed
+UNBOUND_RETRY_S = 1.0   # how often we try again while bound to nothing
 IDLE_INTERVAL = 0.5     # the tick when the window is hidden: nobody sees the level
 # Applications come and go far less often than their level moves: the list of
 # sessions is re-read once a second, their meters every tick.
@@ -98,24 +99,28 @@ class Meter(threading.Thread):
         a knob that moves while the sound stays off only sends them hunting
         through the system settings.
         """
-        if self._vol is None:
+        # Taken once: the meter thread can drop or replace it between two
+        # lines here when the device changes under the wheel.
+        vol = self._vol
+        if vol is None:
             return
         value = max(0.0, min(1.0, float(value)))
-        self._vol.SetMasterVolumeLevelScalar(value, None)
+        vol.SetMasterVolumeLevelScalar(value, None)
         # Asked of the device, not of the snapshot: the snapshot is up to half
         # a second old, and a mute key pressed just before turning would be
         # missed — the one case this is here for.
-        if self._vol.GetMute():
-            self._vol.SetMute(False, None)
+        if vol.GetMute():
+            vol.SetMute(False, None)
         with self._lock:
             self._writes += 1
             self._snap["volume"] = round(value, 4)
             self._snap["muted"] = False
 
     def set_mute(self, muted: bool) -> None:
-        if self._vol is None:
+        vol = self._vol
+        if vol is None:
             return
-        self._vol.SetMute(bool(muted), None)
+        vol.SetMute(bool(muted), None)
         with self._lock:
             self._writes += 1
             self._snap["muted"] = bool(muted)
@@ -153,9 +158,10 @@ class Meter(threading.Thread):
     def set_input_mute(self, muted: bool) -> None:
         """Switch the default microphone off or on — through this thread's own
         object, like everything else here."""
-        if self._mic_vol is None:
+        vol = self._mic_vol
+        if vol is None:
             return
-        self._mic_vol.SetMute(bool(muted), None)
+        vol.SetMute(bool(muted), None)
         with self._lock:
             self._snap["mic_muted"] = bool(muted)
 
@@ -212,6 +218,12 @@ class Meter(threading.Thread):
         with self._lock:
             self._snap.update(mic_id=mic_id or "", mic_calls=devices.calls_default_id() or "")
         if dev_id == self._bound_id and self._vol is not None:
+            return
+        if dev_id is None:
+            # No output at all: every one disabled or unplugged. GetSpeakers
+            # below would only fail, and it makes a new device enumerator each
+            # time — the kind of rapid-fire work that has brought the audio
+            # service down before. The watch rebinds as soon as one appears.
             return
         if self._vol is not None:
             # The device being left, asked at the last moment: the tick is up to
@@ -298,6 +310,8 @@ class Meter(threading.Thread):
         live = {i for i, s in now.items() if s == devices.DEVICE_STATE_ACTIVE}
         before = {i for i, s in was.items() if s == devices.DEVICE_STATE_ACTIVE}
         added, removed = live - before, before - live
+        if added or removed:
+            self._rebind_now = True     # with no device bound, this is what brings one back
         if (added or removed) and self._on_devices_changed:
             self._on_devices_changed(added, removed)
         # Re-read here rather than on the next request thread — and only after
@@ -315,7 +329,8 @@ class Meter(threading.Thread):
         # violation. Caught with a trap.
         comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
         import time
-        elapsed = watched = bound = listed = 0.0
+        elapsed = watched = listed = 0.0
+        bound = -REBIND_EVERY_S     # the first tick binds at once
         try:
             while True:
                 step = IDLE_INTERVAL if self._idle.is_set() else self.interval
@@ -332,7 +347,11 @@ class Meter(threading.Thread):
                     self._presence = self._present = None
                     _log.warning("watching the devices broke down", exc_info=True)
                 try:
-                    if self._rebind_now or elapsed - bound >= REBIND_EVERY_S or self._vol is None:
+                    # Unbound, it tries again every UNBOUND_RETRY_S rather than
+                    # every tick: with no output device at all that would be ten
+                    # attempts a second for as long as it lasts.
+                    if (self._rebind_now or elapsed - bound >= REBIND_EVERY_S
+                            or (self._vol is None and elapsed - bound >= UNBOUND_RETRY_S)):
                         bound = elapsed
                         self._rebind_now = False
                         self._bind()
