@@ -3,6 +3,12 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+- seven more languages: Swedish, Hungarian, Romanian, Greek, Indonesian,
+  Vietnamese and Thai, twenty-two in all. A Windows set to one of them opens
+  the program in it on the first run, as with the others.
+
 ## 1.1.4
 
 - the mouse wheel over the tray icon turns the volume, two per cent a notch as

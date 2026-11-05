@@ -124,8 +124,9 @@ version for everyone else who owns one — but that press is yours to make.
 
 ## Languages
 
-Fifteen: English, Russian, Ukrainian, German, Spanish, French, Italian,
-Portuguese, Polish, Czech, Dutch, Turkish, Chinese, Japanese, Korean.
+Twenty-two: English, Russian, Ukrainian, German, Spanish, French, Italian,
+Portuguese, Polish, Czech, Dutch, Swedish, Hungarian, Romanian, Greek, Turkish,
+Indonesian, Vietnamese, Thai, Chinese, Japanese, Korean.
 
 English, Russian and Ukrainian are written by hand. The rest are machine
 translated and then checked — corrections are very welcome, and they are the

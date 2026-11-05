@@ -40,6 +40,8 @@ LANGUAGES = {
     "de": "Deutsch", "es": "Español", "fr": "Français", "it": "Italiano",
     "pt": "Português", "pl": "Polski", "cs": "Čeština", "nl": "Nederlands",
     "tr": "Türkçe", "zh": "中文", "ja": "日本語", "ko": "한국어",
+    "sv": "Svenska", "hu": "Magyar", "ro": "Română", "el": "Ελληνικά",
+    "id": "Bahasa Indonesia", "vi": "Tiếng Việt", "th": "ไทย",
 }
 # What the model must be told to call each language, in English.
 ENGLISH_NAMES = {
@@ -47,6 +49,8 @@ ENGLISH_NAMES = {
     "pt": "Portuguese (Brazilian usage)", "pl": "Polish", "cs": "Czech",
     "nl": "Dutch", "tr": "Turkish", "zh": "Simplified Chinese",
     "ja": "Japanese", "ko": "Korean",
+    "sv": "Swedish", "hu": "Hungarian", "ro": "Romanian", "el": "Greek",
+    "id": "Indonesian", "vi": "Vietnamese", "th": "Thai",
 }
 # Hand-written and never machine-translated.
 HAND_WRITTEN = ("en", "ru", "uk")

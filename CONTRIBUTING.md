@@ -2,8 +2,8 @@
 
 ## Fixing a translation
 
-This is the most useful thing you can do, and the easiest. Twelve of the fifteen
-languages were translated by machine and read over once — if something sounds
+This is the most useful thing you can do, and the easiest. Nineteen of the
+twenty-two languages were not written by a native speaker — if something sounds
 wrong in your language, it probably is.
 
 Every language is one file: `src/mas/ui/locales/<code>.json`.

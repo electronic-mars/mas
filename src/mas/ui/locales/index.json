@@ -32,6 +32,18 @@
     "name": "Português"
   },
   {
+    "code": "sv",
+    "name": "Svenska"
+  },
+  {
+    "code": "ro",
+    "name": "Română"
+  },
+  {
+    "code": "hu",
+    "name": "Magyar"
+  },
+  {
     "code": "tr",
     "name": "Türkçe"
   },
@@ -40,12 +52,28 @@
     "name": "Čeština"
   },
   {
+    "code": "id",
+    "name": "Bahasa Indonesia"
+  },
+  {
+    "code": "vi",
+    "name": "Tiếng Việt"
+  },
+  {
+    "code": "el",
+    "name": "Ελληνικά"
+  },
+  {
     "code": "ru",
     "name": "Русский"
   },
   {
     "code": "uk",
     "name": "Українська"
+  },
+  {
+    "code": "th",
+    "name": "ไทย"
   },
   {
     "code": "zh",

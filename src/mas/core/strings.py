@@ -3,7 +3,7 @@
 Everything drawn in the window takes its text from the page, which loads a
 locale file itself. But the tray menu, the notifications and the one dialog we
 ever show are put on screen by Python, and they used to be English for everyone —
-in a program that advertises fifteen languages, with the tray being the surface
+in a program that advertises twenty-two languages, with the tray being the surface
 people actually use.
 
 The same locale files serve both. English is kept loaded as the fallback, so a
