@@ -2,6 +2,7 @@
 
     python tools/demo/mas.py hero            one clip, into tools/demo/out/hero.mp4
     python tools/demo/mas.py all             hero, tour and compact
+    python tools/demo/mas.py shots           stills without the cursor, into tools/demo/out/shots/mas
     python tools/demo/mas.py pose [seconds]  stage and program only, for measuring
 
 MAS_DEMO=1 gives the program made-up devices, applications and player, every
@@ -108,7 +109,7 @@ def angle_point(c: Clip, centre: tuple[int, int], degrees: float, radius: float 
     return int(centre[0] + radius * math.sin(a)), int(centre[1] - radius * math.cos(a))
 
 
-def turn(c: Clip, centre: tuple[int, int], seconds: float = 1.3) -> None:
+def turn(c: Clip, centre: tuple[int, int], seconds: float = 1.3, back: bool = True) -> None:
     """The knob from 21 to 100 and back, by its rim.
 
     It follows the angle of the hand from where it was taken: 0 at -135
@@ -119,7 +120,7 @@ def turn(c: Clip, centre: tuple[int, int], seconds: float = 1.3) -> None:
     start, end = -135 + 2.7 * 21, 135 + 6     # a little past the stop, within its slack
     c.move(*angle_point(c, centre, start), 0.5)
     c.down()
-    for a0, a1 in ((start, end), (end, start)):
+    for a0, a1 in ((start, end), (end, start))[:2 if back else 1]:
         steps = int(seconds * 120)
         for i in range(1, steps + 1):
             t = i / steps
@@ -201,6 +202,80 @@ def compact(c: Clip, data: Path) -> None:
 CLIPS = {"hero": hero, "tour": tour, "compact": compact}
 
 
+def rounded(png: Path) -> None:
+    """The corners outside the window are the desktop behind it: made transparent.
+    Windows 11 rounds a window by 8 px at 100 %, 9 here at 125 %; drawn at 4x for a smooth edge."""
+    from PIL import Image, ImageDraw
+    im = Image.open(png).convert("RGBA")
+    mask = Image.new("L", (im.width * 4, im.height * 4), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, mask.width - 1, mask.height - 1), 36, fill=255)
+    im.putalpha(mask.resize(im.size, Image.LANCZOS))
+    im.save(png, optimize=True)
+
+
+def shots() -> None:
+    """Stills for the READMEs and the site, into tools/demo/out/shots/mas: the
+    same scenes as the clips, taken from the screen itself without the cursor,
+    which rests on the title before each one so nothing wears a hover."""
+    to = OUT / "shots/mas"
+    data = start_demo()
+    try:
+        hwnd = open_window(data)
+        c = Clip(0, 0, 0, 0, to / "unused.mp4")
+        c.x, c.y, c.w, c.h = bounds(hwnd)
+
+        def snap(name: str, settle: float = 0.8) -> None:
+            c.place(*PARK)
+            c.wait(settle)
+            c.snap(to / f"{name}.png")
+            rounded(to / f"{name}.png")
+
+        c.place(*PARK)
+        c.click()                         # the first press after the window came forward was lost
+        c.wait(0.8)
+        c.move(*MIXER, 0.4)
+        c.click()
+        c.wait(1.0)
+        c.move(*GAME, 0.3)
+        c.down()
+        c.move(SLIDER_END, GAME[1], 0.6)
+        c.up()
+        snap("mixer")                     # one program at 100, the rest at 21
+        c.place(*DEVICES)
+        c.click()
+        c.wait(1.0)
+        c.place(*HEADPHONES_ROW)
+        c.click()
+        snap("switch", 1.2)               # the card saying where the sound went
+        c.wait(6.0)                       # until the card has gone
+        turn(c, KNOB, 1.0, back=False)
+        snap("devices")                   # the headphones at 100
+        headset(data, True)
+        c.wait(7.0)                       # the sound and the microphone move; the card comes and goes
+        snap("headset")
+        headset(data, False)
+        c.wait(3.0)
+        c.place(*SETTINGS)
+        c.click()
+        c.wait(1.0)
+        c.place(*LIST)
+        c.wheel(-20, 1.0)
+        c.wait(0.5)
+        c.place(*LIGHT)
+        c.click()
+        snap("light", 1.5)
+        c.place(*MATCH)
+        c.click()
+        c.wait(1.0)
+        c.place(*COMPACT)
+        c.click()
+        c.wait(1.5)
+        c.x, c.y, c.w, c.h = bounds(hwnd)
+        snap("compact")                   # the headphones still at 100
+    finally:
+        stop_demo(data)
+
+
 def record(name: str) -> None:
     data = start_demo()
     try:
@@ -241,6 +316,10 @@ def main() -> int:
                 time.sleep(float(sys.argv[2]) if len(sys.argv) > 2 else 120)
             finally:
                 stop_demo(data)
+            return 0
+        if what == "shots":
+            shots()
+            print("stills in", OUT / "shots/mas", flush=True)
             return 0
         for name in (CLIPS if what == "all" else [what]):
             record(name)

@@ -93,6 +93,18 @@ class Clip:
             self.stage.terminate()
             self.stage = None
 
+    def snap(self, out: Path) -> None:
+        """One frame of the stage as it is now, lossless and without the cursor:
+        a still for a README or the site, not a frame cut from a recording."""
+        out.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+             "-f", "gdigrab", "-draw_mouse", "0",
+             "-offset_x", str(self.x), "-offset_y", str(self.y),
+             "-video_size", f"{self.w}x{self.h}", "-i", "desktop",
+             "-frames:v", "1", "-pix_fmt", "rgb24", str(out)],
+            check=True)
+
     # --- the hand -------------------------------------------------------------
     def at(self, sx: int, sy: int) -> tuple[int, int]:
         """A point on the stage, in screen pixels."""
