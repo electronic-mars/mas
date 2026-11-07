@@ -3,11 +3,26 @@
 One section per release, newest first. Version numbers follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.2.0
 
 - seven more languages: Swedish, Hungarian, Romanian, Greek, Indonesian,
   Vietnamese and Thai, twenty-two in all. A Windows set to one of them opens
-  the program in it on the first run, as with the others.
+  the program in it on the first run, as with the others;
+- a game or a program running as administrator shows up in the mixer, with a
+  letter for an icon. It used to be left out, and the mixer then asked for
+  the list again several times a second for as long as it played;
+- with every output device switched off or unplugged, the program waits
+  quietly for one to come back instead of asking Windows ten times a second;
+- the "playing 0 of 6" line above the mixer is gone: the level line under
+  each application already shows which ones play, and in Ukrainian the "з"
+  read as the digit 3;
+- About: "Developer website" in place of the GitHub button, and "Support the
+  project" leads to the support page of that site;
+- smaller fixes: settings are saved one at a time; the headset receiver is
+  never listened to twice; the tray icon is redrawn for a new theme from one
+  thread only; a notch at the very end of the wheel card brings it back; a
+  second press of Install does not download the update twice; a language or
+  device picked from a list that could not be saved shows what is really set.
 
 ## 1.1.4
 
