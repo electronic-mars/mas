@@ -149,12 +149,12 @@ Fixing a translation is the easiest and most useful thing to do — see
 [CONTRIBUTING.md](CONTRIBUTING.md), which also explains how to get a wireless
 headset added.
 
-## Support the project
+## Ways to say thanks
 
-The program is free and will stay free. If it saved you some time and you want
-to say thanks, the ways to do it are on the
-[developer's website](https://electronic-mars.github.io/#support) — pick
-whatever is easiest for you. It buys time to keep working on it.
+If one of my programs saved you some time and you want to say thanks, pick
+whatever is easiest for you. It buys time to keep working on them.
+
+**[Ways to say thanks →](https://electronic-mars.github.io/#support)**
 
 ## Privacy
 
