@@ -3,7 +3,7 @@
 A tray utility for Windows that switches audio between speakers and
 headphones with one click on the tray icon.
 
-![Devices](docs/screens/01-devices-dark.png)
+![Switching to the headphones, the volume from 21 to 100 and back, then a wireless headset taking the sound and the microphone when it is switched on and giving them back when it is switched off](docs/demo/hero.gif)
 
 ## What it does
 
@@ -24,9 +24,15 @@ explicit check for a newer release.
 
 ## Screenshots
 
-| Mixer | Settings | About |
+| The mixer and the themes | The compact window |
+|---|---|
+| ![Each application's volume from 21 to 100 and back, then the light, dark and system themes](docs/demo/tour.gif) | ![The compact window: the volume from 21 to 100 and back, the sound muted and back on](docs/demo/compact.gif) |
+
+| A headset switched on | The mixer | The light theme |
 |---|---|---|
-| ![](docs/screens/04-mixer-dark.png) | ![](docs/screens/06-settings-dark.png) | ![](docs/screens/17-about-dark.png) |
+| ![A wireless headset switched on has taken the sound and the microphone](docs/demo/headset.png) | ![The volume mixer: one program at 100, the others at 21](docs/demo/mixer.png) | ![The settings in the light theme](docs/demo/light.png) |
+| **The volume at 100** | **The card after a switch** | **The compact window** |
+| ![The devices page with the knob turned to 100](docs/demo/devices.png) | ![The card that shows where the sound went after a switch](docs/demo/switch.png) | ![The compact window: the knob, the player and mute](docs/demo/compact.png) |
 
 Light theme, the welcome screen and the rest are in [docs/screens](docs/screens).
 

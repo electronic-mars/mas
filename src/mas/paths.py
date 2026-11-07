@@ -28,7 +28,17 @@ def icons_dir() -> Path:
 
 def data_dir() -> Path:
     """%LOCALAPPDATA%\\MasterAudioSwitcher — settings survive a program update."""
-    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    if os.environ.get("MAS_DEMO") == "1":
+        # The demo (core/demo.py) keeps its settings and its log in a folder of
+        # its own. Decided here, where every path comes from: the log opens
+        # its file the moment the first module is imported, before the demo
+        # could move anything, and wrote into the real one.
+        if not os.environ.get("MAS_DEMO_DATA"):
+            import tempfile
+            os.environ["MAS_DEMO_DATA"] = tempfile.mkdtemp(prefix="mas-demo-")
+        base = os.environ["MAS_DEMO_DATA"]
+    else:
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     d = Path(base) / APP_NAME
     d.mkdir(parents=True, exist_ok=True)
     return d

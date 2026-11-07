@@ -11,7 +11,7 @@ import logging
 
 from . import __version__, log
 from .bridge import PROTOCOL, Bridge
-from .core import devices, mixer, startup
+from .core import demo, devices, mixer, startup
 from .core.config import Config
 from .core.dongle import KNOWN as KNOWN_DONGLES
 from .core.dongle import Dongle
@@ -1332,6 +1332,8 @@ def main() -> int:
     # not given back by a manual collection either — that is, there is no price
     # at all.
     gc.disable()
+    if demo.ON:
+        demo.install()      # before the log and the settings: both go to its own folder
     log.setup()
     # Before anything measures the screen. pywebview calls exactly this when it
     # starts the window (platforms/winforms.py), and until then Windows lies to

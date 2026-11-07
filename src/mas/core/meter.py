@@ -28,6 +28,19 @@ SESSIONS_EVERY_S = 1.0
 SESSIONS_WANTED_S = 1.5
 
 
+def _open(output: bool):
+    """The volume and the meter interfaces of the default speakers or microphone."""
+    from comtypes import CLSCTX_ALL, POINTER, cast
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, IAudioMeterInformation
+
+    dev = AudioUtilities.GetSpeakers() if output else AudioUtilities.GetMicrophone()
+    raw = dev._dev if hasattr(dev, "_dev") else dev
+    return (cast(raw.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None),
+                 POINTER(IAudioEndpointVolume)),
+            cast(raw.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None),
+                 POINTER(IAudioMeterInformation)))
+
+
 class Meter(threading.Thread):
     def __init__(self, interval: float = 0.1, on_devices_changed=None,
                  on_default_changed=None, on_mute_changed=None):
@@ -166,21 +179,13 @@ class Meter(threading.Thread):
             self._snap["mic_muted"] = bool(muted)
 
     def _bind_mic(self, mic_id: str | None) -> None:
-        from comtypes import CLSCTX_ALL, POINTER, cast
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, IAudioMeterInformation
-
         if mic_id == self._mic_id and (self._mic_vol is not None or mic_id is None):
             return
         self._mic_vol = self._mic_meter = None
         self._mic_id = mic_id
         if mic_id is None:
             return                      # no microphone at all: nothing to show
-        dev = AudioUtilities.GetMicrophone()
-        raw = dev._dev if hasattr(dev, "_dev") else dev
-        self._mic_vol = cast(raw.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None),
-                             POINTER(IAudioEndpointVolume))
-        self._mic_meter = cast(raw.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None),
-                               POINTER(IAudioMeterInformation))
+        self._mic_vol, self._mic_meter = _open(output=False)
 
     def set_idle(self, idle: bool) -> None:
         """The window is hidden — nobody sees the level, we poll five times less
@@ -199,9 +204,6 @@ class Meter(threading.Thread):
 
     # --- internals ------------------------------------------------------
     def _bind(self) -> None:
-        from comtypes import CLSCTX_ALL, POINTER, cast
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, IAudioMeterInformation
-
         from . import devices
 
         # Read fresh here, in this thread, so that everybody else can take the
@@ -233,12 +235,7 @@ class Meter(threading.Thread):
                 self._last_out = (self._bound_id, bool(self._vol.GetMute()))
             except Exception:
                 pass
-        dev = AudioUtilities.GetSpeakers()
-        raw = dev._dev if hasattr(dev, "_dev") else dev
-        self._vol = cast(raw.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None),
-                         POINTER(IAudioEndpointVolume))
-        self._meter = cast(raw.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None),
-                           POINTER(IAudioMeterInformation))
+        self._vol, self._meter = _open(output=True)
         self._bound_id = dev_id
         self.ready.set()
         name = ""
