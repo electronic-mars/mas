@@ -32,3 +32,7 @@ crash.log
 
 # Demo recordings, raw and encoded (tools/demo)
 tools/demo/out/
+
+# The Store package of a release: the release workflow builds it, and it
+# weighs 26 MB
+docs/store/*/package/
