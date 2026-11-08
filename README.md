@@ -2,8 +2,8 @@
 
 A tray utility for Windows that moves the sound for you. Turn your headphones on
 and the sound goes to them, the microphone too; turn them off and both come back.
-It works even with a wireless headset on a USB dongle, which Windows itself does
-not notice. Anything else is one click on the tray icon.
+It works even with a wireless headset on a USB dongle: Windows does not notice it
+switching on, the program does. Anything else is one click on the tray icon.
 
 ![Switching to the headphones, the volume from 21 to 100 and back, then a wireless headset taking the sound and the microphone when it is switched on and giving them back when it is switched off](docs/demo/hero.gif)
 
