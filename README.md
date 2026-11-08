@@ -1,23 +1,28 @@
 # Master Audio Switcher
 
-A tray utility for Windows that switches audio between speakers and
-headphones with one click on the tray icon.
+A tray utility for Windows that moves the sound for you. Turn your headphones on
+and the sound goes to them, the microphone too; turn them off and both come back.
+It works even with a wireless headset on a USB dongle, which Windows itself does
+not notice. Anything else is one click on the tray icon.
 
 ![Switching to the headphones, the volume from 21 to 100 and back, then a wireless headset taking the sound and the microphone when it is switched on and giving them back when it is switched off](docs/demo/hero.gif)
 
 ## What it does
 
-- **One click on the tray icon** cycles through the devices you marked.
-- **Priority device.** The moment a chosen device appears, sound moves to it.
-  When it goes away, sound returns to where it was.
+- **Automatic switching.** Pick your headphones once. The moment they turn on,
+  sound moves to them; when they turn off, it goes back to where it was. No click
+  at all.
 - **Wireless headsets that Windows cannot see.** A headset on a USB dongle keeps
   its audio endpoint alive whether it is powered on or off, so Windows never
   reports the change. Master Audio Switcher reads the dongle's own status report
-  over HID — read-only, nothing is ever written to the device.
+  over HID — read-only, nothing is ever written to the device — so automatic
+  switching works with them too.
+- **One click on the tray icon** switches by hand, cycling through the devices
+  you marked.
+- **A microphone follows its headset**, and comes back when the sound does.
 - **Volume mixer** with per-application levels.
 - **Media keys** for the player that is actually in front.
 - **A global hotkey** that works over a fullscreen game.
-- **A microphone follows its headset**, and comes back when you switch away.
 
 Nothing is sent anywhere. No telemetry, no accounts, no network calls except an
 explicit check for a newer release.
