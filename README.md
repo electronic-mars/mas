@@ -12,9 +12,9 @@ switching on, the program does. Anything else is one click on the tray icon.
 - **Automatic switching.** Pick your headphones once. The moment they turn on,
   sound moves to them; when they turn off, it goes back to where it was. No click
   at all.
-- **Wireless headsets that Windows cannot see.** A headset on a USB dongle keeps
-  its audio endpoint alive whether it is powered on or off, so Windows never
-  reports the change. Master Audio Switcher reads the dongle's own status report
+- **Wireless headsets on a USB dongle.** The dongle keeps the headset's audio
+  endpoint alive whether it is powered on or off, so Windows never reports the
+  change. Master Audio Switcher reads the dongle's own status report
   over HID — read-only, nothing is ever written to the device — so automatic
   switching works with them too.
 - **One click on the tray icon** switches by hand, cycling through the devices
